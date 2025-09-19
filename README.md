@@ -15,6 +15,9 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Vendor Management](#vendor-management)
   - [Inventory Management](#inventory-management)
   - [Address Management](#address-management)
+  - [Category Management](#category-management)
+  - [Subcategory Management](#subcategory-management)
+  - [Product Management](#product-management)
 - [Data Models](#data-models)
   - [Entity Relationship Diagram](#entity-relationship-diagram)
   - [Core Entities](#core-entities)
@@ -25,6 +28,10 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
     - [Order Entity](#order-entity)
     - [OrderItem Entity](#orderitem-entity)
     - [PreOrder Entity](#preorder-entity)
+    - [Category Entity](#category-entity)
+    - [Subcategory Entity](#subcategory-entity)
+    - [Product Entity](#product-entity)
+    - [Banner Entity](#banner-entity)
 - [Business Logic](#business-logic)
   - [Order Processing Flow](#order-processing-flow)
   - [Payment Integration](#payment-integration)
@@ -35,6 +42,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Medicine Service](#medicine-service)
   - [User Service](#user-service)
   - [Vendor Service](#vendor-service)
+  - [Main Service](#main-service)
 - [Repository Layer](#repository-layer)
   - [Custom Queries](#custom-queries)
   - [Relationship Management](#relationship-management)
@@ -46,6 +54,9 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Error Handling](#error-handling)
 - [Security Considerations](#security-considerations)
 - [Setup and Installation](#setup-and-installuration)
+  - [Prerequisites](#prerequisites)
+  - [Database Setup](#database-setup)
+  - [Installation Steps](#installation-steps)
 - [Configuration](#configuration)
   - [Database Configuration](#database-configuration)
   - [Connection Pool Settings](#connection-pool-settings)
@@ -64,6 +75,10 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Google Cloud Deployment](#google-cloud-deployment)
 - [Performance Considerations](#performance-considerations)
 - [Scalability](#scalability)
+- [New Features](#new-features)
+  - [Shop by Category](#shop-by-category)
+  - [Vendor Delivery Information](#vendor-delivery-information)
+  - [Banner Management](#banner-management)
 
 ## Overview
 
@@ -75,6 +90,7 @@ Trego is a medicine delivery platform that enables users to:
 - Track order status and history
 - Handle pre-orders for out-of-stock items
 - Process payments through Razorpay integration
+- Shop by category (new feature)
 
 The system follows a microservices-inspired architecture with clearly separated layers:
 - **Controller Layer**: REST API endpoints that handle HTTP requests and responses
@@ -95,7 +111,7 @@ The system follows a microservices-inspired architecture with clearly separated 
 - **Google Cloud SQL MySQL Socket Factory**: For secure connection to Google Cloud SQL instances
 - **Maven 3.8+**: Build automation tool with dependency management
 - **Swagger/OpenAPI (SpringDoc 2.2.0)**: API documentation with interactive testing interface
-- **Lombok**: Boilerplate code reduction with annotations like `@Data`, `@Getter`, `@Setter`
+- **Lombok 1.18.30**: Boilerplate code reduction with annotations like `@Data`, `@Getter`, `@Setter`
 - **Gson 2.8.8 & Jackson 2.13.3**: JSON processing libraries for serialization/deserialization
 - **Apache Commons Lang 3**: Utility library for string manipulation and other common operations
 - **JUnit 5**: Testing framework with parameterized tests and assertions
@@ -115,7 +131,8 @@ src/main/java/com/trego/
 │   ├── PreOrderController.java   # Pre-order management endpoints
 │   ├── StockController.java      # Inventory management endpoints
 │   ├── UserController.java       # User management endpoints
-│   └── VendorController.java     # Vendor management endpoints
+│   ├── SubcategoryController.java # Subcategory management endpoints
+│   └── ProductController.java    # Product management endpoints
 ├── dao/                          # Data access layer
 │   ├── entity/                   # JPA entities with relationships
 │   │   ├── Address.java          # User address entity with geolocation
@@ -127,7 +144,9 @@ src/main/java/com/trego/
 │   │   ├── PreOrder.java         # Pre-order entity for complex transactions
 │   │   ├── Stock.java            # Inventory entity with pricing
 │   │   ├── User.java             # User entity with profile information
-│   │   └── Vendor.java           # Vendor entity with business details
+│   │   ├── Vendor.java           # Vendor entity with business details
+│   │   ├── Subcategory.java      # Subcategory entity
+│   │   └── Product.java          # Product entity
 │   └── impl/                     # Repository implementations extending JpaRepository
 │       ├── AddressRepository.java
 │       ├── BannerRepository.java
@@ -138,7 +157,9 @@ src/main/java/com/trego/
 │       ├── PreOrderRepository.java
 │       ├── StockRepository.java
 │       ├── UserRepository.java
-│       └── VendorRepository.java
+│       ├── VendorRepository.java
+│       ├── SubcategoryRepository.java
+│       └── ProductRepository.java
 ├── dto/                          # Data transfer objects for API communication
 │   ├── response/                 # Response DTOs with @JsonInclude annotations
 │   │   ├── CancelOrderResponseDTO.java
@@ -163,7 +184,9 @@ src/main/java/com/trego/
 │   ├── StockDTO.java
 │   ├── SubstituteDTO.java
 │   ├── UserDTO.java
-│   └── VendorDTO.java
+│   ├── VendorDTO.java
+│   ├── SubcategoryDTO.java
+│   └── ProductDTO.java
 ├── enums/                        # Enumerations for type safety
 │   └── AddressType.java          # Address type enumeration
 ├── exception/                    # Custom exceptions
@@ -178,7 +201,9 @@ src/main/java/com/trego/
 │   │   ├── PreOrderServiceImpl.java
 │   │   ├── StockServiceImpl.java
 │   │   ├── UserServiceImpl.java
-│   │   └── VendorServiceImpl.java
+│   │   ├── VendorServiceImpl.java
+│   │   ├── SubcategoryServiceImpl.java
+│   │   └── ProductServiceImpl.java
 │   ├── IAddressService.java      # Service interfaces with method declarations
 │   ├── IMainService.java
 │   ├── IMasterService.java
@@ -187,9 +212,12 @@ src/main/java/com/trego/
 │   ├── IPreOrderService.java
 │   ├── IStockService.java
 │   ├── IUserService.java
-│   └── IVendorService.java
+│   ├── IVendorService.java
+│   ├── ISubcategoryService.java
+│   └── IProductService.java
 └── utils/                        # Utility classes and constants
-    └── Constants.java            # Application-wide constants
+    ├── Constants.java            # Application-wide constants
+    └── DataSeeder.java           # Data seeder for initial categories
 ```
 
 ## Core Features
@@ -231,9 +259,15 @@ src/main/java/com/trego/
    - Test environment configuration for development
 
 7. **Marketing Features**
-   - Banner management for promotional campaigns
+   - Banner management for promotional campaigns with proper URL processing
    - Category-based medicine organization
    - Substitute medicine suggestions for better customer experience
+   - Vendor delivery time and review information
+
+8. **Shop by Category** (New Feature)
+   - Filter medicines by predefined categories
+   - Category-based search functionality
+   - Automatic category seeding for initial setup
 
 ## API Endpoints
 
@@ -256,6 +290,9 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
 - `GET /medicines` - Retrieve all medicines with stock and vendor information
 - `GET /medicines/{id}` - Get a specific medicine by ID with detailed information
 - `GET /medicines/search` - Search medicines by text with pagination and vendor filtering
+- `GET /medicines/category/{category}` - Get medicines by category
+- `GET /medicines/category/{category}/page` - Get medicines by category with pagination
+- `GET /medicines/search/category/{category}` - Search medicines by name within a category
 
 ### Order Management
 - `POST /orders` - Place a new order (creates Razorpay order and pre-order)
@@ -271,14 +308,24 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
 - `GET /stocks` - Retrieve stock information (limited implementation)
 
 ### Master Data
-- `GET /masters/banners` - Retrieve banner information for homepage
-- `GET /masters/categories` - Retrieve medicine categories for navigation
+- `GET /loadAll` - Retrieve all master data including banners, vendors, and categories
+- `GET /categories` - Retrieve medicine categories for navigation
+
+### Category Management
+- `GET /categories` - Retrieve all categories by type
+
+### Subcategory Management
+- `GET /api/subcategories` - Retrieve all subcategories
+- `GET /api/subcategories/category/{categoryId}` - Retrieve subcategories by category ID
+
+### Product Management
+- `GET /api/subcategories/{id}/products` - Retrieve products by subcategory ID
 
 ## Data Models
 
 ### Entity Relationship Diagram
 
-```mermaid
+```
 erDiagram
     USER ||--o{ ADDRESS : has
     USER ||--o{ ORDER : places
@@ -290,6 +337,9 @@ erDiagram
     ORDER ||--o{ ORDERITEM : contains
     PREORDER ||--o{ ORDER : generates
     USER ||--o{ ADDRESS : "owns"
+    CATEGORY ||--o{ MEDICINE : classifies
+    CATEGORY ||--o{ SUBCATEGORY : contains
+    SUBCATEGORY ||--o{ PRODUCT : contains
 ```
 
 ### Core Entities
@@ -348,6 +398,7 @@ The Medicine entity contains comprehensive information about medicines including
 - `countryOfOrigin`: Country of origin (String)
 - `questionAnswers`: FAQ section (String)
 - `photo1` to `photo4`: Medicine image URLs (String)
+- `category`: Category for "Shop by Category" feature (String)
 
 **Relationships:**
 - One-to-many relationship with [Stock](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Stock.java#L13-L32) entities (mapped by the `medicine` field)
@@ -369,6 +420,8 @@ The Vendor entity represents a pharmacy or seller with business information.
 - `lat`: Latitude for geolocation (String)
 - `lng`: Longitude for geolocation (String)
 - `address`: Physical address (String)
+- `deliveryTime`: Estimated delivery time (String)
+- `reviews`: Vendor reviews and ratings (String)
 
 **Annotations:**
 - `@Data`: Lombok annotation for boilerplate code generation
@@ -385,7 +438,7 @@ The Stock entity represents inventory information for medicines at vendors.
 - `expiryDate`: Expiry date (String)
 
 **Relationships:**
-- Many-to-one relationship with [Medicine](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Medicine.java#L14-L52) entity (with `@JoinColumn`)
+- Many-to-one relationship with [Medicine](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Medicine.java#L14-L53) entity (with `@JoinColumn`)
 - Many-to-one relationship with [Vendor](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Vendor.java#L12-L26) entity (with `@JoinColumn`)
 - `@JsonIgnore` annotation on medicine relationship to prevent circular references
 
@@ -440,7 +493,7 @@ The OrderItem entity represents individual items within an order.
 
 **Relationships:**
 - Many-to-one relationship with [Order](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Order.java#L21-L92) entity (with cascade operations)
-- Many-to-one relationship with [Medicine](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Medicine.java#L14-L52) entity
+- Many-to-one relationship with [Medicine](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Medicine.java#L14-L53) entity
 
 **Annotations:**
 - `@Data`: Lombok annotation for boilerplate code generation
@@ -470,6 +523,70 @@ The PreOrder entity represents pre-order information for complex multi-vendor or
 **Annotations:**
 - `@Data`: Lombok annotation for boilerplate code generation
 - `@Entity(name = "preorders")`: JPA entity mapped to "preorders" table
+
+#### Category Entity
+The Category entity represents medicine categories for the "Shop by Category" feature.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `name`: Category name (String)
+- `logo`: Logo URL (String)
+- `type`: Category type (String)
+- `prescriptionRequired`: Whether prescription is required (String)
+- `createdBy`: Creator information (String)
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "categories")`: JPA entity mapped to "categories" table
+
+#### Subcategory Entity
+The Subcategory entity represents subcategories in the product catalog system.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `name`: Subcategory name (String)
+- `categoryId`: Reference to Category (Long)
+- `description`: Subcategory description (String)
+- `image`: Image URL (String)
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "subcategories")`: JPA entity mapped to "subcategories" table
+
+#### Product Entity
+The Product entity represents products in the product catalog system.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `name`: Product name (String)
+- `description`: Product description (String)
+- `price`: Product price (BigDecimal)
+- `tax`: Product tax (BigDecimal)
+- `subcategoryId`: Reference to Subcategory (Long)
+- `image`: Image URL (String)
+- `stock`: Available stock (Integer)
+
+**Computed Fields:**
+- `totalPrice`: Computed field (price + tax)
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "products")`: JPA entity mapped to "products" table
+- `@Transient`: For computed totalPrice field
+
+#### Banner Entity
+The Banner entity represents marketing banners for the homepage.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `logo`: Logo URL (String)
+- `bannerUrl`: URL to which the banner links (String)
+- `position`: Position of the banner (top/middle) (String)
+- `createdBy`: Creator information (String)
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "banner")`: JPA entity mapped to "banner" table
 
 ## Business Logic
 
@@ -583,7 +700,7 @@ The [OrderServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_bac
 
 ### Medicine Service
 
-The [MedicineServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/MedicineServiceImpl.java#L22-L128) class handles medicine catalog operations:
+The [MedicineServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/MedicineServiceImpl.java#L22-L150) class handles medicine catalog operations:
 
 1. **Medicine Retrieval**:
    - Retrieves all medicines with stock information
@@ -594,6 +711,11 @@ The [MedicineServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_
    - Text-based search with pagination
    - Vendor-specific filtering
    - Case-insensitive matching
+
+3. **Category-based Filtering** (New Feature):
+   - Retrieves medicines by category
+   - Supports pagination for category results
+   - Allows searching within categories
 
 ### User Service
 
@@ -611,6 +733,39 @@ The [UserServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_back
 
 The vendor service handles vendor-related operations including inventory management and medicine availability.
 
+### Subcategory Service
+
+The [SubcategoryServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/SubcategoryServiceImpl.java#L13-L43) class handles subcategory operations:
+
+1. **Subcategory Retrieval**:
+   - Retrieves all subcategories
+   - Retrieves subcategories by category ID
+
+### Product Service
+
+The [ProductServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/ProductServiceImpl.java#L12-L37) class handles product operations:
+
+1. **Product Retrieval**:
+   - Retrieves products by subcategory ID
+   - Calculates total price (price + tax) for each product
+
+### Main Service
+
+The [MainServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/MainServiceImpl.java#L12-L24) class handles main application operations:
+
+1. **Banner Retrieval**:
+   - Retrieves all banners by position (top/middle)
+   - Converts Banner entities to BannerDTOs with proper URL processing
+   - Processes banner images with base URLs for proper display
+
+2. **Vendor Information**:
+   - Retrieves vendor information with delivery time and reviews
+   - Processes vendor logos with base URLs for proper display
+   - Populates vendor medicines with proper image URLs
+
+3. **Category Retrieval**:
+   - Retrieves medicine categories for navigation
+
 ## Repository Layer
 
 ### Custom Queries
@@ -623,6 +778,17 @@ The repository layer extends JpaRepository and includes custom queries:
 
 2. **OrderRepository**:
    - Bulk update operations for order status and cancellation reasons
+
+3. **MedicineRepository** (Updated for Category Feature):
+   - Added methods for category-based filtering
+   - Added pagination support for category queries
+   - Added search within category functionality
+
+4. **SubcategoryRepository**:
+   - Added method to find subcategories by category ID
+
+5. **ProductRepository**:
+   - Added method to find products by subcategory ID
 
 ### Relationship Management
 
@@ -645,7 +811,12 @@ Request DTOs handle incoming data from API clients:
 Response DTOs handle outgoing data to API clients:
 - [OrderResponseDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/response/OrderResponseDTO.java#L11-L24): Order details with nested objects
 - [PreOrderResponseDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/response/PreOrderResponseDTO.java#L12-L20): Pre-order information
-- [MedicineWithStockAndVendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MedicineWithStockAndVendorDTO.java#L9-L20): Medicine information with inventory
+- [MedicineWithStockAndVendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MedicineWithStockAndVendorDTO.java#L9-L23): Medicine information with inventory
+- Updated DTOs to include category information
+- [SubcategoryDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/SubcategoryDTO.java#L5-L9): Subcategory information
+- [ProductDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/ProductDTO.java#L6-L12): Product information with computed total price
+- [BannerDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/BannerDTO.java#L3-L12): Banner information with proper URL processing
+- [VendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/VendorDTO.java#L3-L22): Vendor information with delivery time and reviews
 
 ## API Controllers
 
@@ -688,6 +859,13 @@ Controllers include basic error handling:
 - MySQL 8.0+ (or Google Cloud SQL)
 - IDE with Spring Boot support
 
+### Database Setup
+1. Install MySQL Server
+2. Create the database:
+   ```sql
+   CREATE DATABASE trego_db;
+   ```
+
 ### Installation Steps
 
 1. Clone the repository:
@@ -713,18 +891,17 @@ Controllers include basic error handling:
 ## Configuration
 
 ### Database Configuration
-The application is configured to connect to Google Cloud SQL MySQL database:
+The application is configured to connect to a local MySQL database:
 ```properties
-spring.datasource.url=jdbc:mysql://google/trego_db?cloudSqlInstance=trego-451604:us-central1:tregodbprod&socketFactory=com.google.cloud.sql.mysql.SocketFactory
+spring.datasource.url=jdbc:mysql://localhost:3306/trego_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 spring.datasource.username=root
-spring.datasource.password=trego@2024
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect
+spring.datasource.password=root
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 ```
 
-For local development, you can modify the URL to connect to a local MySQL instance:
+For Google Cloud SQL deployment:
 ```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/trego_db
+spring.datasource.url=jdbc:mysql://google/trego_db?cloudSqlInstance=trego-451604:us-central1:tregodbprod&socketFactory=com.google.cloud.sql.mysql.SocketFactory
 ```
 
 ### Connection Pool Settings
@@ -766,6 +943,7 @@ springdoc.swagger-ui.path=/swagger-ui.html
    - Primary key: `id`
    - Foreign key references: None
    - Referenced by: `stocks.medicine_id`, `order_items.medicine_id`
+   - New field: `category` for category classification
 
 4. **vendors** table:
    - Primary key: `id`
@@ -792,6 +970,26 @@ springdoc.swagger-ui.path=/swagger-ui.html
    - Foreign key: `user_id` references `users.id`
    - Referenced by: `orders.pre_order_id`
 
+9. **categories** table:
+   - Primary key: `id`
+   - Foreign key references: None
+   - Referenced by: None (category is stored as a string in medicines table)
+
+10. **subcategories** table:
+    - Primary key: `id`
+    - Foreign key: `category_id` references `categories.id`
+    - Referenced by: `products.subcategory_id`
+
+11. **products** table:
+    - Primary key: `id`
+    - Foreign key: `subcategory_id` references `subcategories.id`
+    - Referenced by: None
+
+12. **banners** table:
+    - Primary key: `id`
+    - Foreign key references: None
+    - Referenced by: None
+
 ### Indexing Strategy
 
 The database schema should include appropriate indexes for performance:
@@ -799,6 +997,8 @@ The database schema should include appropriate indexes for performance:
 - Foreign key indexes for join operations
 - Composite indexes for frequently queried columns
 - Full-text indexes for search functionality
+- Index on the `category` field in the `medicines` table for efficient category filtering
+- Index on `subcategory_id` in the `products` table for efficient product retrieval
 
 ## Testing
 
@@ -858,7 +1058,7 @@ The application is configured for Google Cloud SQL deployment:
 ## Performance Considerations
 
 1. **Database Optimization**:
-   - Proper indexing strategy
+   - Proper indexing strategy including index on category field
    - Query optimization with fetch joins
    - Connection pooling with HikariCP
 
@@ -881,3 +1081,82 @@ The application is configured for Google Cloud SQL deployment:
    - JVM tuning options
    - Database optimization
    - Memory management
+
+## New Features
+
+### Shop by Category
+
+The "Shop by Category" feature allows users to filter medicines by predefined categories. This feature includes:
+
+1. **Category Field in Medicine Entity**:
+   - Added a `category` field to the [Medicine](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Medicine.java#L14-L53) entity to classify medicines
+   - Updated [MedicineDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MedicineDTO.java#L11-L66) and [MedicineWithStockAndVendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MedicineWithStockAndVendorDTO.java#L9-L23) to include category information
+
+2. **New API Endpoints**:
+   - `GET /medicines/category/{category}` - Get all medicines in a specific category
+   - `GET /medicines/category/{category}/page` - Get medicines in a category with pagination
+   - `GET /medicines/search/category/{category}` - Search for medicines by name within a specific category
+
+3. **Data Seeding**:
+   - Automatic seeding of initial categories (Tablets, Syrups, Antibiotics) on application startup
+   - Seeding only occurs if no categories exist in the database
+
+4. **Repository Updates**:
+   - Added methods to [MedicineRepository](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/impl/MedicineRepository.java#L12-L32) for category-based queries
+   - Added pagination support for category queries
+
+5. **Service Layer Implementation**:
+   - Updated [IMedicineService](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/IMedicineService.java#L9-L22) interface with new category-based methods
+   - Implemented category filtering in [MedicineServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/MedicineServiceImpl.java#L22-L150)
+
+6. **Required Categories**:
+   - Tablets
+   - Syrups
+   - Antibiotics
+
+This feature is designed to be clean, reusable, and scalable for future categories. New categories can be added through the existing category management endpoints or by updating the data seeder.
+
+### Vendor Delivery Information
+
+The "Vendor Delivery Information" feature provides detailed delivery information for vendors. This feature includes:
+
+1. **Vendor Entity Updates**:
+   - Added fields for `deliveryTime` and `reviews` to the [Vendor](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Vendor.java#L12-L26) entity to store delivery information
+
+2. **Vendor DTO Updates**:
+   - Added fields for `deliveryTime` and `reviews` to the [VendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/VendorDTO.java#L3-L22) to transfer delivery information to the frontend
+
+3. **Service Layer Implementation**:
+   - Updated [MainServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/MainServiceImpl.java#L12-L24) to populate vendor delivery time and reviews fields
+   - Updated [VendorServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/VendorServiceImpl.java#L12-L26) to populate vendor delivery time and reviews fields
+   - Updated [PreOrderServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/PreOrderServiceImpl.java#L15-L73) to populate vendor delivery time and reviews fields
+
+This feature enhances the user experience by providing clear and detailed delivery information and reviews for each vendor.
+
+### Banner Management
+
+The "Banner Management" feature allows administrators to manage marketing banners for the homepage. This feature includes:
+
+1. **Banner Entity**:
+   - Added a [Banner](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Banner.java#L12-L24) entity to represent banners with fields for logo, banner URL, position, and creator information
+
+2. **Banner DTO**:
+   - Added a [BannerDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/BannerDTO.java#L3-L12) to properly transfer banner data to the frontend with processed URLs
+
+3. **Main DTO Updates**:
+   - Updated [MainDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MainDTO.java#L3-L15) to use BannerDTO instead of Banner entity for proper data transfer
+
+4. **Repository Updates**:
+   - Added [BannerRepository](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/impl/BannerRepository.java#L9-L13) with methods for banner queries
+
+5. **Service Layer Implementation**:
+   - Updated [MainServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/MainServiceImpl.java#L12-L24) to properly convert Banner entities to BannerDTOs with correct URL processing
+
+6. **API Endpoints**:
+   - Banners are exposed through the main endpoint: `GET /loadAll` which returns a [MainDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MainDTO.java#L3-L15) containing top and middle banners
+
+7. **Error Handling**:
+   - Proper error handling with appropriate HTTP status codes
+   - Exception logging for debugging purposes
+
+This feature provides a simple and effective way to manage marketing banners for the homepage with proper URL processing for display.
