@@ -143,8 +143,10 @@ public class PreOrderServiceImpl implements IPreOrderService {
                // cart.setAddress(vendor.getAddress());
                cart.setLat(vendor.getLat());
                cart.setLng(vendor.getLng());
-
-
+               cart.setDeliveryTime(vendor.getDeliveryTime());
+               cart.setReviews(vendor.getReviews());
+               cart.setDeliveryTime(vendor.getDeliveryTime());
+               cart.setReviews(vendor.getReviews());
                double totalCartValue = medicines.stream()
                        .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
                        .sum();
@@ -192,7 +194,10 @@ public class PreOrderServiceImpl implements IPreOrderService {
          // cart.setAddress(vendor.getAddress());
           cart.setLat(vendor.getLat());
           cart.setLng(vendor.getLng());
-
+          cart.setDeliveryTime(vendor.getDeliveryTime());
+          cart.setReviews(vendor.getReviews());
+          cart.setDeliveryTime(vendor.getDeliveryTime());
+          cart.setReviews(vendor.getReviews());
           return cart;
       }).collect(Collectors.toList());
 
