@@ -23,4 +23,6 @@ public class Vendor {
     private String lat;
     private String lng;
     private String address;
+    private String deliveryTime;
+    private String reviews;
 }

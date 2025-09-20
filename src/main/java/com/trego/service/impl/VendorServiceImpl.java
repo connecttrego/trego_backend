@@ -49,6 +49,13 @@ public class VendorServiceImpl implements IVendorService {
             }else{
                 vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL+ vendor.getLogo());
             }
+            vendorDTO.setGstNumber(vendor.getGistin());
+            vendorDTO.setLicence(vendor.getDruglicense());
+            vendorDTO.setAddress(vendor.getAddress());
+            vendorDTO.setLat(vendor.getLat());
+            vendorDTO.setLng(vendor.getLng());
+            vendorDTO.setDeliveryTime(vendor.getDeliveryTime());
+            vendorDTO.setReviews(vendor.getReviews());
             vendorDTOs.add(vendorDTO);
         }
         return  vendorDTOs;
@@ -70,7 +77,8 @@ public class VendorServiceImpl implements IVendorService {
         vendorDTO.setAddress(vendor.getAddress());
         vendorDTO.setLat(vendor.getLat());
         vendorDTO.setLng(vendor.getLng());
-
+        vendorDTO.setDeliveryTime(vendor.getDeliveryTime());
+        vendorDTO.setReviews(vendor.getReviews());
         List<StockDTO> stockDTOS = new ArrayList<>();
 
         // Create a Pageable object
