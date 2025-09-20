@@ -5,10 +5,7 @@ import com.trego.dao.entity.Medicine;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.entity.Vendor;
 import com.trego.dao.impl.*;
-import com.trego.dto.MainDTO;
-import com.trego.dto.MedicineDTO;
-import com.trego.dto.StockDTO;
-import com.trego.dto.VendorDTO;
+import com.trego.dto.*;
 import com.trego.service.IMainService;
 import com.trego.service.IMasterService;
 import com.trego.utils.Constants;
@@ -17,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class MainServiceImpl implements IMainService {
@@ -41,18 +39,36 @@ public class MainServiceImpl implements IMainService {
         MainDTO mainDTO = new MainDTO();
 
         List<Banner> topBanners = bannerRepository.findByPosition("top");
-        // Append base path using Java 8 Stream API
-        topBanners.stream()
-                .forEach(banner -> banner.setLogo(Constants.LOGO_BASE_URL + Constants.TOP_BASE_URL + banner.getLogo()));
+        // Convert Banner entities to BannerDTOs and append base path
+        List<BannerDTO> topBannerDTOs = topBanners.stream()
+                .map(banner -> {
+                    BannerDTO dto = new BannerDTO();
+                    dto.setId(banner.getId());
+                    dto.setLogo(Constants.LOGO_BASE_URL + Constants.TOP_BASE_URL + banner.getLogo());
+                    dto.setBannerUrl(banner.getBannerUrl());
+                    dto.setPosition(banner.getPosition());
+                    dto.setCreatedBy(banner.getCreatedBy());
+                    return dto;
+                })
+                .collect(Collectors.toList());
 
-
-        mainDTO.setTopBanners(topBanners);
+        mainDTO.setTopBanners(topBannerDTOs);
+        
         List<Banner> middleBanners = bannerRepository.findByPosition("middle");
-        // Append base path using Java 8 Stream API
-        middleBanners.stream()
-                .forEach(banner -> banner.setLogo(Constants.LOGO_BASE_URL + Constants.MIDDLE_BASE_URL + banner.getLogo()));
+        // Convert Banner entities to BannerDTOs and append base path
+        List<BannerDTO> middleBannerDTOs = middleBanners.stream()
+                .map(banner -> {
+                    BannerDTO dto = new BannerDTO();
+                    dto.setId(banner.getId());
+                    dto.setLogo(Constants.LOGO_BASE_URL + Constants.MIDDLE_BASE_URL + banner.getLogo());
+                    dto.setBannerUrl(banner.getBannerUrl());
+                    dto.setPosition(banner.getPosition());
+                    dto.setCreatedBy(banner.getCreatedBy());
+                    return dto;
+                })
+                .collect(Collectors.toList());
 
-        mainDTO.setMiddleBanners(middleBanners);
+        mainDTO.setMiddleBanners(middleBannerDTOs);
 
         List<VendorDTO> topOfflineVendors = new ArrayList<>();
         List<VendorDTO> topOnlineVendors = new ArrayList<>();
@@ -91,6 +107,8 @@ public class MainServiceImpl implements IMainService {
         vendorDTO.setAddress(vendor.getAddress());
         vendorDTO.setLat(vendor.getLat());
         vendorDTO.setLng(vendor.getLng());
+        vendorDTO.setDeliveryTime(vendor.getDeliveryTime());
+        vendorDTO.setReviews(vendor.getReviews());
         return vendorDTO;
     }
 
