@@ -39,16 +39,21 @@ public class VendorServiceImpl implements IVendorService {
     public List<VendorDTO> findVendorsByType(String type) {
         List<VendorDTO> vendorDTOs = new ArrayList<>();
 
-        List<Vendor>  vendors = vendorRepository.findByCategory(type); // This will fetch all vendors
+        // Remove category condition - fetch all vendors without filtering by type
+        List<Vendor>  vendors = vendorRepository.findAll(); // This will fetch all vendors
         for (Vendor vendor : vendors){
             VendorDTO vendorDTO = new VendorDTO();
             vendorDTO.setId(vendor.getId());
             vendorDTO.setName(vendor.getName());
-            if(vendor.getCategory().equalsIgnoreCase("retail")) {
-                vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL+ vendor.getLogo());
-            }else{
-                vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL+ vendor.getLogo());
-            }
+            // Remove the category-based URL logic
+            vendorDTO.setLogo(vendor.getLogo());
+            vendorDTO.setGstNumber(vendor.getGistin());
+            vendorDTO.setLicence(vendor.getDruglicense());
+            vendorDTO.setAddress(vendor.getAddress());
+            vendorDTO.setLat(vendor.getLat());
+            vendorDTO.setLng(vendor.getLng());
+            vendorDTO.setDeliveryTime(vendor.getDeliveryTime());
+            vendorDTO.setReviews(vendor.getReviews());
             vendorDTOs.add(vendorDTO);
         }
         return  vendorDTOs;
@@ -60,17 +65,15 @@ public class VendorServiceImpl implements IVendorService {
         Vendor vendor = vendorRepository.findById(id).orElse(null);
         vendorDTO.setId(vendor.getId());
         vendorDTO.setName(vendor.getName());
-        if(vendor.getCategory().equalsIgnoreCase("retail")) {
-            vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL+ vendor.getLogo());
-        }else{
-            vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL+ vendor.getLogo());
-        }
+        // Remove the category-based URL logic
+        vendorDTO.setLogo(vendor.getLogo());
         vendorDTO.setGstNumber(vendor.getGistin());
         vendorDTO.setLicence(vendor.getDruglicense());
         vendorDTO.setAddress(vendor.getAddress());
         vendorDTO.setLat(vendor.getLat());
         vendorDTO.setLng(vendor.getLng());
-
+        vendorDTO.setDeliveryTime(vendor.getDeliveryTime());
+        vendorDTO.setReviews(vendor.getReviews());
         List<StockDTO> stockDTOS = new ArrayList<>();
 
         // Create a Pageable object
@@ -95,7 +98,8 @@ public class VendorServiceImpl implements IVendorService {
                 medicineDTO.setMedicineType(medicine.getMedicineType());
                 medicineDTO.setDescription(medicine.getDescription());
                 medicineDTO.setSaltComposition(medicine.getSaltComposition());
-                medicineDTO.setPhoto1(Constants.LOGO_BASE_URL  + Constants.MEDICINES_BASE_URL + medicine.getPhoto1());
+                // Remove the URL prefix
+                medicineDTO.setPhoto1(medicine.getPhoto1());
                 medicineDTO.setDiscount(stock.getDiscount());
                 medicineDTO.setQty(stock.getQty());
                 medicineDTO.setMrp(stock.getMrp());

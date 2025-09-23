@@ -24,6 +24,8 @@ public class CartResponseDTO {
     private String logo;
     private String lat;
     private String lng;
+    private String deliveryTime;
+    private String reviews;
 
     private List<MedicineDTO> medicine;
 }

@@ -75,7 +75,8 @@ public class MedicineServiceImpl implements IMedicineService {
         medicineDTO.setManufacturer(medicine.getManufacturer());
         medicineDTO.setCountryOfOrigin(medicine.getCountryOfOrigin());
         medicineDTO.setQuestionAnswers(medicine.getQuestionAnswers());
-        medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL  + medicine.getPhoto1());
+        // Remove the URL prefix
+        medicineDTO.setPhoto1(medicine.getPhoto1());
         List<Stock> stocks   = stockRepository.findByMedicineId(medicine.getId());
         medicineDTO.setOffLineStocks(stocks);
         medicineDTO.setOnLineStocks(new ArrayList<>());
@@ -117,7 +118,8 @@ public class MedicineServiceImpl implements IMedicineService {
         medicineWithStockAndVendorDTO.setMedicineType(medicine.getMedicineType());
         medicineWithStockAndVendorDTO.setManufacturer(medicine.getManufacturer());
         medicineWithStockAndVendorDTO.setSaltComposition(medicine.getSaltComposition());
-        medicineWithStockAndVendorDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL  + medicine.getPhoto1());
+        // Remove the URL prefix
+        medicineWithStockAndVendorDTO.setPhoto1(medicine.getPhoto1());
         medicineWithStockAndVendorDTO.setUseOf(medicine.getUseOf());
         SubstituteDTO substituteDTO =  new SubstituteDTO();
         substituteDTO.setText("60% Low Price Substitute Avaliable ");
