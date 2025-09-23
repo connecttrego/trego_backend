@@ -52,6 +52,8 @@ public class MainServiceImpl implements IMainService {
                 })
                 .collect(Collectors.toList());
 
+        mainDTO.setTopBanners(topBannerDTOs);
+
         List<Banner> middleBanners = bannerRepository.findByPosition("middle");
         List<BannerDTO> middleBannerDTOs = middleBanners.stream()
                 .map(banner -> {
@@ -64,6 +66,7 @@ public class MainServiceImpl implements IMainService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+        // Convert Banner entities to BannerDTOs and append base path
 
         mainDTO.setTopBanners(topBannerDTOs);
         mainDTO.setMiddleBanners(middleBannerDTOs);
@@ -106,4 +109,26 @@ public class MainServiceImpl implements IMainService {
         return vendorDTO;
     }
 
+    private static List<MedicineDTO> populateMedicineDTOs(List<Stock> stocks) {
+        List<MedicineDTO> medicineDTOList = new ArrayList<>();
+        for(Stock stock : stocks){
+            Medicine medicine = stock.getMedicine();
+            MedicineDTO medicineDTO = new MedicineDTO();
+            medicineDTO.setId(medicine.getId());
+            medicineDTO.setName(medicine.getName());
+            medicineDTO.setMedicineType(medicine.getMedicineType());
+            medicineDTO.setManufacturer(medicine.getManufacturer());
+            medicineDTO.setSaltComposition(medicine.getSaltComposition());
+            medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicine.getPhoto1());
+            medicineDTO.setUseOf(medicine.getUseOf());
+            medicineDTO.setStrip(medicine.getPacking());
+            medicineDTO.setDiscount(stock.getDiscount());
+            medicineDTO.setQty(stock.getQty());
+            medicineDTO.setMrp(stock.getMrp());
+
+            medicineDTO.setExpiryDate(stock.getExpiryDate());
+            medicineDTOList.add(medicineDTO);
+        }
+        return medicineDTOList;
+    }
 }

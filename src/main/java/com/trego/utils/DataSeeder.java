@@ -34,9 +34,6 @@ public class DataSeeder {
             if (categoryRepository.count() == 0) {
                 // Create the required categories without type restriction
                 List<Category> categories = Arrays.asList(
-                    createCategory("Tablets", "tablets.jpg", "", "no", "system"),
-                    createCategory("Syrups", "syrups.jpg", "", "no", "system"),
-                    createCategory("Antibiotics", "antibiotics.jpg", "", "yes", "system")
                 );
                 
                 categoryRepository.saveAll(categories);
