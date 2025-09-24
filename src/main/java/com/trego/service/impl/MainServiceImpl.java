@@ -12,8 +12,7 @@ import com.trego.utils.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +31,9 @@ public class MainServiceImpl implements IMainService {
     BannerRepository bannerRepository;
 
     @Autowired
+    OrderItemRepository orderItemRepository;
+
+    @Autowired
     IMasterService masterService;
 
     @Override
@@ -44,7 +46,7 @@ public class MainServiceImpl implements IMainService {
                 .map(banner -> {
                     BannerDTO dto = new BannerDTO();
                     dto.setId(banner.getId());
-                    dto.setLogo(Constants.LOGO_BASE_URL + Constants.TOP_BASE_URL + banner.getLogo());
+                    dto.setLogo(banner.getLogo());
                     dto.setBannerUrl(banner.getBannerUrl());
                     dto.setPosition(banner.getPosition());
                     dto.setCreatedBy(banner.getCreatedBy());
@@ -59,7 +61,7 @@ public class MainServiceImpl implements IMainService {
                 .map(banner -> {
                     BannerDTO dto = new BannerDTO();
                     dto.setId(banner.getId());
-                    dto.setLogo(Constants.LOGO_BASE_URL + Constants.MIDDLE_BASE_URL + banner.getLogo());
+                    dto.setLogo(banner.getLogo());
                     dto.setBannerUrl(banner.getBannerUrl());
                     dto.setPosition(banner.getPosition());
                     dto.setCreatedBy(banner.getCreatedBy());
@@ -75,8 +77,29 @@ public class MainServiceImpl implements IMainService {
         List<Vendor> vendors = vendorRepository.findAll();
         List<VendorDTO> topOfflineVendors = new ArrayList<>();
         List<VendorDTO> topOnlineVendors = new ArrayList<>();
+        
+        // Get top selling medicine IDs
+        List<Object[]> topSellingMedicineData = orderItemRepository.findTopSellingMedicineIds();
+        Map<Long, Long> medicineSalesMap = new HashMap<>();
+        for (Object[] data : topSellingMedicineData) {
+            medicineSalesMap.put((Long) data[0], (Long) data[1]);
+        }
+        
         for (Vendor vendor : vendors) {
             VendorDTO vendorDTO = populateVendorDTO(vendor);
+            List<Stock> stocks   = stockRepository.findByVendorId(vendor.getId());
+            
+            // Sort stocks based on sales count (highest first)
+            stocks.sort((s1, s2) -> {
+                Long medicineId1 = s1.getMedicine().getId();
+                Long medicineId2 = s2.getMedicine().getId();
+                Long sales1 = medicineSalesMap.getOrDefault(medicineId1, 0L);
+                Long sales2 = medicineSalesMap.getOrDefault(medicineId2, 0L);
+                return sales2.compareTo(sales1); // Descending order
+            });
+            
+            List<MedicineDTO> medicineDTOList = populateMedicineDTOs(stocks, medicineSalesMap);
+            vendorDTO.setMedicines(medicineDTOList);
             // Add to both lists if less than 5 vendors in each list
             if(topOnlineVendors.size() < 5){
                 topOfflineVendors.add(vendorDTO);
@@ -94,11 +117,7 @@ public class MainServiceImpl implements IMainService {
         VendorDTO vendorDTO = new VendorDTO();
         vendorDTO.setId(vendor.getId());
         vendorDTO.setName(vendor.getName());
-        if(vendor.getCategory().equalsIgnoreCase("retail")) {
-            vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL+ vendor.getLogo());
-        }else{
-            vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL+ vendor.getLogo());
-        }
+        vendorDTO.setLogo(vendor.getLogo());
         vendorDTO.setGstNumber(vendor.getGistin());
         vendorDTO.setLicence(vendor.getDruglicense());
         vendorDTO.setAddress(vendor.getAddress());
@@ -109,9 +128,26 @@ public class MainServiceImpl implements IMainService {
         return vendorDTO;
     }
 
-    private static List<MedicineDTO> populateMedicineDTOs(List<Stock> stocks) {
+    private static List<MedicineDTO> populateMedicineDTOs(List<Stock> stocks, Map<Long, Long> medicineSalesMap) {
+        int count = 0;
         List<MedicineDTO> medicineDTOList = new ArrayList<>();
+        
+        // Sort stocks based on sales count (highest first), then by stock ID as fallback
+        stocks.sort((s1, s2) -> {
+            Long medicineId1 = s1.getMedicine().getId();
+            Long medicineId2 = s2.getMedicine().getId();
+            Long sales1 = medicineSalesMap.getOrDefault(medicineId1, 0L);
+            Long sales2 = medicineSalesMap.getOrDefault(medicineId2, 0L);
+            int salesComparison = sales2.compareTo(sales1); // Descending order of sales
+            if (salesComparison != 0) {
+                return salesComparison;
+            }
+            // If sales are equal, sort by stock ID to maintain consistent ordering
+            return Long.valueOf(s1.getId()).compareTo(Long.valueOf(s2.getId()));
+        });
+        
         for(Stock stock : stocks){
+            count++;
             Medicine medicine = stock.getMedicine();
             MedicineDTO medicineDTO = new MedicineDTO();
             medicineDTO.setId(medicine.getId());
@@ -125,9 +161,15 @@ public class MainServiceImpl implements IMainService {
             medicineDTO.setDiscount(stock.getDiscount());
             medicineDTO.setQty(stock.getQty());
             medicineDTO.setMrp(stock.getMrp());
-
             medicineDTO.setExpiryDate(stock.getExpiryDate());
+            
+            // Add sales count information
+            Long salesCount = medicineSalesMap.getOrDefault(medicine.getId(), 0L);
+            medicineDTO.setSalesCount(salesCount);
+
             medicineDTOList.add(medicineDTO);
+            if(count >= 10) // Changed from > 10 to >= 10 to get exactly 10 medicines
+                break;
         }
         return medicineDTOList;
     }

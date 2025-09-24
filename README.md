@@ -18,6 +18,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Category Management](#category-management)
   - [Subcategory Management](#subcategory-management)
   - [Product Management](#product-management)
+  - [OTC Product Management](#otc-product-management)
 - [Data Models](#data-models)
   - [Entity Relationship Diagram](#entity-relationship-diagram)
   - [Core Entities](#core-entities)
@@ -31,6 +32,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
     - [Category Entity](#category-entity)
     - [Subcategory Entity](#subcategory-entity)
     - [Product Entity](#product-entity)
+    - [OTC Product Entity](#otc-product-entity)
     - [Banner Entity](#banner-entity)
 - [Business Logic](#business-logic)
   - [Order Processing Flow](#order-processing-flow)
@@ -43,6 +45,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [User Service](#user-service)
   - [Vendor Service](#vendor-service)
   - [Main Service](#main-service)
+  - [OTC Product Service](#otc-product-service)
 - [Repository Layer](#repository-layer)
   - [Custom Queries](#custom-queries)
   - [Relationship Management](#relationship-management)
@@ -79,6 +82,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Shop by Category](#shop-by-category)
   - [Vendor Delivery Information](#vendor-delivery-information)
   - [Banner Management](#banner-management)
+  - [OTC Product Management](#otc-product-management-1)
 
 ## Overview
 
@@ -132,7 +136,8 @@ src/main/java/com/trego/
 │   ├── StockController.java      # Inventory management endpoints
 │   ├── UserController.java       # User management endpoints
 │   ├── SubcategoryController.java # Subcategory management endpoints
-│   └── ProductController.java    # Product management endpoints
+│   ├── ProductController.java    # Product management endpoints
+│   └── OtcProductController.java # OTC Product management endpoints
 ├── dao/                          # Data access layer
 │   ├── entity/                   # JPA entities with relationships
 │   │   ├── Address.java          # User address entity with geolocation
@@ -146,7 +151,8 @@ src/main/java/com/trego/
 │   │   ├── User.java             # User entity with profile information
 │   │   ├── Vendor.java           # Vendor entity with business details
 │   │   ├── Subcategory.java      # Subcategory entity
-│   │   └── Product.java          # Product entity
+│   │   ├── Product.java          # Product entity
+│   │   └── OtcProduct.java       # OTC Product entity
 │   └── impl/                     # Repository implementations extending JpaRepository
 │       ├── AddressRepository.java
 │       ├── BannerRepository.java
@@ -159,7 +165,8 @@ src/main/java/com/trego/
 │       ├── UserRepository.java
 │       ├── VendorRepository.java
 │       ├── SubcategoryRepository.java
-│       └── ProductRepository.java
+│       ├── ProductRepository.java
+│       └── OtcProductRepository.java
 ├── dto/                          # Data transfer objects for API communication
 │   ├── response/                 # Response DTOs with @JsonInclude annotations
 │   │   ├── CancelOrderResponseDTO.java
@@ -186,7 +193,8 @@ src/main/java/com/trego/
 │   ├── UserDTO.java
 │   ├── VendorDTO.java
 │   ├── SubcategoryDTO.java
-│   └── ProductDTO.java
+│   ├── ProductDTO.java
+│   └── OtcProductDTO.java
 ├── enums/                        # Enumerations for type safety
 │   └── AddressType.java          # Address type enumeration
 ├── exception/                    # Custom exceptions
@@ -203,7 +211,8 @@ src/main/java/com/trego/
 │   │   ├── UserServiceImpl.java
 │   │   ├── VendorServiceImpl.java
 │   │   ├── SubcategoryServiceImpl.java
-│   │   └── ProductServiceImpl.java
+│   │   ├── ProductServiceImpl.java
+│   │   └── OtcProductServiceImpl.java
 │   ├── IAddressService.java      # Service interfaces with method declarations
 │   ├── IMainService.java
 │   ├── IMasterService.java
@@ -214,10 +223,17 @@ src/main/java/com/trego/
 │   ├── IUserService.java
 │   ├── IVendorService.java
 │   ├── ISubcategoryService.java
-│   └── IProductService.java
+│   ├── IProductService.java
+│   └── IOtcProductService.java
 └── utils/                        # Utility classes and constants
     ├── Constants.java            # Application-wide constants
     └── DataSeeder.java           # Data seeder for initial categories
+
+src/test/java/com/trego/          # Test directory
+├── TregoApiApplicationTests.java # Main application tests
+└── api/                          # REST controller tests
+    ├── BookControllerTest.java   # Book controller tests
+    └── OtcProductControllerTest.java # OTC Product controller tests
 ```
 
 ## Core Features
@@ -269,6 +285,15 @@ src/main/java/com/trego/
    - Category-based search functionality
    - Automatic category seeding for initial setup
 
+9. **OTC Product Management** (New Feature)
+   - Comprehensive database structure for over-the-counter products with detailed medical and e-commerce fields
+   - Detailed medical information including ingredients, benefits, side effects, usage instructions, and safety advice
+   - E-commerce fields for pricing, discounts, packaging, stock levels, and product images
+   - Regulatory information for prescription requirements, storage instructions, and country of origin
+   - Manufacturer details including address and alternate brands
+   - Navigation breadcrumbs for improved user experience
+   - Computed total price (price + tax) for frontend convenience
+
 ## API Endpoints
 
 ### Authentication
@@ -319,7 +344,15 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
 - `GET /api/subcategories/category/{categoryId}` - Retrieve subcategories by category ID
 
 ### Product Management
-- `GET /api/subcategories/{id}/products` - Retrieve products by subcategory ID
+- `GET /api/subcategories/{id}/products` - Retrieve products by subcategory ID (with optional pagination)
+  - Query Parameters:
+    - `page` (optional, default: 0) - Page number (0-based)
+    - `size` (optional, default: 10) - Number of items per page
+  - Response: Returns a Page object with pagination metadata and content array
+  - Example: `GET /api/subcategories/2/products?page=0&size=5`
+
+### OTC Product Management
+- `GET /api/otc-subcategories/{id}/products` - Retrieve OTC products by subcategory ID
 
 ## Data Models
 
@@ -340,6 +373,7 @@ erDiagram
     CATEGORY ||--o{ MEDICINE : classifies
     CATEGORY ||--o{ SUBCATEGORY : contains
     SUBCATEGORY ||--o{ PRODUCT : contains
+    SUBCATEGORY ||--o{ OTC_PRODUCT : contains
 ```
 
 ### Core Entities
@@ -574,6 +608,58 @@ The Product entity represents products in the product catalog system.
 - `@Entity(name = "products")`: JPA entity mapped to "products" table
 - `@Transient`: For computed totalPrice field
 
+#### OTC Product Entity
+The OTC Product entity represents over-the-counter products with comprehensive medical and e-commerce information.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `name`: Product name (String)
+- `category`: Product category (String)
+- `subCategory`: Product sub-category (String)
+- `breadcrum`: Navigation breadcrumb (String)
+- `description`: Product description (String)
+- `manufacturers`: Product manufacturers (String)
+- `packaging`: Packaging type (String)
+- `packInfo`: Package information (String)
+- `price`: Product price (BigDecimal)
+- `bestPrice`: Best available price (BigDecimal)
+- `discountPercent`: Discount percentage (BigDecimal)
+- `prescriptionRequired`: Whether prescription is required (String)
+- `primaryUse`: Primary use of the product (String)
+- `saltSynonmys`: Salt synonyms (String)
+- `storage`: Storage instructions (String)
+- `introduction`: Product introduction (String)
+- `useOf`: How to use the product (String)
+- `benefits`: Product benefits (String)
+- `sideEffect`: Side effects (String)
+- `howToUse`: Directions for use (String)
+- `howWorks`: How the product works (String)
+- `safetyAdvise`: Safety advice (String)
+- `ifMiss`: What to do if a dose is missed (String)
+- `ingredients`: Product ingredients (String)
+- `alternateBrand`: Alternate brands (String)
+- `manufacturerAddress`: Manufacturer address (String)
+- `forSale`: Regions where product is for sale (String)
+- `countryOfOrigin`: Country of origin (String)
+- `tax`: Product tax (BigDecimal)
+- `subcategoryId`: Reference to Subcategory (Long)
+- `image`: Image URL (String)
+- `stock`: Available stock (Integer)
+
+**Computed Fields:**
+- `totalPrice`: Computed field (price + tax)
+- `image`: Image URL (String)
+- `stock`: Available stock (Integer)
+
+**Computed Fields:**
+- `totalPrice`: Computed field (price + tax)
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "otc_products")`: JPA entity mapped to "otc_products" table
+- `@Column(name = "subcategory_id")`: Explicit column mapping for subcategoryId
+- `@Transient`: For computed totalPrice field
+
 #### Banner Entity
 The Banner entity represents marketing banners for the homepage.
 
@@ -766,6 +852,30 @@ The [MainServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_back
 3. **Category Retrieval**:
    - Retrieves medicine categories for navigation
 
+### OTC Product Service
+
+The [OtcProductServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/OtcProductServiceImpl.java#L12-L69) class handles OTC product operations:
+
+1. **OTC Product Retrieval**:
+   - Retrieves OTC products by subcategory ID using the repository layer
+   - Handles null subcategory ID validation with appropriate error handling
+   - Maps entity data to DTOs with comprehensive medical and e-commerce information
+
+2. **Data Transformation**:
+   - Converts OtcProduct entities to OtcProductDTOs through the convertToDTO method
+   - Handles all the detailed fields for medical products including name, category, subCategory, breadcrum, description, manufacturers, packaging, packInfo, price, bestPrice, discountPercent, prescriptionRequired, primaryUse, saltSynonmys, storage, introduction, useOf, benefits, sideEffect, howToUse, howWorks, safetyAdvise, ifMiss, ingredients, alternateBrand, manufacturerAddress, forSale, countryOfOrigin, tax, subcategoryId, image, and stock
+   - Transfers the computed totalPrice field (price + tax) to the DTO
+
+3. **Error Handling**:
+   - Wraps all operations in try-catch blocks for proper exception handling
+   - Throws RuntimeException with meaningful error messages for debugging
+   - Logs exceptions to the console for troubleshooting purposes
+
+4. **Performance Considerations**:
+   - Uses Java 8 Streams for efficient data transformation
+   - Implements proper validation before database queries
+   - Follows Spring Boot best practices for service layer implementation
+
 ## Repository Layer
 
 ### Custom Queries
@@ -789,6 +899,13 @@ The repository layer extends JpaRepository and includes custom queries:
 
 5. **ProductRepository**:
    - Added method to find products by subcategory ID
+
+6. **OtcProductRepository**:
+   - Added [OtcProductRepository](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/impl/OtcProductRepository.java#L9-L11) with method to find OTC products by subcategory ID
+   - Extends JpaRepository<OtcProduct, Long> for standard CRUD operations
+   - Custom method: findBySubcategoryId(Long subcategoryId) for efficient querying
+   - Uses Spring Data JPA naming conventions for automatic query generation
+   - Returns List<OtcProduct> for easy integration with service layer
 
 ### Relationship Management
 
@@ -815,6 +932,7 @@ Response DTOs handle outgoing data to API clients:
 - Updated DTOs to include category information
 - [SubcategoryDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/SubcategoryDTO.java#L5-L9): Subcategory information
 - [ProductDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/ProductDTO.java#L6-L12): Product information with computed total price
+- [OtcProductDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/OtcProductDTO.java#L7-L38): OTC Product information with comprehensive medical and e-commerce fields including name, category, subCategory, breadcrum, description, manufacturers, packaging, packInfo, price, bestPrice, discountPercent, prescriptionRequired, primaryUse, saltSynonmys, storage, introduction, useOf, benefits, sideEffect, howToUse, howWorks, safetyAdvise, ifMiss, ingredients, alternateBrand, manufacturerAddress, forSale, countryOfOrigin, tax, and totalPrice
 - [BannerDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/BannerDTO.java#L3-L12): Banner information with proper URL processing
 - [VendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/VendorDTO.java#L3-L22): Vendor information with delivery time and reviews
 
@@ -828,12 +946,24 @@ Controllers follow RESTful design principles:
 - Appropriate HTTP status codes
 - JSON request/response format
 
+The OTC Product Controller specifically:
+- Uses @RestController annotation for automatic JSON serialization
+- Maps to the base URL path: /api/otc-subcategories
+- Implements the GET /{subcategoryId}/products endpoint for retrieving OTC products by subcategory ID
+- Follows standard Spring Boot controller patterns
+
 ### Error Handling
 
 Controllers include basic error handling:
 - Try-catch blocks for exception handling
 - Appropriate HTTP status codes for different scenarios
 - Error response DTOs for consistent error format
+
+The OTC Product Controller specifically:
+- Returns HttpStatus.BAD_REQUEST (400) for null subcategory IDs
+- Returns HttpStatus.INTERNAL_SERVER_ERROR (500) for unexpected exceptions
+- Returns HttpStatus.OK (200) with empty list for valid subcategory IDs with no products
+- Logs exceptions to console for debugging purposes
 
 ## Security Considerations
 
@@ -978,14 +1108,22 @@ springdoc.swagger-ui.path=/swagger-ui.html
 10. **subcategories** table:
     - Primary key: `id`
     - Foreign key: `category_id` references `categories.id`
-    - Referenced by: `products.subcategory_id`
+    - Referenced by: `products.subcategory_id`, `otc_products.subcategory_id`
 
 11. **products** table:
     - Primary key: `id`
     - Foreign key: `subcategory_id` references `subcategories.id`
     - Referenced by: None
 
-12. **banners** table:
+12. **otc_products** table:
+    - Primary key: `id`
+    - Foreign key: `subcategory_id` references `subcategories.id`
+    - Referenced by: None
+    - Fields: `name`, `category`, `sub_category`, `breadcrum`, `description`, `manufacturers`, `packaging`, `pack_info`, `price`, `best_price`, `discount_percent`, `prescription_required`, `primary_use`, `salt_synonmys`, `storage`, `introduction`, `use_of`, `benefits`, `side_effect`, `how_to_use`, `how_works`, `safety_advise`, `if_miss`, `ingredients`, `alternate_brand`, `manufacturer_address`, `for_sale`, `country_of_origin`, `tax`, `image`, `stock`
+    - Computed field: `total_price` (price + tax)
+    - Appropriate data types for medical and e-commerce information
+
+13. **banners** table:
     - Primary key: `id`
     - Foreign key references: None
     - Referenced by: None
@@ -999,27 +1137,39 @@ The database schema should include appropriate indexes for performance:
 - Full-text indexes for search functionality
 - Index on the `category` field in the `medicines` table for efficient category filtering
 - Index on `subcategory_id` in the `products` table for efficient product retrieval
+- Index on `subcategory_id` in the `otc_products` table for efficient OTC product retrieval
+- Additional indexes on frequently queried fields like `name`, `category`, and `prescription_required` in the `otc_products` table
 
 ## Testing
 
 ### Unit Testing
 
-The project includes basic unit test structure:
+The project includes comprehensive unit test structure:
 - JUnit 5 for test framework
 - Spring Boot Test for integration testing
 - TestRestTemplate for REST API testing
+- Comprehensive test coverage for OTC Product functionality
 
 ### Integration Testing
 
 Integration tests use:
 - Random port web environment for testing
-- In-memory database or testcontainers for isolation
+- In-memory database (H2) for isolation
 - Test property sources for configuration
 
 To run tests:
 ```bash
 mvn test
 ```
+
+### OTC Product Controller Testing
+
+The OTC Product functionality includes dedicated integration tests:
+- [OtcProductControllerTest](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/test/java/com/trego/api/OtcProductControllerTest.java#L35-L146) for testing OTC product endpoints
+- Tests cover successful product retrieval by subcategory ID
+- Tests handle invalid subcategory IDs gracefully
+- Uses in-memory H2 database for test isolation
+- Tests verify all OTC product fields are properly serialized
 
 ## API Documentation
 
@@ -1160,3 +1310,117 @@ The "Banner Management" feature allows administrators to manage marketing banner
    - Exception logging for debugging purposes
 
 This feature provides a simple and effective way to manage marketing banners for the homepage with proper URL processing for display.
+
+### OTC Product Management
+
+The "OTC Product Management" feature allows for comprehensive management of over-the-counter products with detailed medical and e-commerce information. This feature includes:
+
+1. **OTC Product Entity**:
+   - Added an [OtcProduct](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/OtcProduct.java#L9-L86) entity to represent OTC products with comprehensive fields for medical information, e-commerce data, regulatory details, and manufacturer information
+   - Fields include: name, category, subCategory, breadcrum, description, manufacturers, packaging, packInfo, price, bestPrice, discountPercent, prescriptionRequired, primaryUse, saltSynonmys, storage, introduction, useOf, benefits, sideEffect, howToUse, howWorks, safetyAdvise, ifMiss, ingredients, alternateBrand, manufacturerAddress, forSale, countryOfOrigin, tax, subcategoryId, image, and stock
+   - Computed field: totalPrice (price + tax)
+
+2. **OTC Product DTO**:
+   - Added an [OtcProductDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/OtcProductDTO.java#L7-L38) to properly transfer OTC product data to the frontend
+   - Includes all fields from the entity for complete data transfer
+   - Transfers computed totalPrice field for frontend convenience
+
+3. **Repository Updates**:
+   - Added [OtcProductRepository](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/impl/OtcProductRepository.java#L9-L11) with methods for OTC product queries including finding products by subcategory ID
+   - Extends JpaRepository for standard CRUD operations
+   - Custom method: findBySubcategoryId(Long subcategoryId)
+
+4. **Service Layer Implementation**:
+   - Added [IOtcProductService](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/IOtcProductService.java#L7-L9) interface for OTC product operations
+   - Implemented [OtcProductServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/OtcProductServiceImpl.java#L12-L69) with business logic for retrieving OTC products and mapping entities to DTOs
+   - Converts OtcProduct entities to OtcProductDTOs with all fields
+   - Calculates and transfers the totalPrice computed field
+   - Proper error handling with meaningful exception messages
+
+5. **API Endpoints**:
+   - Added [OtcProductController](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/api/OtcProductController.java#L12-L38) with endpoint: `GET /api/otc-subcategories/{id}/products` for retrieving OTC products by subcategory ID
+   - Returns List<OtcProductDTO> with proper HTTP status codes
+   - Handles null subcategory ID with BAD_REQUEST (400)
+   - Handles exceptions with INTERNAL_SERVER_ERROR (500)
+   - Returns empty list for valid subcategory IDs with no products
+
+6. **Database Schema**:
+   - Added `otc_products` table with all required fields
+   - Foreign key relationship with `subcategories` table via `subcategory_id`
+   - Index on `subcategory_id` for efficient queries
+   - Appropriate data types for all fields (VARCHAR, DECIMAL, LONG, INTEGER)
+
+7. **Testing**:
+   - Added [OtcProductControllerTest](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/test/java/com/trego/api/OtcProductControllerTest.java#L35-L146) for integration testing
+   - Tests cover successful retrieval and error cases
+   - Uses in-memory H2 database for test isolation
+   - Verifies all fields are properly serialized
+
+8. **Error Handling**:
+   - Proper error handling with appropriate HTTP status codes
+   - Exception logging for debugging purposes
+   - Graceful handling of invalid subcategory IDs
+   - Meaningful error messages for troubleshooting
+
+This feature provides a comprehensive system for managing OTC products with detailed information that is essential for pharmaceutical e-commerce platforms. The implementation follows best practices for REST API design, data transfer, and error handling.
+
+## Performance Considerations
+
+1. **Database Optimization**:
+   - Proper indexing strategy including index on subcategory_id field in otc_products table
+   - Query optimization with fetch joins
+   - Connection pooling with HikariCP
+
+2. **Caching**:
+   - No explicit caching implemented
+   - Potential for Redis or in-memory caching
+
+3. **Pagination**:
+   - Implemented for large result sets
+   - Configurable page size
+
+## Scalability
+
+1. **Horizontal Scaling**:
+   - Stateless application design
+   - Database sharding potential
+   - Load balancing support
+
+2. **Vertical Scaling**:
+   - JVM tuning options
+   - Database optimization
+   - Memory management
+
+## API Documentation
+
+API documentation is available through Swagger UI:
+- Access at `/swagger-ui.html` when the application is running
+- Provides interactive API testing interface
+- Shows all endpoints with request/response schemas
+- Includes example requests and responses
+
+## Deployment
+
+### Standalone JAR
+
+Build and run as standalone JAR:
+```bash
+mvn clean package
+java -jar target/trego-api-1.0.jar
+```
+
+### Docker Deployment
+
+Create a Dockerfile:
+```dockerfile
+FROM openjdk:17-jdk-slim
+COPY target/trego-api-1.0.jar app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]
+```
+
+### Google Cloud Deployment
+
+The application is configured for Google Cloud SQL deployment:
+- Uses Google Cloud SQL MySQL Socket Factory
+- Configured for MySQL 8.0+ compatibility
+- Environment variables for configuration
