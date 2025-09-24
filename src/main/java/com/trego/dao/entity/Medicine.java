@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.util.List;
 
+
 @Data
 @Entity(name = "medicines")
 public class Medicine {
@@ -18,18 +19,22 @@ public class Medicine {
     private String saltComposition;
 
     private String medicineType;
+    @Column(columnDefinition = "LONGTEXT")
     private String introduction;
+    @Column(columnDefinition = "LONGTEXT")
     private String description;
-
+    @Column(columnDefinition = "LONGTEXT")
     private String howItWorks;
+    @Column(columnDefinition = "LONGTEXT")
     private String safetyAdvise;
+    @Column(columnDefinition = "LONGTEXT")
     private String ifMiss;
     private String packing;
     private String packagingType;
     private String prescriptionRequired;
     private String storage;
     private String useOf;
-
+    @Column(columnDefinition = "LONGTEXT")
     private String commonSideEffect;
     private String alcoholInteraction;
     private String pregnancyInteraction;
@@ -39,6 +44,7 @@ public class Medicine {
     private String liverInteraction;
     private String manufacturerAddress;
     private String countryOfOrigin;
+    @Column(columnDefinition = "LONGTEXT")
     private String questionAnswers;
     private String photo1;
     private String photo2;
