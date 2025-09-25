@@ -5,6 +5,8 @@ import lombok.Data;
 
 import java.util.List;
 
+import com.trego.dao.entity.Stock;
+
 
 @Data
 @Entity(name = "medicines")
