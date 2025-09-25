@@ -20,6 +20,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Product Management](#product-management)
   - [OTC Product Management](#otc-product-management)
   - [Substitute Product Management](#substitute-product-management)
+  - [Attachment and Prescription Management](#attachment-and-prescription-management)
 - [Data Models](#data-models)
   - [Entity Relationship Diagram](#entity-relationship-diagram)
   - [Core Entities](#core-entities)
@@ -141,7 +142,8 @@ src/main/java/com/trego/
 │   ├── UserController.java       # User management endpoints
 │   ├── SubcategoryController.java # Subcategory management endpoints
 │   ├── ProductController.java    # Product management endpoints
-│   └── OtcProductController.java # OTC Product management endpoints
+│   ├── OtcProductController.java # OTC Product management endpoints
+│   └── AttachmentController.java # Attachment management endpoints
 ├── dao/                          # Data access layer
 │   ├── entity/                   # JPA entities with relationships
 │   │   ├── Address.java          # User address entity with geolocation
@@ -156,7 +158,8 @@ src/main/java/com/trego/
 │   │   ├── Vendor.java           # Vendor entity with business details
 │   │   ├── Subcategory.java      # Subcategory entity
 │   │   ├── Product.java          # Product entity
-│   │   └── OtcProduct.java       # OTC Product entity
+│   │   ├── OtcProduct.java       # OTC Product entity
+│   │   └── Attachment.java       # Attachment entity for file uploads
 │   └── impl/                     # Repository implementations extending JpaRepository
 │       ├── AddressRepository.java
 │       ├── BannerRepository.java
@@ -170,7 +173,8 @@ src/main/java/com/trego/
 │       ├── VendorRepository.java
 │       ├── SubcategoryRepository.java
 │       ├── ProductRepository.java
-│       └── OtcProductRepository.java
+│       ├── OtcProductRepository.java
+│       └── AttachmentRepository.java
 ├── dto/                          # Data transfer objects for API communication
 │   ├── response/                 # Response DTOs with @JsonInclude annotations
 │   │   ├── CancelOrderResponseDTO.java
@@ -198,7 +202,8 @@ src/main/java/com/trego/
 │   ├── VendorDTO.java
 │   ├── SubcategoryDTO.java
 │   ├── ProductDTO.java
-│   └── OtcProductDTO.java
+│   ├── OtcProductDTO.java
+│   └── AttachmentDTO.java
 ├── enums/                        # Enumerations for type safety
 │   └── AddressType.java          # Address type enumeration
 ├── exception/                    # Custom exceptions
@@ -216,7 +221,8 @@ src/main/java/com/trego/
 │   │   ├── VendorServiceImpl.java
 │   │   ├── SubcategoryServiceImpl.java
 │   │   ├── ProductServiceImpl.java
-│   │   └── OtcProductServiceImpl.java
+│   │   ├── OtcProductServiceImpl.java
+│   │   └── AttachmentServiceImpl.java
 │   ├── IAddressService.java      # Service interfaces with method declarations
 │   ├── IMainService.java
 │   ├── IMasterService.java
@@ -228,16 +234,20 @@ src/main/java/com/trego/
 │   ├── IVendorService.java
 │   ├── ISubcategoryService.java
 │   ├── IProductService.java
-│   └── IOtcProductService.java
+│   ├── IOtcProductService.java
+│   └── IAttachmentService.java
 └── utils/                        # Utility classes and constants
     ├── Constants.java            # Application-wide constants
     └── DataSeeder.java           # Data seeder for initial categories
 
 src/test/java/com/trego/          # Test directory
 ├── TregoApiApplicationTests.java # Main application tests
-└── api/                          # REST controller tests
-    ├── BookControllerTest.java   # Book controller tests
-    └── OtcProductControllerTest.java # OTC Product controller tests
+├── api/                          # REST controller tests
+│   ├── BookControllerTest.java   # Book controller tests
+│   ├── OtcProductControllerTest.java # OTC Product controller tests
+│   └── AttachmentControllerTest.java # Attachment controller tests
+└── service/impl/                 # Service implementation tests
+    └── AttachmentServiceImplTest.java # Attachment service implementation tests
 ```
 
 ## Core Features
@@ -414,6 +424,63 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
     - `medicineId` (Long) - The ID of the medicine to find the maximum discount for
   - Response: Returns a BigDecimal value representing the maximum discount percentage
   - Example: `GET /api/medicines/1/substitutes/max-discount`
+
+### Attachment and Prescription Management
+The Attachment and Prescription Management feature allows users to upload prescriptions and other attachments related to their orders.
+
+**API Endpoints:**
+- `POST /api/attachments/upload` - Upload a prescription or attachment
+  - Request Parameters:
+    - `file` (MultipartFile) - The file to upload (required)
+    - `orderId` (Long) - Order ID to associate with the attachment (optional, but at least one of orderId, orderItemId, or userId must be provided)
+    - `orderItemId` (Long) - Order item ID to associate with the attachment (optional)
+    - `userId` (Long) - User ID to associate with the attachment (optional)
+    - `description` (String) - Description of the attachment (optional)
+  - Response: Returns an AttachmentDTO with the uploaded file details
+  - Example: `POST /api/attachments/upload` with form data including file and orderId=1
+
+- `GET /api/attachments/order/{orderId}` - Retrieve all attachments for an order
+  - Path Parameters:
+    - `orderId` (Long) - The ID of the order
+  - Response: Returns an array of AttachmentDTO objects
+  - Example: `GET /api/attachments/order/1`
+
+- `GET /api/attachments/order-item/{orderItemId}` - Retrieve all attachments for an order item
+  - Path Parameters:
+    - `orderItemId` (Long) - The ID of the order item
+  - Response: Returns an array of AttachmentDTO objects
+  - Example: `GET /api/attachments/order-item/1`
+
+- `GET /api/attachments/user/{userId}` - Retrieve all attachments for a user
+  - Path Parameters:
+    - `userId` (Long) - The ID of the user
+  - Response: Returns an array of AttachmentDTO objects
+  - Example: `GET /api/attachments/user/1`
+
+- `GET /api/attachments/{id}` - Retrieve a specific attachment by ID
+  - Path Parameters:
+    - `id` (Long) - The ID of the attachment
+  - Response: Returns an AttachmentDTO object
+  - Example: `GET /api/attachments/1`
+
+- `DELETE /api/attachments/{id}` - Delete an attachment
+  - Path Parameters:
+    - `id` (Long) - The ID of the attachment to delete
+  - Response: Returns HTTP 200 OK on success
+  - Example: `DELETE /api/attachments/1`
+
+**AttachmentDTO Fields:**
+- `id` (Long) - The attachment ID
+- `fileName` (String) - Original name of the uploaded file
+- `fileType` (String) - MIME type of the uploaded file
+- `fileUrl` (String) - Path to the stored file
+- `orderId` (Long) - Order ID associated with the attachment (if any)
+- `orderItemId` (Long) - Order item ID associated with the attachment (if any)
+- `userId` (Long) - User ID associated with the attachment (if any)
+- `description` (String) - Description of the attachment
+- `createdAt` (LocalDateTime) - Timestamp when the attachment was created
+- `updatedAt` (LocalDateTime) - Timestamp when the attachment was last updated
+
     USER ||--o{ ADDRESS : has
     USER ||--o{ ORDER : places
     USER ||--o{ PREORDER : creates
@@ -638,6 +705,29 @@ The OrderItem entity represents individual items within an order.
 **Annotations:**
 - `@Data`: Lombok annotation for boilerplate code generation
 - `@Entity(name = "order_items")`: JPA entity mapped to "order_items" table
+
+#### Attachment Entity
+The Attachment entity represents uploaded files such as prescriptions and other documents.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `fileName`: Original name of the uploaded file (String)
+- `fileType`: MIME type of the uploaded file (String)
+- `fileUrl`: Path to the stored file (String)
+- `orderId`: Reference to an order (Long, optional)
+- `orderItemId`: Reference to an order item (Long, optional)
+- `userId`: Reference to a user (Long, optional)
+- `description`: Description of the attachment (String, optional)
+- `createdAt`: Timestamp when the attachment was created (LocalDateTime)
+- `updatedAt`: Timestamp when the attachment was last updated (LocalDateTime)
+
+**Lifecycle Methods:**
+- `@PrePersist`: Sets `createdAt` timestamp before persisting
+- `@PreUpdate`: Sets `updatedAt` timestamp before updating
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "attachments")`: JPA entity mapped to "attachments" table
 
 #### PreOrder Entity
 The PreOrder entity represents pre-order information for complex multi-vendor orders.
