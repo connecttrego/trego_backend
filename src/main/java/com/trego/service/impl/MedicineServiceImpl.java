@@ -7,7 +7,9 @@ import com.trego.dao.impl.MedicineRepository;
 import com.trego.dao.impl.StockRepository;
 import com.trego.dto.MedicineWithStockAndVendorDTO;
 import com.trego.dto.SubstituteDTO;
+import com.trego.dto.SubstituteDetailDTO;
 import com.trego.service.IMedicineService;
+import com.trego.service.ISubstituteService;
 import com.trego.utils.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -26,6 +28,9 @@ public class MedicineServiceImpl implements IMedicineService {
 
     @Autowired
     StockRepository stockRepository;
+    
+    @Autowired
+    ISubstituteService substituteService;
 
     @Override
     public List<MedicineWithStockAndVendorDTO> findAll() {
@@ -105,6 +110,9 @@ public class MedicineServiceImpl implements IMedicineService {
           //  List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
             MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = populateMedicineWithStockVendor(medicine);
             medicineWithStockAndVendorDTO.setStocks(medicine.getStocks());
+            // Add substitutes to the response
+            List<SubstituteDetailDTO> substitutes = substituteService.getSubstitutesByMedicineId(medicine.getId());
+            medicineWithStockAndVendorDTO.setSubstitutes(substitutes);
             return medicineWithStockAndVendorDTO;
         });
         return medicineDTOs;
@@ -125,6 +133,9 @@ public class MedicineServiceImpl implements IMedicineService {
         substituteDTO.setText("60% Low Price Substitute Avaliable ");
         medicineWithStockAndVendorDTO.setSubstituteDTO(substituteDTO);
         medicineWithStockAndVendorDTO.setPacking(medicine.getPacking());
+        // Add substitutes to the response
+        List<SubstituteDetailDTO> substitutes = substituteService.getSubstitutesByMedicineId(medicine.getId());
+        medicineWithStockAndVendorDTO.setSubstitutes(substitutes);
         return  medicineWithStockAndVendorDTO;
     }
 }
