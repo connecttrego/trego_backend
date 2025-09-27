@@ -9,6 +9,7 @@ import com.trego.dto.MedicineWithStockAndVendorDTO;
 import com.trego.dto.SubstituteDTO;
 import com.trego.service.IMedicineService;
 import com.trego.utils.Constants;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,18 +34,18 @@ public class MedicineServiceImpl implements IMedicineService {
         List<Medicine> medicines = medicineRepository.findAll();
         for (Medicine medicine : medicines) {
 
-            MedicineWithStockAndVendorDTO  medicineWithStockAndVendorDTO = populateMedicineWithStockVendor(medicine);
+            MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = populateMedicineWithStockVendor(medicine);
             List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
             medicineWithStockAndVendorDTO.setStocks(stocks);
             medicineWithStockAndVendorDTOList.add(medicineWithStockAndVendorDTO);
         }
 
-        return  medicineWithStockAndVendorDTOList;
+        return medicineWithStockAndVendorDTOList;
     }
 
     @Override
     public MedicineDTO getMedicineById(Long id) {
-        Medicine medicine =  medicineRepository.findById(id).orElse(null);
+        Medicine medicine = medicineRepository.findById(id).orElse(null);
 
         MedicineDTO medicineDTO = new MedicineDTO();
         medicineDTO.setId(medicine.getId());
@@ -56,9 +57,9 @@ public class MedicineServiceImpl implements IMedicineService {
 
         medicineDTO.setIntroduction(medicine.getIntroduction());
         medicineDTO.setDescription(medicine.getDescription());
-       medicineDTO.setHowItWorks(medicine.getHowItWorks());
-       medicineDTO.setSafetyAdvise(medicine.getSafetyAdvise());
-       medicineDTO.setIfMiss(medicine.getIfMiss());
+        medicineDTO.setHowItWorks(medicine.getHowItWorks());
+        medicineDTO.setSafetyAdvise(medicine.getSafetyAdvise());
+        medicineDTO.setIfMiss(medicine.getIfMiss());
         medicineDTO.setUseOf(medicine.getUseOf());
         medicineDTO.setStrip(medicine.getPacking());
         medicineDTO.setPrescriptionRequired(medicine.getPrescriptionRequired());
@@ -71,17 +72,17 @@ public class MedicineServiceImpl implements IMedicineService {
         medicineDTO.setLactationInteraction(medicine.getLactationInteraction());
         medicineDTO.setDrivingInteraction(medicine.getDrivingInteraction());
         medicineDTO.setKidneyInteraction(medicine.getKidneyInteraction());
-       medicineDTO.setLiverInteraction(medicine.getLiverInteraction());
+        medicineDTO.setLiverInteraction(medicine.getLiverInteraction());
         medicineDTO.setManufacturer(medicine.getManufacturer());
         medicineDTO.setCountryOfOrigin(medicine.getCountryOfOrigin());
         medicineDTO.setQuestionAnswers(medicine.getQuestionAnswers());
         // Remove the URL prefix
         medicineDTO.setPhoto1(medicine.getPhoto1());
-        List<Stock> stocks   = stockRepository.findByMedicineId(medicine.getId());
+        List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
         medicineDTO.setOffLineStocks(stocks);
         medicineDTO.setOnLineStocks(new ArrayList<>());
 
-        return  medicineDTO;
+        return medicineDTO;
     }
 
     @Override
@@ -89,11 +90,11 @@ public class MedicineServiceImpl implements IMedicineService {
         Pageable pageable = PageRequest.of(page, size);
         MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = new MedicineWithStockAndVendorDTO();
         Page<Medicine> medicines = null;
-        if(vendorId != 0 ){
+        if (vendorId != 0) {
             medicines = medicineRepository.findByNameWithVendorId(searchText, vendorId, pageable);
 
-        }else {
-             medicines = medicineRepository.findByNameContainingIgnoreCaseOrNameIgnoreCase(searchText, "", pageable);
+        } else {
+            medicines = medicineRepository.findByNameContainingIgnoreCaseOrNameIgnoreCase(searchText, "", pageable);
         }
         return convertResponse(medicines);
 
@@ -102,14 +103,13 @@ public class MedicineServiceImpl implements IMedicineService {
     private Page<MedicineWithStockAndVendorDTO> convertResponse(Page<Medicine> medicines) {
         List<Medicine> tempMedicines = medicines.getContent();
         Page<MedicineWithStockAndVendorDTO> medicineDTOs = medicines.map(medicine -> {
-          //  List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
+            //  List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
             MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = populateMedicineWithStockVendor(medicine);
             medicineWithStockAndVendorDTO.setStocks(medicine.getStocks());
             return medicineWithStockAndVendorDTO;
         });
         return medicineDTOs;
     }
-
 
     private MedicineWithStockAndVendorDTO populateMedicineWithStockVendor(Medicine medicine) {
         MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = new MedicineWithStockAndVendorDTO();
@@ -121,10 +121,10 @@ public class MedicineServiceImpl implements IMedicineService {
         // Remove the URL prefix
         medicineWithStockAndVendorDTO.setPhoto1(medicine.getPhoto1());
         medicineWithStockAndVendorDTO.setUseOf(medicine.getUseOf());
-        SubstituteDTO substituteDTO =  new SubstituteDTO();
+        SubstituteDTO substituteDTO = new SubstituteDTO();
         substituteDTO.setText("60% Low Price Substitute Avaliable ");
         medicineWithStockAndVendorDTO.setSubstituteDTO(substituteDTO);
         medicineWithStockAndVendorDTO.setPacking(medicine.getPacking());
-        return  medicineWithStockAndVendorDTO;
+        return medicineWithStockAndVendorDTO;
     }
 }
