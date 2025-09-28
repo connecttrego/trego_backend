@@ -47,7 +47,7 @@ public class MedicineController {
 
     @GetMapping("/substitute/{id}")
     public List<SubstituteDetailDTO> findSubstitute(
-            @RequestParam(defaultValue = "0") long id
+            @PathVariable long id
     ) {
         return substituteService.findSubstitute(id);
     }
