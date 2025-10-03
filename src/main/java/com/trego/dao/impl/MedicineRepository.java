@@ -61,7 +61,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
             from medicines m2
             where m2.id = :medicineId
         )
-        and m.id != :medicineId
+        and m.id != :medicineId LIMIT 2
         """, nativeQuery = true)
     List<SubstituteDetailView> findSubstituteByMedicineId(@Param("medicineId") long medicineId);
 //AND m.manufacturer IN ('Abbott', 'Lupin Ltd', 'Dr. Reddy’s Labs')
