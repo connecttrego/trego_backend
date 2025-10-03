@@ -18,6 +18,9 @@ public class VendorDTO {
     private String lng;
     private String deliveryTime;
     private String reviews;
+    private String rating;
     private List<MedicineDTO> medicines;
+
+    private List<BannerDTO> banners;
 
 }

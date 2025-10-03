@@ -69,8 +69,6 @@ public class MainServiceImpl implements IMainService {
                 })
                 .collect(Collectors.toList());
         // Convert Banner entities to BannerDTOs and append base path
-
-        mainDTO.setTopBanners(topBannerDTOs);
         mainDTO.setMiddleBanners(middleBannerDTOs);
 
         // Get all vendors

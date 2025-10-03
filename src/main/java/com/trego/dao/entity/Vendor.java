@@ -11,7 +11,6 @@ import lombok.Data;
 @Entity(name = "vendors")
 public class Vendor {
 
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -25,4 +24,5 @@ public class Vendor {
     private String address;
     private String deliveryTime;
     private String reviews;
+    private String rating;
 }
