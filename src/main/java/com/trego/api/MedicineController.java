@@ -3,6 +3,7 @@ package com.trego.api;
 import com.trego.dto.MedicineDTO;
 import com.trego.dto.MedicineWithStockAndVendorDTO;
 import com.trego.dto.SubstituteDetailDTO;
+import com.trego.dto.view.SubstituteDetailView;
 import com.trego.service.IMedicineService;
 import com.trego.service.ISubstituteService;
 
@@ -46,7 +47,7 @@ public class MedicineController {
     }
 
     @GetMapping("/substitute/{id}")
-    public List<SubstituteDetailDTO> findSubstitute(
+    public List<SubstituteDetailView> findSubstitute(
             @PathVariable long id
     ) {
         return substituteService.findSubstitute(id);
