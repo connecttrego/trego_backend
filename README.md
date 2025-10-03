@@ -19,6 +19,8 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Subcategory Management](#subcategory-management)
   - [Product Management](#product-management)
   - [OTC Product Management](#otc-product-management)
+  - [Substitute Product Management](#substitute-product-management)
+  - [Attachment and Prescription Management](#attachment-and-prescription-management)
 - [Data Models](#data-models)
   - [Entity Relationship Diagram](#entity-relationship-diagram)
   - [Core Entities](#core-entities)
@@ -33,6 +35,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
     - [Subcategory Entity](#subcategory-entity)
     - [Product Entity](#product-entity)
     - [OTC Product Entity](#otc-product-entity)
+    - [Substitute Entity](#substitute-entity)
     - [Banner Entity](#banner-entity)
 - [Business Logic](#business-logic)
   - [Order Processing Flow](#order-processing-flow)
@@ -46,6 +49,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Vendor Service](#vendor-service)
   - [Main Service](#main-service)
   - [OTC Product Service](#otc-product-service)
+  - [Substitute Service](#substitute-service)
 - [Repository Layer](#repository-layer)
   - [Custom Queries](#custom-queries)
   - [Relationship Management](#relationship-management)
@@ -83,6 +87,7 @@ Trego is a comprehensive medicine delivery platform backend built with Spring Bo
   - [Vendor Delivery Information](#vendor-delivery-information)
   - [Banner Management](#banner-management)
   - [OTC Product Management](#otc-product-management-1)
+  - [Substitute Product Management](#substitute-product-management-1)
 
 ## Overview
 
@@ -137,7 +142,8 @@ src/main/java/com/trego/
 │   ├── UserController.java       # User management endpoints
 │   ├── SubcategoryController.java # Subcategory management endpoints
 │   ├── ProductController.java    # Product management endpoints
-│   └── OtcProductController.java # OTC Product management endpoints
+│   ├── OtcProductController.java # OTC Product management endpoints
+│   └── AttachmentController.java # Attachment management endpoints
 ├── dao/                          # Data access layer
 │   ├── entity/                   # JPA entities with relationships
 │   │   ├── Address.java          # User address entity with geolocation
@@ -152,7 +158,8 @@ src/main/java/com/trego/
 │   │   ├── Vendor.java           # Vendor entity with business details
 │   │   ├── Subcategory.java      # Subcategory entity
 │   │   ├── Product.java          # Product entity
-│   │   └── OtcProduct.java       # OTC Product entity
+│   │   ├── OtcProduct.java       # OTC Product entity
+│   │   └── Attachment.java       # Attachment entity for file uploads
 │   └── impl/                     # Repository implementations extending JpaRepository
 │       ├── AddressRepository.java
 │       ├── BannerRepository.java
@@ -166,7 +173,8 @@ src/main/java/com/trego/
 │       ├── VendorRepository.java
 │       ├── SubcategoryRepository.java
 │       ├── ProductRepository.java
-│       └── OtcProductRepository.java
+│       ├── OtcProductRepository.java
+│       └── AttachmentRepository.java
 ├── dto/                          # Data transfer objects for API communication
 │   ├── response/                 # Response DTOs with @JsonInclude annotations
 │   │   ├── CancelOrderResponseDTO.java
@@ -194,7 +202,8 @@ src/main/java/com/trego/
 │   ├── VendorDTO.java
 │   ├── SubcategoryDTO.java
 │   ├── ProductDTO.java
-│   └── OtcProductDTO.java
+│   ├── OtcProductDTO.java
+│   └── AttachmentDTO.java
 ├── enums/                        # Enumerations for type safety
 │   └── AddressType.java          # Address type enumeration
 ├── exception/                    # Custom exceptions
@@ -212,7 +221,8 @@ src/main/java/com/trego/
 │   │   ├── VendorServiceImpl.java
 │   │   ├── SubcategoryServiceImpl.java
 │   │   ├── ProductServiceImpl.java
-│   │   └── OtcProductServiceImpl.java
+│   │   ├── OtcProductServiceImpl.java
+│   │   └── AttachmentServiceImpl.java
 │   ├── IAddressService.java      # Service interfaces with method declarations
 │   ├── IMainService.java
 │   ├── IMasterService.java
@@ -224,16 +234,20 @@ src/main/java/com/trego/
 │   ├── IVendorService.java
 │   ├── ISubcategoryService.java
 │   ├── IProductService.java
-│   └── IOtcProductService.java
+│   ├── IOtcProductService.java
+│   └── IAttachmentService.java
 └── utils/                        # Utility classes and constants
     ├── Constants.java            # Application-wide constants
     └── DataSeeder.java           # Data seeder for initial categories
 
 src/test/java/com/trego/          # Test directory
 ├── TregoApiApplicationTests.java # Main application tests
-└── api/                          # REST controller tests
-    ├── BookControllerTest.java   # Book controller tests
-    └── OtcProductControllerTest.java # OTC Product controller tests
+├── api/                          # REST controller tests
+│   ├── BookControllerTest.java   # Book controller tests
+│   ├── OtcProductControllerTest.java # OTC Product controller tests
+│   └── AttachmentControllerTest.java # Attachment controller tests
+└── service/impl/                 # Service implementation tests
+    └── AttachmentServiceImplTest.java # Attachment service implementation tests
 ```
 
 ## Core Features
@@ -354,12 +368,119 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
 ### OTC Product Management
 - `GET /api/otc-subcategories/{id}/products` - Retrieve OTC products by subcategory ID
 
-## Data Models
+### Substitute Product Management
+- `GET /api/medicines/{medicineId}/substitutes` - Retrieve up to 2 substitute products for a medicine, sorted by best price (low to high)
+  - Path Parameters:
+    - `medicineId` (Long) - The ID of the medicine to find substitutes for
+  - Response: Returns an array of SubstituteDetailDTO objects with comprehensive product information
+  - Example: `GET /api/medicines/1/substitutes`
+  
+  Response Fields:
+  - `id` (Long) - The substitute product ID
+  - `name` (String) - The name of the substitute product
+  - `manufacturers` (String) - The manufacturer of the substitute product
+  - `saltComposition` (String) - The salt composition
+  - `medicineType` (String) - The type of medicine (Tablet, Capsule, etc.)
+  - `stock` (Integer) - Available stock quantity
+  - `introduction` (String) - Product introduction
+  - `benefits` (String) - Product benefits
+  - `description` (String) - Detailed product description
+  - `howToUse` (String) - Instructions for use
+  - `safetyAdvise` (String) - Safety information
+  - `ifMiss` (String) - What to do if a dose is missed
+  - `packaging` (String) - Packaging information
+  - `packagingType` (String) - Type of packaging
+  - `mrp` (BigDecimal) - Maximum retail price
+  - `bestPrice` (BigDecimal) - Best available price
+  - `discountPercent` (BigDecimal) - Discount percentage
+  - `views` (Integer) - Number of views
+  - `bought` (Integer) - Number of purchases
+  - `prescriptionRequired` (String) - Prescription requirement information
+  - `label` (String) - Product label
+  - `factBox` (String) - Key facts about the product
+  - `primaryUse` (String) - Primary use of the medicine
+  - `storage` (String) - Storage instructions
+  - `useOf` (String) - Usage information
+  - `commonSideEffect` (String) - Common side effects
+  - `alcoholInteraction` (String) - Alcohol interaction information
+  - `pregnancyInteraction` (String) - Pregnancy interaction information
+  - `lactationInteraction` (String) - Lactation interaction information
+  - `drivingInteraction` (String) - Driving interaction information
+  - `kidneyInteraction` (String) - Kidney interaction information
+  - `liverInteraction` (String) - Liver interaction information
+  - `manufacturerAddress` (String) - Manufacturer address
+  - `countryOfOrigin` (String) - Country of origin
+  - `forSale` (String) - Availability for sale
+  - `qa` (String) - Questions and answers
 
-### Entity Relationship Diagram
+- `GET /api/medicines/{medicineId}/substitutes/sorted-by-discount` - Retrieve up to 2 substitute products for a medicine, sorted by discount percentage in descending order (highest discount first)
+  - Path Parameters:
+    - `medicineId` (Long) - The ID of the medicine to find substitutes for
+  - Response: Returns an array of SubstituteDetailDTO objects sorted by discount percentage (highest first)
+  - Example: `GET /api/medicines/1/substitutes/sorted-by-discount`
 
-```
-erDiagram
+- `GET /api/medicines/{medicineId}/substitutes/max-discount` - Retrieve the maximum discount percentage among all substitute products for a medicine
+  - Path Parameters:
+    - `medicineId` (Long) - The ID of the medicine to find the maximum discount for
+  - Response: Returns a BigDecimal value representing the maximum discount percentage
+  - Example: `GET /api/medicines/1/substitutes/max-discount`
+
+### Attachment and Prescription Management
+The Attachment and Prescription Management feature allows users to upload prescriptions and other attachments related to their orders.
+
+**API Endpoints:**
+- `POST /api/attachments/upload` - Upload a prescription or attachment
+  - Request Parameters:
+    - `file` (MultipartFile) - The file to upload (required)
+    - `orderId` (Long) - Order ID to associate with the attachment (optional, but at least one of orderId, orderItemId, or userId must be provided)
+    - `orderItemId` (Long) - Order item ID to associate with the attachment (optional)
+    - `userId` (Long) - User ID to associate with the attachment (optional)
+    - `description` (String) - Description of the attachment (optional)
+  - Response: Returns an AttachmentDTO with the uploaded file details
+  - Example: `POST /api/attachments/upload` with form data including file and orderId=1
+
+- `GET /api/attachments/order/{orderId}` - Retrieve all attachments for an order
+  - Path Parameters:
+    - `orderId` (Long) - The ID of the order
+  - Response: Returns an array of AttachmentDTO objects
+  - Example: `GET /api/attachments/order/1`
+
+- `GET /api/attachments/order-item/{orderItemId}` - Retrieve all attachments for an order item
+  - Path Parameters:
+    - `orderItemId` (Long) - The ID of the order item
+  - Response: Returns an array of AttachmentDTO objects
+  - Example: `GET /api/attachments/order-item/1`
+
+- `GET /api/attachments/user/{userId}` - Retrieve all attachments for a user
+  - Path Parameters:
+    - `userId` (Long) - The ID of the user
+  - Response: Returns an array of AttachmentDTO objects
+  - Example: `GET /api/attachments/user/1`
+
+- `GET /api/attachments/{id}` - Retrieve a specific attachment by ID
+  - Path Parameters:
+    - `id` (Long) - The ID of the attachment
+  - Response: Returns an AttachmentDTO object
+  - Example: `GET /api/attachments/1`
+
+- `DELETE /api/attachments/{id}` - Delete an attachment
+  - Path Parameters:
+    - `id` (Long) - The ID of the attachment to delete
+  - Response: Returns HTTP 200 OK on success
+  - Example: `DELETE /api/attachments/1`
+
+**AttachmentDTO Fields:**
+- `id` (Long) - The attachment ID
+- `fileName` (String) - Original name of the uploaded file
+- `fileType` (String) - MIME type of the uploaded file
+- `fileUrl` (String) - Path to the stored file
+- `orderId` (Long) - Order ID associated with the attachment (if any)
+- `orderItemId` (Long) - Order item ID associated with the attachment (if any)
+- `userId` (Long) - User ID associated with the attachment (if any)
+- `description` (String) - Description of the attachment
+- `createdAt` (LocalDateTime) - Timestamp when the attachment was created
+- `updatedAt` (LocalDateTime) - Timestamp when the attachment was last updated
+
     USER ||--o{ ADDRESS : has
     USER ||--o{ ORDER : places
     USER ||--o{ PREORDER : creates
@@ -486,6 +607,58 @@ The Order entity represents a customer order with comprehensive tracking informa
 **Fields:**
 - `id`: Unique identifier (Long, auto-generated)
 - `totalAmount`: Total order amount (double)
+
+#### Substitute Entity
+The Substitute entity represents substitute products for medicines with comprehensive medical and e-commerce information.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `medicineId`: Reference to the original medicine (Long)
+- `substituteMedicineId`: Reference to the substitute medicine (Long)
+- `name`: Product name (String)
+- `manufacturers`: Product manufacturers (String)
+- `saltComposition`: Active ingredients (String)
+- `medicineType`: Type of medicine (tablet, syrup, etc.) (String)
+- `stock`: Available stock (Integer)
+- `introduction`: Brief description (String)
+- `benefits`: Product benefits (String)
+- `description`: Detailed description (String)
+- `howToUse`: Directions for use (String)
+- `safetyAdvise`: Safety information (String)
+- `ifMiss`: Instructions if dose is missed (String)
+- `packaging`: Packaging information (String)
+- `packagingType`: Type of packaging (String)
+- `mrp`: Maximum retail price (BigDecimal)
+- `bestPrice`: Best available price (BigDecimal)
+- `discountPercent`: Discount percentage (BigDecimal)
+- `views`: Number of views (Integer)
+- `bought`: Number of purchases (Integer)
+- `prescriptionRequired`: Whether prescription is required (String)
+- `label`: Product label (String)
+- `factBox`: Key facts about the product (String)
+- `primaryUse`: Primary use of the product (String)
+- `storage`: Storage instructions (String)
+- `useOf`: How to use the product (String)
+- `commonSideEffect`: Common side effects (String)
+- `alcoholInteraction`: Alcohol interaction warnings (String)
+- `pregnancyInteraction`: Pregnancy interaction warnings (String)
+- `lactationInteraction`: Lactation interaction warnings (String)
+- `drivingInteraction`: Driving interaction warnings (String)
+- `kidneyInteraction`: Kidney interaction warnings (String)
+- `liverInteraction`: Liver interaction warnings (String)
+- `manufacturerAddress`: Manufacturer address (String)
+- `countryOfOrigin`: Country of origin (String)
+- `forSale`: Regions where product is for sale (String)
+- `qa`: Questions and answers (String)
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "substitutes")`: JPA entity mapped to "substitutes" table
+- `@Column(name = "medicine_id")`: Explicit column mapping for medicineId
+- `@Column(name = "substitute_medicine_id")`: Explicit column mapping for substituteMedicineId
+- `@Column(name = "best_price")`: Explicit column mapping for bestPrice
+- `@Column(name = "discount_percent")`: Explicit column mapping for discountPercent
+
 - `discount`: Discount applied (double)
 - `address`: Delivery address details (String)
 - `pincode`: Postal code (String)
@@ -532,6 +705,29 @@ The OrderItem entity represents individual items within an order.
 **Annotations:**
 - `@Data`: Lombok annotation for boilerplate code generation
 - `@Entity(name = "order_items")`: JPA entity mapped to "order_items" table
+
+#### Attachment Entity
+The Attachment entity represents uploaded files such as prescriptions and other documents.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `fileName`: Original name of the uploaded file (String)
+- `fileType`: MIME type of the uploaded file (String)
+- `fileUrl`: Path to the stored file (String)
+- `orderId`: Reference to an order (Long, optional)
+- `orderItemId`: Reference to an order item (Long, optional)
+- `userId`: Reference to a user (Long, optional)
+- `description`: Description of the attachment (String, optional)
+- `createdAt`: Timestamp when the attachment was created (LocalDateTime)
+- `updatedAt`: Timestamp when the attachment was last updated (LocalDateTime)
+
+**Lifecycle Methods:**
+- `@PrePersist`: Sets `createdAt` timestamp before persisting
+- `@PreUpdate`: Sets `updatedAt` timestamp before updating
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "attachments")`: JPA entity mapped to "attachments" table
 
 #### PreOrder Entity
 The PreOrder entity represents pre-order information for complex multi-vendor orders.
@@ -659,6 +855,18 @@ The OTC Product entity represents over-the-counter products with comprehensive m
 - `@Entity(name = "otc_products")`: JPA entity mapped to "otc_products" table
 - `@Column(name = "subcategory_id")`: Explicit column mapping for subcategoryId
 - `@Transient`: For computed totalPrice field
+
+#### Substitute Entity
+The Substitute entity represents substitute products for medicines.
+
+**Fields:**
+- `id`: Unique identifier (Long, auto-generated)
+- `medicineId`: Reference to Medicine (Long)
+- `substituteId`: Reference to Substitute Medicine (Long)
+
+**Annotations:**
+- `@Data`: Lombok annotation for boilerplate code generation
+- `@Entity(name = "substitutes")`: JPA entity mapped to "substitutes" table
 
 #### Banner Entity
 The Banner entity represents marketing banners for the homepage.
@@ -876,6 +1084,36 @@ The [OtcProductServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/treg
    - Implements proper validation before database queries
    - Follows Spring Boot best practices for service layer implementation
 
+### Substitute Service
+
+The [SubstituteServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/SubstituteServiceImpl.java#L13-L85) class handles substitute product operations:
+
+1. **Substitute Product Retrieval**:
+   - Retrieves substitute products by medicine ID using the repository layer
+   - Automatically sorts results by best price in ascending order (low to high)
+   - Limits results to a maximum of 2 substitute products per medicine
+   - Maps entity data to DTOs with comprehensive medical and e-commerce information
+
+2. **Data Transformation**:
+   - Converts Substitute entities to SubstituteDetailDTOs through the convertToDTO method
+   - Handles all the detailed fields for substitute products including name, manufacturers, saltComposition, medicineType, stock, introduction, benefits, description, howToUse, safetyAdvise, ifMiss, packaging, packagingType, mrp, bestPrice, discountPercent, views, bought, prescriptionRequired, label, factBox, primaryUse, storage, useOf, commonSideEffect, alcoholInteraction, pregnancyInteraction, lactationInteraction, drivingInteraction, kidneyInteraction, liverInteraction, manufacturerAddress, countryOfOrigin, forSale, and qa
+
+3. **Sorting and Limiting**:
+   - Uses repository method with ORDER BY clause for efficient database-level sorting
+   - Uses Java Streams for limiting results to maximum 2 items
+   - Ensures consistent ordering with low to high price sorting
+
+4. **Error Handling**:
+   - Wraps all operations in try-catch blocks for proper exception handling
+   - Throws RuntimeException with meaningful error messages for debugging
+   - Logs exceptions to the console for troubleshooting purposes
+
+5. **Performance Considerations**:
+   - Uses database-level sorting for efficiency
+   - Implements proper validation before database queries
+   - Follows Spring Boot best practices for service layer implementation
+   - Limits results at the service layer to reduce data transfer
+
 ## Repository Layer
 
 ### Custom Queries
@@ -907,6 +1145,14 @@ The repository layer extends JpaRepository and includes custom queries:
    - Uses Spring Data JPA naming conventions for automatic query generation
    - Returns List<OtcProduct> for easy integration with service layer
 
+7. **SubstituteRepository**:
+   - Added [SubstituteRepository](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/impl/SubstituteRepository.java#L9-L14) with method to find substitute products by medicine ID
+   - Extends JpaRepository<Substitute, Long> for standard CRUD operations
+   - Custom method: findByMedicineIdOrderByBestPriceAsc(Long medicineId) for efficient querying with sorting
+   - Uses Spring Data JPA naming conventions for automatic query generation
+   - Returns List<Substitute> for easy integration with service layer
+   - Sorts results by best price in ascending order at the database level for efficiency
+
 ### Relationship Management
 
 The repository layer handles complex entity relationships:
@@ -928,11 +1174,12 @@ Request DTOs handle incoming data from API clients:
 Response DTOs handle outgoing data to API clients:
 - [OrderResponseDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/response/OrderResponseDTO.java#L11-L24): Order details with nested objects
 - [PreOrderResponseDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/response/PreOrderResponseDTO.java#L12-L20): Pre-order information
-- [MedicineWithStockAndVendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MedicineWithStockAndVendorDTO.java#L9-L23): Medicine information with inventory
+- [MedicineWithStockAndVendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MedicineWithStockAndVendorDTO.java#L9-L24): Medicine information with inventory
 - Updated DTOs to include category information
 - [SubcategoryDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/SubcategoryDTO.java#L5-L9): Subcategory information
 - [ProductDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/ProductDTO.java#L6-L12): Product information with computed total price
 - [OtcProductDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/OtcProductDTO.java#L7-L38): OTC Product information with comprehensive medical and e-commerce fields including name, category, subCategory, breadcrum, description, manufacturers, packaging, packInfo, price, bestPrice, discountPercent, prescriptionRequired, primaryUse, saltSynonmys, storage, introduction, useOf, benefits, sideEffect, howToUse, howWorks, safetyAdvise, ifMiss, ingredients, alternateBrand, manufacturerAddress, forSale, countryOfOrigin, tax, and totalPrice
+- [SubstituteDetailDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/SubstituteDetailDTO.java#L5-L47): Substitute Product information with comprehensive medical and e-commerce fields including name, manufacturers, saltComposition, medicineType, stock, introduction, benefits, description, howToUse, safetyAdvise, ifMiss, packaging, packagingType, mrp, bestPrice, discountPercent, views, bought, prescriptionRequired, label, factBox, primaryUse, storage, useOf, commonSideEffect, alcoholInteraction, pregnancyInteraction, lactationInteraction, drivingInteraction, kidneyInteraction, liverInteraction, manufacturerAddress, countryOfOrigin, forSale, and qa
 - [BannerDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/BannerDTO.java#L3-L12): Banner information with proper URL processing
 - [VendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/VendorDTO.java#L3-L22): Vendor information with delivery time and reviews
 
@@ -952,6 +1199,13 @@ The OTC Product Controller specifically:
 - Implements the GET /{subcategoryId}/products endpoint for retrieving OTC products by subcategory ID
 - Follows standard Spring Boot controller patterns
 
+The Substitute Controller specifically:
+- Uses @RestController annotation for automatic JSON serialization
+- Maps to the base URL path: /api/medicines
+- Implements the GET /{medicineId}/substitutes endpoint for retrieving substitute products by medicine ID
+- Follows standard Spring Boot controller patterns
+- Returns properly formatted JSON responses with appropriate HTTP status codes
+
 ### Error Handling
 
 Controllers include basic error handling:
@@ -963,6 +1217,11 @@ The OTC Product Controller specifically:
 - Returns HttpStatus.BAD_REQUEST (400) for null subcategory IDs
 - Returns HttpStatus.INTERNAL_SERVER_ERROR (500) for unexpected exceptions
 - Returns HttpStatus.OK (200) with empty list for valid subcategory IDs with no products
+- Logs exceptions to console for debugging purposes
+
+The Substitute Controller specifically:
+- Returns HttpStatus.INTERNAL_SERVER_ERROR (500) for unexpected exceptions
+- Returns HttpStatus.OK (200) with empty list for valid medicine IDs with no substitutes
 - Logs exceptions to console for debugging purposes
 
 ## Security Considerations
@@ -1027,7 +1286,6 @@ spring.datasource.url=jdbc:mysql://localhost:3306/trego_db?useSSL=false&serverTi
 spring.datasource.username=root
 spring.datasource.password=root
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
-```
 
 For Google Cloud SQL deployment:
 ```properties
@@ -1123,7 +1381,14 @@ springdoc.swagger-ui.path=/swagger-ui.html
     - Computed field: `total_price` (price + tax)
     - Appropriate data types for medical and e-commerce information
 
-13. **banners** table:
+13. **substitutes** table:
+    - Primary key: `id`
+    - Foreign key: `medicine_id` references `medicines.id`
+    - Referenced by: None
+    - Fields: `medicine_id`, `substitute_medicine_id`, `name`, `manufacturers`, `salt_composition`, `medicine_type`, `stock`, `introduction`, `benefits`, `description`, `how_to_use`, `safety_advise`, `if_miss`, `packaging`, `packaging_type`, `mrp`, `best_price`, `discount_percent`, `views`, `bought`, `prescription_required`, `label`, `fact_box`, `primary_use`, `storage`, `use_of`, `common_side_effect`, `alcohol_interaction`, `pregnancy_interaction`, `lactation_interaction`, `driving_interaction`, `kidney_interaction`, `liver_interaction`, `manufacturer_address`, `country_of_origin`, `for_sale`, `qa`
+    - Appropriate data types for medical and e-commerce information
+
+14. **banners** table:
     - Primary key: `id`
     - Foreign key references: None
     - Referenced by: None
@@ -1138,6 +1403,8 @@ The database schema should include appropriate indexes for performance:
 - Index on the `category` field in the `medicines` table for efficient category filtering
 - Index on `subcategory_id` in the `products` table for efficient product retrieval
 - Index on `subcategory_id` in the `otc_products` table for efficient OTC product retrieval
+- Index on `medicine_id` in the `substitutes` table for efficient substitute retrieval
+- Index on `best_price` in the `substitutes` table for efficient sorting
 - Additional indexes on frequently queried fields like `name`, `category`, and `prescription_required` in the `otc_products` table
 
 ## Testing
@@ -1179,12 +1446,7 @@ API documentation is available through Swagger UI:
 - Shows all endpoints with request/response schemas
 - Includes example requests and responses
 
-## Deployment
-
-### Standalone JAR
-
-Build and run as standalone JAR:
-```bash
+## API Testing with Postman
 mvn clean package
 java -jar target/trego-api-1.0.jar
 ```
@@ -1204,6 +1466,118 @@ The application is configured for Google Cloud SQL deployment:
 - Uses Google Cloud SQL MySQL Socket Factory
 - Configured for MySQL 8.0+ compatibility
 - Environment variables for configuration
+
+## API Testing with Postman
+
+### Importing the API Collection
+
+1. **Using Swagger UI Export**:
+   - Start the application and navigate to `http://localhost:8080/swagger-ui.html`
+   - Click on the "OpenAPI 3.0" link or find the export option
+   - Download the OpenAPI/Swagger specification file (JSON or YAML format)
+   - In Postman, click "Import" and select the downloaded file
+   - Postman will automatically create a collection with all API endpoints
+
+2. **Manual Setup**:
+   - Open Postman
+   - Click "New" > "Collection"
+   - Name the collection "Trego API"
+   - Click "Add a request" to create individual API requests
+
+### Setting up Requests
+
+#### General Request Structure:
+- **Base URL**: `http://localhost:8080` (when running locally)
+- **Headers**: 
+  - `Content-Type: application/json` (for POST/PUT requests with JSON body)
+  - `Accept: application/json` (to specify JSON response format)
+
+#### Example Requests:
+
+1. **Get All Medicines**:
+   - **Method**: GET
+   - **URL**: `http://localhost:8080/medicines`
+   - **Headers**: None required
+   - **Body**: Not applicable (GET request)
+   - **Expected Response**: 
+     - Status Code: 200 OK
+     - Response Body: Array of medicine objects with stock and vendor information
+
+2. **Get Medicine by ID**:
+   - **Method**: GET
+   - **URL**: `http://localhost:8080/medicines/1`
+   - **Headers**: None required
+   - **Body**: Not applicable (GET request)
+   - **Expected Response**: 
+     - Status Code: 200 OK
+     - Response Body: Detailed medicine object
+
+3. **Get Substitutes for a Medicine**:
+   - **Method**: GET
+   - **URL**: `http://localhost:8080/api/medicines/1/substitutes`
+   - **Headers**: None required
+   - **Body**: Not applicable (GET request)
+   - **Expected Response**: 
+     - Status Code: 200 OK
+     - Response Body: Array of up to 2 substitute objects sorted by price
+
+4. **Get Maximum Discount Among Substitutes**:
+   - **Method**: GET
+   - **URL**: `http://localhost:8080/api/medicines/1/substitutes/max-discount`
+   - **Headers**: None required
+   - **Body**: Not applicable (GET request)
+   - **Expected Response**: 
+     - Status Code: 200 OK
+     - Response Body: JSON number representing the maximum discount percentage
+
+5. **Search Medicines**:
+   - **Method**: GET
+   - **URL**: `http://localhost:8080/medicines/search?searchText=paracetamol`
+   - **Headers**: None required
+   - **Body**: Not applicable (GET request)
+   - **Expected Response**: 
+     - Status Code: 200 OK
+     - Response Body: Paginated results of medicines matching the search term
+
+### Common Error Handling
+
+1. **400 Bad Request**:
+   - **Cause**: Invalid request parameters or malformed data
+   - **Example**: Providing a non-numeric value for medicineId
+   - **Solution**: Check request parameters and ensure they match expected data types
+
+2. **404 Not Found**:
+   - **Cause**: Requested resource does not exist
+   - **Example**: Requesting a medicine with an ID that doesn't exist
+   - **Solution**: Verify the resource ID exists in the database
+
+3. **500 Internal Server Error**:
+   - **Cause**: Server-side exception or database error
+   - **Example**: Database connection failure or unhandled exception in code
+   - **Solution**: Check server logs for detailed error information
+
+4. **401 Unauthorized** (if authentication is implemented):
+   - **Cause**: Missing or invalid authentication credentials
+   - **Solution**: Provide valid authentication token or credentials
+
+### Response Analysis
+
+1. **Status Codes**:
+   - 200: Success
+   - 201: Created (for POST requests)
+   - 400: Bad Request
+   - 404: Not Found
+   - 500: Internal Server Error
+
+2. **Response Body**:
+   - JSON format for all responses
+   - Consistent field naming conventions
+   - Proper data types (strings, numbers, booleans, arrays, objects)
+
+3. **Error Responses**:
+   - Standardized error format
+   - Descriptive error messages
+   - Error codes for programmatic handling
 
 ## Performance Considerations
 
@@ -1364,38 +1738,70 @@ The "OTC Product Management" feature allows for comprehensive management of over
 
 This feature provides a comprehensive system for managing OTC products with detailed information that is essential for pharmaceutical e-commerce platforms. The implementation follows best practices for REST API design, data transfer, and error handling.
 
-## Performance Considerations
+### Substitute Product Management
 
-1. **Database Optimization**:
-   - Proper indexing strategy including index on subcategory_id field in otc_products table
-   - Query optimization with fetch joins
-   - Connection pooling with HikariCP
+The "Substitute Product Management" feature allows users to find substitute products for medicines, sorted by price from low to high, with a maximum of 2 substitutes per medicine. This feature includes:
 
-2. **Caching**:
-   - No explicit caching implemented
-   - Potential for Redis or in-memory caching
+1. **Substitute Entity**:
+   - Added a [Substitute](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/entity/Substitute.java#L9-L65) entity to represent substitute products with comprehensive fields for medical information, e-commerce data, regulatory details, and manufacturer information
+   - Fields include: name, manufacturers, saltComposition, medicineType, stock, introduction, benefits, description, howToUse, safetyAdvise, ifMiss, packaging, packagingType, mrp, bestPrice, discountPercent, views, bought, prescriptionRequired, label, factBox, primaryUse, storage, useOf, commonSideEffect, alcoholInteraction, pregnancyInteraction, lactationInteraction, drivingInteraction, kidneyInteraction, liverInteraction, manufacturerAddress, countryOfOrigin, forSale, and qa
 
-3. **Pagination**:
-   - Implemented for large result sets
-   - Configurable page size
+2. **Substitute DTO**:
+   - Added a [SubstituteDetailDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/SubstituteDetailDTO.java#L5-L47) to properly transfer substitute product data to the frontend
+   - Includes all fields from the entity for complete data transfer
 
-## Scalability
+3. **Repository Updates**:
+   - Added [SubstituteRepository](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/impl/SubstituteRepository.java#L9-L14) with methods for substitute product queries including finding products by medicine ID
+   - Extends JpaRepository for standard CRUD operations
+   - Custom method: findByMedicineIdOrderByBestPriceAsc(Long medicineId) for efficient queries with sorting
 
-1. **Horizontal Scaling**:
-   - Stateless application design
-   - Database sharding potential
-   - Load balancing support
+4. **Service Layer Implementation**:
+   - Added [ISubstituteService](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/ISubstituteService.java#L7-L13) interface for substitute product operations
+   - Implemented [SubstituteServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/SubstituteServiceImpl.java#L13-L85) with business logic for retrieving substitute products and mapping entities to DTOs
+   - Converts Substitute entities to SubstituteDetailDTOs with all fields
+   - Automatically sorts substitutes by best price (low to high) or by discount percentage (high to low)
+   - Limits results to maximum 2 substitutes per medicine
+   - Proper error handling with meaningful exception messages
 
-2. **Vertical Scaling**:
-   - JVM tuning options
-   - Database optimization
-   - Memory management
+5. **API Endpoints**:
+   - Added [SubstituteController](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/api/SubstituteController.java#L12-L30) with endpoints:
+     - `GET /api/medicines/{medicineId}/substitutes` for retrieving substitute products by medicine ID
+     - `GET /api/medicines/{medicineId}/substitutes/sorted-by-discount` for retrieving substitute products sorted by discount percentage (highest first)
+     - `GET /api/medicines/{medicineId}/substitutes/max-discount` for retrieving substitute products sorted by discount percentage (highest first)
+   - Returns List<SubstituteDetailDTO> with proper HTTP status codes
+   - Handles exceptions with INTERNAL_SERVER_ERROR (500)
+   - Returns empty list for valid medicine IDs with no substitutes
 
-## API Documentation
+6. **Database Schema**:
+   - Added `substitutes` table with all required fields:
+     - `id` - Primary key
+     - `medicine_id` - Foreign key referencing the medicine
+     - `substitute_medicine_id` - Foreign key referencing the substitute medicine
+     - All other fields as described in the Substitute entity
+   - Foreign key relationship with `medicines` table via `medicine_id`
+   - Index on `medicine_id` for efficient queries
+   - Index on `best_price` for efficient sorting
+   - Appropriate data types for all fields (VARCHAR, DECIMAL, LONG, INTEGER)
 
-API documentation is available through Swagger UI:
-- Access at `/swagger-ui.html` when the application is running
-- Provides interactive API testing interface
+7. **Integration with Existing APIs**:
+   - Updated [MedicineServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/MedicineServiceImpl.java#L22-L150) to include substitute products in medicine responses
+   - Updated [MedicineWithStockAndVendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/MedicineWithStockAndVendorDTO.java#L9-L24) to include a list of substitute products
+
+8. **Testing**:
+   - Added [SubstituteControllerTest](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/test/java/com/trego/api/SubstituteControllerTest.java#L15-L77) for integration testing
+   - Added [SubstituteServiceImplTest](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/test/java/com/trego/service/impl/SubstituteServiceImplTest.java#L15-L105) for unit testing business logic
+   - Tests cover successful retrieval, sorting, and limiting of results
+   - Tests verify proper error handling
+   - Tests cover discount-based sorting functionality
+   - Uses mocks for isolation
+
+9. **Error Handling**:
+   - Proper error handling with appropriate HTTP status codes
+   - Exception logging for debugging purposes
+   - Graceful handling of invalid medicine IDs
+   - Meaningful error messages for troubleshooting
+
+This feature provides a comprehensive system for managing substitute products with detailed information that is essential for pharmaceutical e-commerce platforms. The implementation follows best practices for REST API design, data transfer, and error handling, with automatic sorting and limiting of results.
 - Shows all endpoints with request/response schemas
 - Includes example requests and responses
 
