@@ -425,6 +425,36 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
   - Response: Returns a BigDecimal value representing the maximum discount percentage
   - Example: `GET /api/medicines/1/substitutes/max-discount`
 
+### Medicine Bucket Optimization
+- `POST /api/buckets/optimize` - Create optimized medicine buckets based on requested medicines
+  - Request Body: BucketRequestDTO containing a list of medicine IDs
+  - Response: Returns a list of BucketDTO objects sorted by total price (lowest first)
+  - Example: `POST /api/buckets/optimize`
+  
+  Request Body:
+  ```json
+  {
+    "medicineIds": [1, 2, 3]
+  }
+  ```
+  
+  Response Fields:
+  - `id` (Long) - The bucket ID (vendor ID for single-vendor buckets, timestamp for mixed buckets)
+  - `name` (String) - The bucket name
+  - `items` (Array) - List of BucketItemDTO objects
+  - `totalPrice` (Double) - Total price of all items in the bucket
+  - `vendorId` (Long) - Vendor ID (if all items are from the same vendor)
+  - `vendorName` (String) - Vendor name (if all items are from the same vendor)
+  
+  BucketItemDTO Fields:
+  - `medicineId` (Long) - Medicine ID
+  - `medicineName` (String) - Medicine name
+  - `vendorId` (Long) - Vendor ID
+  - `vendorName` (String) - Vendor name
+  - `price` (Double) - Final price after discount
+  - `discount` (Double) - Discount percentage
+  - `quantity` (Integer) - Available quantity
+
 ### Attachment and Prescription Management
 The Attachment and Prescription Management feature allows users to upload prescriptions and other attachments related to their orders.
 
@@ -1447,27 +1477,6 @@ API documentation is available through Swagger UI:
 - Includes example requests and responses
 
 ## API Testing with Postman
-mvn clean package
-java -jar target/trego-api-1.0.jar
-```
-
-### Docker Deployment
-
-Create a Dockerfile:
-```dockerfile
-FROM openjdk:17-jdk-slim
-COPY target/trego-api-1.0.jar app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
-```
-
-### Google Cloud Deployment
-
-The application is configured for Google Cloud SQL deployment:
-- Uses Google Cloud SQL MySQL Socket Factory
-- Configured for MySQL 8.0+ compatibility
-- Environment variables for configuration
-
-## API Testing with Postman
 
 ### Importing the API Collection
 
@@ -1538,6 +1547,23 @@ The application is configured for Google Cloud SQL deployment:
    - **Expected Response**: 
      - Status Code: 200 OK
      - Response Body: Paginated results of medicines matching the search term
+
+6. **Create Optimized Medicine Buckets**:
+   - **Method**: POST
+   - **URL**: `http://localhost:8080/api/buckets/optimize`
+   - **Headers**: 
+     - `Content-Type: application/json`
+     - `Accept: application/json`
+   - **Body**:
+     ```json
+     {
+       "medicineIds": [1, 2, 3]
+     }
+     ```
+   - **Expected Response**: 
+     - Status Code: 200 OK
+     - Response Body: Array of BucketDTO objects sorted by total price (lowest first)
+     - Each bucket contains items from either a single vendor or a mix of vendors at the best prices
 
 ### Common Error Handling
 
