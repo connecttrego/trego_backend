@@ -114,10 +114,10 @@ public class MainServiceImpl implements IMainService {
                 //medDTO.setSalesCount(salesCount.intValue());
 
                 System.out.println("vendorId "+vendorId+"  medicineId "+medicineId);
-                // Get stock info - Fixed method call to use existing repository method
-                Stock stock = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId)
-                        .orElse(null);
-                if (stock != null) {
+                // Get stock info - Use the new method that returns a List to handle multiple stocks
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                if (!stocks.isEmpty()) {
+                    Stock stock = stocks.get(0);
                     medDTO.setMrp(stock.getMrp());
                     medDTO.setDiscount(stock.getDiscount());
                     medDTO.setQty(stock.getQty());

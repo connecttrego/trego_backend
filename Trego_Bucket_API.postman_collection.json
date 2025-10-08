@@ -69,6 +69,27 @@
 			"response": []
 		},
 		{
+			"name": "Create Optimized Buckets from Preorder",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/buckets/optimize/preorder/11",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"buckets",
+						"optimize",
+						"preorder",
+						"11"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "Get All Vendors",
 			"request": {
 				"method": "GET",

@@ -394,7 +394,9 @@ public class OrderServiceImpl implements IOrderService {
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
         List<MedicineDTO> medicines = cart.getMedicine().stream()
                     .map(medicine -> {
-                        Optional<Stock> optionalStock = stockRepository.findByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
+                        // Use the new method that returns a List to handle multiple stocks
+                        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
+                        Optional<Stock> optionalStock = stocks.isEmpty() ? Optional.empty() : Optional.of(stocks.get(0));
                         return optionalStock.map(stock -> populateMedicalDTO(medicine, stock)).orElse(null);
                     })
                     .filter(Objects::nonNull) // Filters out null values from the stream
@@ -454,11 +456,12 @@ public class OrderServiceImpl implements IOrderService {
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 
-                            Optional<Stock> optionalStock = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
-                            if(optionalStock.isPresent()){
-                                Stock stock = optionalStock.get();
+                            // Use the new method that returns a List to handle multiple stocks
+                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                            if(!stocks.isEmpty()){
+                                Stock stock = stocks.get(0);
                                 double price = stock.getMrp();
-                                double discountPercentage = stock.getDiscount();;
+                                double discountPercentage = stock.getDiscount();
                                 double totalCartValue=  price * qty;
                                 totalCartValue = totalCartValue - (totalCartValue * discountPercentage / 100.0);
                                 return  totalCartValue;
@@ -482,13 +485,13 @@ public class OrderServiceImpl implements IOrderService {
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 
-                            Optional<Stock> optionalStock = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
-                            if(optionalStock.isPresent()){
-
-                                Stock stock = optionalStock.get();
+                            // Use the new method that returns a List to handle multiple stocks
+                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                            if(!stocks.isEmpty()){
+                                Stock stock = stocks.get(0);
                                 double price = stock.getMrp();
                                 medicine.setMrp(price);
-                                double discountPercentage = stock.getDiscount();;
+                                double discountPercentage = stock.getDiscount();
                                 double tempTotalCartValue =  price * qty;
                                 return  tempTotalCartValue;
                             }else {

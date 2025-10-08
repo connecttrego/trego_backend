@@ -441,7 +441,13 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
     }
   }
   ```
-  
+
+- `GET /api/buckets/optimize/preorder/{orderId}` - Create optimized medicine buckets based on an existing preorder
+  - Path Parameters:
+    - `orderId` (Long) - The ID of the preorder to optimize
+  - Response: Returns a list of BucketDTO objects sorted by total price (lowest first)
+  - Example: `GET /api/buckets/optimize/preorder/11`
+
   Response Fields:
   - `id` (Long) - The bucket ID (vendor ID for single-vendor buckets, timestamp for mixed buckets)
   - `name` (String) - The bucket name
@@ -1503,6 +1509,9 @@ API documentation is available through Swagger UI:
 
 #### General Request Structure:
 - **Base URL**: `http://localhost:8080` (when running locally)
+
+#### Example Requests:
+
 - **Headers**: 
   - `Content-Type: application/json` (for POST/PUT requests with JSON body)
   - `Accept: application/json` (to specify JSON response format)
@@ -1576,16 +1585,16 @@ API documentation is available through Swagger UI:
      - Each bucket contains items from either a single vendor or a mix of vendors at the best prices
      - Each item includes both available quantity from the vendor and requested quantity from the user
 
-### Common Error Handling
-
-1. **400 Bad Request**:
-   - **Cause**: Invalid request parameters or malformed data
-   - **Example**: Providing a non-numeric value for medicineId
-   - **Solution**: Check request parameters and ensure they match expected data types
-
-2. **404 Not Found**:
-   - **Cause**: Requested resource does not exist
-   - **Example**: Requesting a medicine with an ID that doesn't exist
+7. **Create Optimized Medicine Buckets from Preorder**:
+   - **Method**: GET
+   - **URL**: `http://localhost:8080/api/buckets/optimize/preorder/11`
+   - **Headers**: None required
+   - **Body**: Not applicable (GET request)
+   - **Expected Response**: 
+     - Status Code: 200 OK
+     - Response Body: Array of BucketDTO objects sorted by total price (lowest first)
+     - Each bucket contains items from either a single vendor or a mix of vendors at the best prices
+     - Each item includes both available quantity from the vendor and requested quantity from the preorder
    - **Solution**: Verify the resource ID exists in the database
 
 3. **500 Internal Server Error**:
