@@ -8,7 +8,9 @@ public class BucketItemDTO {
     private String medicineName;
     private Long vendorId;
     private String vendorName;
-    private double price;
+    private double price; // Price per unit
     private double discount;
-    private int quantity;
+    private int availableQuantity; // Available quantity from vendor
+    private int requestedQuantity; // Quantity requested by user
+    private double totalPrice; // Total price (price per unit * requested quantity)
 }

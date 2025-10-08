@@ -18,8 +18,8 @@ public class BucketController {
     private IBucketService bucketService;
 
     /**
-     * Create optimized medicine buckets based on requested medicines
-     * @param request DTO containing list of medicine IDs
+     * Create optimized medicine buckets based on requested medicines and quantities
+     * @param request DTO containing map of medicine IDs and their required quantities
      * @return List of bucket options sorted by price (lowest first)
      */
     @PostMapping("/optimize")

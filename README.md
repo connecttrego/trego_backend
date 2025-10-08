@@ -426,15 +426,19 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
   - Example: `GET /api/medicines/1/substitutes/max-discount`
 
 ### Medicine Bucket Optimization
-- `POST /api/buckets/optimize` - Create optimized medicine buckets based on requested medicines
-  - Request Body: BucketRequestDTO containing a list of medicine IDs
+- `POST /api/buckets/optimize` - Create optimized medicine buckets based on requested medicines and quantities
+  - Request Body: BucketRequestDTO containing a map of medicine IDs and their required quantities
   - Response: Returns a list of BucketDTO objects sorted by total price (lowest first)
   - Example: `POST /api/buckets/optimize`
   
   Request Body:
   ```json
   {
-    "medicineIds": [1, 2, 3]
+    "medicineQuantities": {
+      "1": 2,
+      "2": 1,
+      "3": 3
+    }
   }
   ```
   
@@ -451,9 +455,11 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
   - `medicineName` (String) - Medicine name
   - `vendorId` (Long) - Vendor ID
   - `vendorName` (String) - Vendor name
-  - `price` (Double) - Final price after discount
+  - `price` (Double) - Price per unit after discount
   - `discount` (Double) - Discount percentage
-  - `quantity` (Integer) - Available quantity
+  - `availableQuantity` (Integer) - Available quantity from vendor
+  - `requestedQuantity` (Integer) - Quantity requested by user
+  - `totalPrice` (Double) - Total price (price per unit * requested quantity)
 
 ### Attachment and Prescription Management
 The Attachment and Prescription Management feature allows users to upload prescriptions and other attachments related to their orders.
@@ -1557,13 +1563,18 @@ API documentation is available through Swagger UI:
    - **Body**:
      ```json
      {
-       "medicineIds": [1, 2, 3]
+       "medicineQuantities": {
+         "1": 2,
+         "2": 1,
+         "3": 3
+       }
      }
      ```
    - **Expected Response**: 
      - Status Code: 200 OK
      - Response Body: Array of BucketDTO objects sorted by total price (lowest first)
      - Each bucket contains items from either a single vendor or a mix of vendors at the best prices
+     - Each item includes both available quantity from the vendor and requested quantity from the user
 
 ### Common Error Handling
 

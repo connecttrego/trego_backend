@@ -30,7 +30,8 @@ public class BucketServiceImpl implements IBucketService {
 
     @Override
     public List<BucketDTO> createOptimizedBuckets(BucketRequestDTO request) {
-        List<Long> medicineIds = request.getMedicineIds();
+        Map<Long, Integer> medicineQuantities = request.getMedicineQuantities();
+        List<Long> medicineIds = new ArrayList<>(medicineQuantities.keySet());
         
         // Get all medicines
         List<Medicine> medicines = medicineRepository.findAllById(medicineIds);
@@ -59,13 +60,15 @@ public class BucketServiceImpl implements IBucketService {
             
             if (vendorMedicineIds.containsAll(medicineIds)) {
                 // Create a bucket for this vendor
-                BucketDTO bucket = createBucketForVendor(vendorId, vendorStocks, medicines);
-                buckets.add(bucket);
+                BucketDTO bucket = createBucketForVendor(vendorId, vendorStocks, medicines, medicineQuantities);
+                if (bucket != null) {
+                    buckets.add(bucket);
+                }
             }
         }
         
         // Also create mixed vendor buckets (one medicine from each vendor at best price)
-        BucketDTO mixedBucket = createMixedVendorBucket(medicines, relevantStocks);
+        BucketDTO mixedBucket = createMixedVendorBucket(medicines, relevantStocks, medicineQuantities);
         if (mixedBucket != null) {
             buckets.add(mixedBucket);
         }
@@ -76,7 +79,7 @@ public class BucketServiceImpl implements IBucketService {
         return buckets;
     }
     
-    private BucketDTO createBucketForVendor(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines) {
+    private BucketDTO createBucketForVendor(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities) {
         BucketDTO bucket = new BucketDTO();
         bucket.setId(vendorId); // Use vendor ID as bucket ID
         Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
@@ -88,24 +91,40 @@ public class BucketServiceImpl implements IBucketService {
         double totalPrice = 0.0;
         
         for (Medicine medicine : medicines) {
+            Long medicineId = medicine.getId();
+            int requestedQuantity = medicineQuantities.get(medicineId);
+            
             // Find the stock for this medicine from this vendor
             Optional<Stock> stockOptional = vendorStocks.stream()
-                    .filter(s -> s.getMedicine().getId() == medicine.getId()) // Fixed: using == for primitive comparison
+                    .filter(s -> s.getMedicine().getId() == medicineId)
                     .findFirst();
             
             if (stockOptional.isPresent()) {
                 Stock stock = stockOptional.get();
-                BucketItemDTO item = new BucketItemDTO();
-                item.setMedicineId(medicine.getId());
-                item.setMedicineName(medicine.getName());
-                item.setVendorId(vendorId);
-                item.setVendorName(vendor != null ? vendor.getName() : "");
-                item.setPrice(calculateFinalPrice(stock.getMrp(), stock.getDiscount()));
-                item.setDiscount(stock.getDiscount());
-                item.setQuantity(stock.getQty());
                 
-                items.add(item);
-                totalPrice += item.getPrice();
+                // Check if vendor has enough quantity
+                if (stock.getQty() >= requestedQuantity) {
+                    BucketItemDTO item = new BucketItemDTO();
+                    item.setMedicineId(medicineId);
+                    item.setMedicineName(medicine.getName());
+                    item.setVendorId(vendorId);
+                    item.setVendorName(vendor != null ? vendor.getName() : "");
+                    item.setPrice(calculateUnitPrice(stock.getMrp(), stock.getDiscount()));
+                    item.setDiscount(stock.getDiscount());
+                    item.setAvailableQuantity(stock.getQty());
+                    item.setRequestedQuantity(requestedQuantity);
+                    double itemTotalPrice = calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity);
+                    item.setTotalPrice(itemTotalPrice);
+                    
+                    items.add(item);
+                    totalPrice += itemTotalPrice;
+                } else {
+                    // Vendor doesn't have enough quantity, so this bucket is invalid
+                    return null;
+                }
+            } else {
+                // Vendor doesn't have this medicine, so this bucket is invalid
+                return null;
             }
         }
         
@@ -115,7 +134,7 @@ public class BucketServiceImpl implements IBucketService {
         return bucket;
     }
     
-    private BucketDTO createMixedVendorBucket(List<Medicine> medicines, List<Stock> allStocks) {
+    private BucketDTO createMixedVendorBucket(List<Medicine> medicines, List<Stock> allStocks, Map<Long, Integer> medicineQuantities) {
         BucketDTO bucket = new BucketDTO();
         bucket.setId(System.currentTimeMillis()); // Unique ID for mixed bucket
         bucket.setName("Best price mixed vendor bucket");
@@ -124,31 +143,44 @@ public class BucketServiceImpl implements IBucketService {
         double totalPrice = 0.0;
         
         for (Medicine medicine : medicines) {
+            Long medicineId = medicine.getId();
+            int requestedQuantity = medicineQuantities.get(medicineId);
+            
             // Find the best price for this medicine across all vendors
             List<Stock> medicineStocks = allStocks.stream()
-                    .filter(stock -> stock.getMedicine().getId() == medicine.getId()) // Fixed: using == for primitive comparison
+                    .filter(stock -> stock.getMedicine().getId() == medicineId)
                     .collect(Collectors.toList());
             
             if (!medicineStocks.isEmpty()) {
-                // Find the stock with the lowest final price
-                Optional<Stock> bestStockOptional = medicineStocks.stream()
-                        .min(Comparator.comparingDouble(stock -> calculateFinalPrice(stock.getMrp(), stock.getDiscount())));
+                // Filter stocks that have enough quantity
+                List<Stock> sufficientStocks = medicineStocks.stream()
+                        .filter(stock -> stock.getQty() >= requestedQuantity)
+                        .collect(Collectors.toList());
                 
-                if (bestStockOptional.isPresent()) {
-                    Stock bestStock = bestStockOptional.get();
-                    Vendor vendor = bestStock.getVendor();
+                if (!sufficientStocks.isEmpty()) {
+                    // Find the stock with the lowest final price
+                    Optional<Stock> bestStockOptional = sufficientStocks.stream()
+                            .min(Comparator.comparingDouble(stock -> calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity)));
                     
-                    BucketItemDTO item = new BucketItemDTO();
-                    item.setMedicineId(medicine.getId());
-                    item.setMedicineName(medicine.getName());
-                    item.setVendorId(vendor.getId());
-                    item.setVendorName(vendor.getName());
-                    item.setPrice(calculateFinalPrice(bestStock.getMrp(), bestStock.getDiscount()));
-                    item.setDiscount(bestStock.getDiscount());
-                    item.setQuantity(bestStock.getQty());
-                    
-                    items.add(item);
-                    totalPrice += item.getPrice();
+                    if (bestStockOptional.isPresent()) {
+                        Stock bestStock = bestStockOptional.get();
+                        Vendor vendor = bestStock.getVendor();
+                        
+                        BucketItemDTO item = new BucketItemDTO();
+                        item.setMedicineId(medicineId);
+                        item.setMedicineName(medicine.getName());
+                        item.setVendorId(vendor.getId());
+                        item.setVendorName(vendor.getName());
+                        item.setPrice(calculateUnitPrice(bestStock.getMrp(), bestStock.getDiscount()));
+                        item.setDiscount(bestStock.getDiscount());
+                        item.setAvailableQuantity(bestStock.getQty());
+                        item.setRequestedQuantity(requestedQuantity);
+                        double itemTotalPrice = calculateTotalPrice(bestStock.getMrp(), bestStock.getDiscount(), requestedQuantity);
+                        item.setTotalPrice(itemTotalPrice);
+                        
+                        items.add(item);
+                        totalPrice += itemTotalPrice;
+                    }
                 }
             }
         }
@@ -163,8 +195,13 @@ public class BucketServiceImpl implements IBucketService {
         return null;
     }
     
-    private double calculateFinalPrice(double mrp, double discount) {
+    private double calculateUnitPrice(double mrp, double discount) {
         return mrp - (mrp * discount / 100);
+    }
+    
+    private double calculateTotalPrice(double mrp, double discount, int quantity) {
+        double unitPrice = calculateUnitPrice(mrp, discount);
+        return unitPrice * quantity;
     }
 
     @Override

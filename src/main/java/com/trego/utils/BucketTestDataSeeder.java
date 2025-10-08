@@ -107,28 +107,28 @@
 //         List<Medicine> medicines = Arrays.asList(medicine1, medicine2, medicine3);
 //         medicineRepository.saveAll(medicines);
 
-//         // Create test stocks
+//         // Create test stocks with higher quantities for testing
 //         // Vendor 1 stocks
 //         Stock stock1v1 = new Stock();
 //         stock1v1.setMedicine(medicine1);
 //         stock1v1.setVendor(vendor1);
 //         stock1v1.setMrp(15.0);
 //         stock1v1.setDiscount(10.0);
-//         stock1v1.setQty(100);
+//         stock1v1.setQty(1000); // Increased quantity
 
 //         Stock stock2v1 = new Stock();
 //         stock2v1.setMedicine(medicine2);
 //         stock2v1.setVendor(vendor1);
 //         stock2v1.setMrp(50.0);
 //         stock2v1.setDiscount(5.0);
-//         stock2v1.setQty(50);
+//         stock2v1.setQty(500); // Increased quantity
 
 //         Stock stock3v1 = new Stock();
 //         stock3v1.setMedicine(medicine3);
 //         stock3v1.setVendor(vendor1);
 //         stock3v1.setMrp(75.0);
 //         stock3v1.setDiscount(15.0);
-//         stock3v1.setQty(30);
+//         stock3v1.setQty(300); // Increased quantity
 
 //         // Vendor 2 stocks
 //         Stock stock1v2 = new Stock();
@@ -136,21 +136,21 @@
 //         stock1v2.setVendor(vendor2);
 //         stock1v2.setMrp(12.0);
 //         stock1v2.setDiscount(15.0);
-//         stock1v2.setQty(200);
+//         stock1v2.setQty(2000); // Increased quantity
 
 //         Stock stock2v2 = new Stock();
 //         stock2v2.setMedicine(medicine2);
 //         stock2v2.setVendor(vendor2);
 //         stock2v2.setMrp(45.0);
 //         stock2v2.setDiscount(10.0);
-//         stock2v2.setQty(75);
+//         stock2v2.setQty(750); // Increased quantity
 
 //         Stock stock3v2 = new Stock();
 //         stock3v2.setMedicine(medicine3);
 //         stock3v2.setVendor(vendor2);
 //         stock3v2.setMrp(70.0);
 //         stock3v2.setDiscount(20.0);
-//         stock3v2.setQty(40);
+//         stock3v2.setQty(400); // Increased quantity
 
 //         // Vendor 3 stocks (only has medicine 1 and 2)
 //         Stock stock1v3 = new Stock();
@@ -158,14 +158,14 @@
 //         stock1v3.setVendor(vendor3);
 //         stock1v3.setMrp(18.0);
 //         stock1v3.setDiscount(5.0);
-//         stock1v3.setQty(150);
+//         stock1v3.setQty(1500); // Increased quantity
 
 //         Stock stock2v3 = new Stock();
 //         stock2v3.setMedicine(medicine2);
 //         stock2v3.setVendor(vendor3);
 //         stock2v3.setMrp(55.0);
 //         stock2v3.setDiscount(8.0);
-//         stock2v3.setQty(60);
+//         stock2v3.setQty(600); // Increased quantity
 
 //         List<Stock> stocks = Arrays.asList(
 //                 stock1v1, stock2v1, stock3v1,
