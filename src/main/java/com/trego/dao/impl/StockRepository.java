@@ -16,5 +16,16 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
 
     List<Stock> findByVendorId(long id);
     Page<Stock> findByVendorId(Long vendorId, Pageable pageable);
-    Optional<Stock> findByMedicineIdAndVendorId(long medicineId, long vendorId);
+
+    List<Stock> findByMedicineIdAndVendorId(long medicineId, Long vendorId);
+
+    Optional<Stock> findByVendorIdAndMedicineId(long vendorId, long medicineId);
+
+    @Query("""
+    SELECT s.medicine.id, s.vendor.id, SUM(s.qty), AVG(s.discount), SUM(s.mrp)
+    FROM Stock s
+    WHERE s.vendor.id = :vendorId
+    GROUP BY s.medicine.id, s.vendor.id
+    """)
+    List<Object[]> findAggregatedStockByVendor(@Param("vendorId") long vendorId);
 }
