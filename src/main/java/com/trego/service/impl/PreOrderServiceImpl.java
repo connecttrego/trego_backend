@@ -89,120 +89,74 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     @Override
-    public VandorCartResponseDTO vendorSpecificPrice(long orderId) {
-        PreOrder preOrder = preOrderRepository.findByIdAndPaymentStatus(orderId, "unpaid");
+    public VandorCartResponseDTO vendorSpecificPrice( long orderId) {
+        PreOrder preOrder = preOrderRepository.findById(orderId).orElse(null);
         VandorCartResponseDTO vandorCartResponseDTO = new VandorCartResponseDTO();
-        if (preOrder != null) {
-            Gson gson = new Gson();
-            vandorCartResponseDTO = gson.fromJson(preOrder.getPayload(), VandorCartResponseDTO.class);
-            vandorCartResponseDTO.setOrderId(orderId);
+        vandorCartResponseDTO.setUserId(preOrder.getUserId());
+        vandorCartResponseDTO.setOrderId(orderId);
+        Gson gson = new Gson();
+        PreOrderResponseDTO preOrderResponseDTO =  gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
+        preOrderResponseDTO.setOrderId(preOrder.getId());
+
+        // Get all unique medicine IDs from all carts
+        List<Medicine> allMedicines = medicineRepository.findAllById(
+                preOrderResponseDTO.getCarts().stream()
+                        .flatMap(cart -> cart.getMedicine().stream())
+                        .map(MedicineDTO::getId)
+                        .distinct()
+                        .collect(Collectors.toList())
+        );
 
 
-            // Extract all medicines from the carts using Java Streams
-            List<MedicineDTO> allMedicines = vandorCartResponseDTO.getCarts().stream()
-                    .flatMap(cart -> cart.getMedicine().stream()
-                            .map(medicine -> {
-                                medicine.setQty(medicine.getQty()); // Assuming MedicineDTO has a quantity field
-                                return medicine;
-                            })
-                    )
-                    .collect(Collectors.toMap(
-                            MedicineDTO::getId,
-                            medicine -> medicine,
-                            (existing, replacement) -> {
-                                existing.setQty(existing.getQty() + replacement.getQty()); // Merge quantity
-                                return existing;
-                            }
-                    ))
-                    .values()
-                    .stream()
+        List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
+            List<MedicineDTO> medicines = cart.getMedicine().stream()
+                    .map(medicine -> {
+                        // Use the new method that returns a List to handle multiple stocks
+                        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
+                        Optional<Stock> optionalStock = stocks.isEmpty() ? Optional.empty() : Optional.of(stocks.get(0));
+                        // Instead of returning null, return the medicine with indication of unavailability
+                        if (optionalStock.isPresent()) {
+                            return populateMedicalDTO(medicine, optionalStock.get());
+                        } else {
+                            // Return medicine with default values indicating unavailability
+                            return populateUnavailableMedicalDTO(medicine);
+                        }
+                    })
+                    // Remove the filter that removes null values since we're not returning null anymore
                     .collect(Collectors.toList());
 
-
-            List<CartResponseDTO> cartDTOs = vandorCartResponseDTO.getCarts().stream().map(cart -> {
-
-                // Build medicine list by merging stock duplicates
-                List<MedicineDTO> medicines = allMedicines.stream()
-                        .map(medicine -> {
-                            // Fetch all stock rows for this medicine & vendor
-                            List<Stock> stockList = stockRepository.findByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
-
-                            if (stockList == null || stockList.isEmpty()) {
-                                return null;
-                            }
-
-                            // Combine stock data
-                            double totalMrp = 0.0;
-                            double totalDiscount = 0.0;
-                            int totalQty = 0;
-
-                            for (Stock stock : stockList) {
-                                totalMrp += stock.getMrp();
-                                totalDiscount += stock.getDiscount();
-                                totalQty += stock.getQty();
-                            }
-
-                            double avgDiscount = totalDiscount / stockList.size();
-
-                            // Pick the latest expiry date if present
-                            String latestExpiry = stockList.stream()
-                                    .map(Stock::getExpiryDate)
-                                    .filter(Objects::nonNull)
-                                    .max(String::compareTo)
-                                    .orElse(null);
-
-                            // Create a combined stock object
-                            Stock combinedStock = new Stock();
-                            combinedStock.setMrp(totalMrp);
-                            combinedStock.setDiscount(avgDiscount);
-                            combinedStock.setQty(totalQty);
-                            combinedStock.setExpiryDate(latestExpiry);
-
-                            // Populate MedicineDTO
-                            return populateMedicalDTO(medicine, combinedStock);
-                        })
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
-
-                // Set medicine list to cart
-                cart.setMedicine(medicines);
-
-                // Get vendor info
-                Vendor vendor = vendorRepository.findById(cart.getVendorId()).orElse(null);
-                if (vendor != null) {
-                    cart.setVendorId(vendor.getId());
-                    cart.setName(vendor.getName());
-
-                    String logoBase = vendor.getCategory().equalsIgnoreCase("retail")
-                            ? Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL
-                            : Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL;
-                    cart.setLogo(logoBase + vendor.getLogo());
-
-                    cart.setGstNumber(vendor.getGistin());
-                    cart.setLicence(vendor.getDruglicense());
-                    cart.setLat(vendor.getLat());
-                    cart.setLng(vendor.getLng());
-                    cart.setDeliveryTime(vendor.getDeliveryTime());
-                    cart.setReviews(vendor.getReviews());
+            cart.setMedicine(medicines);
+            Vendor vendor = vendorRepository.findById(cart.getVendorId()).orElse(null);
+            if (vendor != null) {
+                cart.setVendorId(vendor.getId());
+                cart.setName(vendor.getName());
+                if(vendor.getCategory().equalsIgnoreCase("retail")) {
+                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL+ vendor.getLogo());
+                }else{
+                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL+ vendor.getLogo());
                 }
+                cart.setGstNumber(vendor.getGistin());
+                cart.setLicence(vendor.getDruglicense());
+                // cart.setAddress(vendor.getAddress());
+                cart.setLat(vendor.getLat());
+                cart.setLng(vendor.getLng());
+                cart.setDeliveryTime(vendor.getDeliveryTime());
+                cart.setReviews(vendor.getReviews());
+            }
+            double totalCartValue = medicines.stream()
+                    .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
+                    .sum();
 
-                // Compute totals
-                double totalCartValue = medicines.stream()
-                        .mapToDouble(m -> m.getMrp() * m.getQty())
-                        .sum();
+            double discount   = medicines.stream()
+                    .mapToDouble(medicine ->(medicine.getMrp() * medicine.getQty()) * medicine.getDiscount() / 100.0)
+                    .sum();
 
-                double totalDiscount = medicines.stream()
-                        .mapToDouble(m -> (m.getMrp() * m.getQty()) * m.getDiscount() / 100.0)
-                        .sum();
+            cart.setTotalCartValue(totalCartValue);
+            cart.setAmountToPay(totalCartValue - discount);
+            return cart;
+        }).collect(Collectors.toList());
 
-                cart.setTotalCartValue(totalCartValue);
-                cart.setAmountToPay(totalCartValue - totalDiscount);
-
-                return cart;
-            }).collect(Collectors.toList());
-
-            vandorCartResponseDTO.setCarts(cartDTOs);
-        }
+        vandorCartResponseDTO.setCarts(cartDTOs);
 
         return vandorCartResponseDTO;
     }
@@ -212,38 +166,44 @@ public class PreOrderServiceImpl implements IPreOrderService {
 
             List<MedicineDTO> medicines = cart.getMedicine().stream()
                     .map(medicine -> {
-                        List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
-                        if (stocks.isEmpty()) return null;
-
-                        Stock stock = stocks.get(0);
-                        return populateMedicalDTO(medicine, stock);
+                        // Use the new method that returns a List to handle multiple stocks
+                        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
+                        Optional<Stock> optionalStock = stocks.isEmpty() ? Optional.empty() : Optional.of(stocks.get(0));
+                        // Instead of returning null, return the medicine with indication of unavailability
+                        if (!stocks.isEmpty()) {
+                            Stock stock = stocks.get(0);
+                            return populateMedicalDTO(medicine, stock);
+                        } else {
+                            // Return medicine with default values indicating unavailability
+                            return populateUnavailableMedicalDTO(medicine);
+                        }
                     })
-                    .filter(Objects::nonNull) // Filters out null values from the stream
+                    // Remove the filter that removes null values since we're not returning null anymore
                     .collect(Collectors.toList());
 
 
             cart.setMedicine(medicines);
 
 
-            Vendor vendor = vendorRepository.findById(cart.getVendorId()).orElse(null);
-            cart.setVendorId(vendor.getId());
-            cart.setName(vendor.getName());
-            if (vendor.getCategory().equalsIgnoreCase("retail")) {
-                cart.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL + vendor.getLogo());
-            } else {
-                cart.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL + vendor.getLogo());
-            }
-            cart.setGstNumber(vendor.getGistin());
-            cart.setLicence(vendor.getDruglicense());
-            // cart.setAddress(vendor.getAddress());
-            cart.setLat(vendor.getLat());
-            cart.setLng(vendor.getLng());
-            cart.setDeliveryTime(vendor.getDeliveryTime());
-            cart.setReviews(vendor.getReviews());
-            cart.setDeliveryTime(vendor.getDeliveryTime());
-            cart.setReviews(vendor.getReviews());
-            return cart;
-        }).collect(Collectors.toList());
+          Vendor vendor = vendorRepository.findById(cart.getVendorId()).orElse(null);
+          if (vendor != null) {
+              cart.setVendorId(vendor.getId());
+              cart.setName(vendor.getName());
+              if(vendor.getCategory().equalsIgnoreCase("retail")) {
+                  cart.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL+ vendor.getLogo());
+              }else{
+                  cart.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL+ vendor.getLogo());
+              }
+              cart.setGstNumber(vendor.getGistin());
+              cart.setLicence(vendor.getDruglicense());
+             // cart.setAddress(vendor.getAddress());
+              cart.setLat(vendor.getLat());
+              cart.setLng(vendor.getLng());
+              cart.setDeliveryTime(vendor.getDeliveryTime());
+              cart.setReviews(vendor.getReviews());
+          }
+          return cart;
+      }).collect(Collectors.toList());
 
         double totalCartValue = getTotalCartValue(cartDTOs);
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
@@ -271,6 +231,28 @@ public class PreOrderServiceImpl implements IPreOrderService {
         return medicineDTO;
     }
 
+    private MedicineDTO populateUnavailableMedicalDTO(MedicineDTO medicineDTO) {
+        // Create a copy of the medicine DTO with default values indicating unavailability
+        MedicineDTO unavailableMedicine = new MedicineDTO();
+        unavailableMedicine.setId(medicineDTO.getId());
+        unavailableMedicine.setName(medicineDTO.getName());
+        unavailableMedicine.setManufacturer(medicineDTO.getManufacturer());
+        unavailableMedicine.setSaltComposition(medicineDTO.getSaltComposition());
+        unavailableMedicine.setMedicineType(medicineDTO.getMedicineType());
+        unavailableMedicine.setUseOf(medicineDTO.getUseOf());
+        unavailableMedicine.setStrip(medicineDTO.getStrip());
+        unavailableMedicine.setPhoto1(medicineDTO.getPhoto1());
+
+        // Set default values indicating unavailability
+        unavailableMedicine.setMrp(0.0);
+        unavailableMedicine.setDiscount(0.0);
+        unavailableMedicine.setQty(0);
+        unavailableMedicine.setActualPrice(0.0);
+        unavailableMedicine.setExpiryDate("Not Available");
+
+        return unavailableMedicine;
+    }
+
     private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
@@ -295,15 +277,13 @@ public class PreOrderServiceImpl implements IPreOrderService {
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 
-                            List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
-
-                            if (!stocks.isEmpty()) {
-                                // Pick the first stock (or combine them if needed)
+                            // Use the new method that returns a List to handle multiple stocks
+                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                            if(!stocks.isEmpty()){
                                 Stock stock = stocks.get(0);
-
                                 double price = stock.getMrp();
                                 double discountPercentage = stock.getDiscount();
-                                double totalCartValue = price * qty;
+                                double totalCartValue=  price * qty;
                                 totalCartValue = totalCartValue - (totalCartValue * discountPercentage / 100.0);
 
                                 return totalCartValue;
@@ -326,20 +306,18 @@ public class PreOrderServiceImpl implements IPreOrderService {
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 
-                            List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
-                            if (!stocks.isEmpty()) {
-                                // take the first stock, or combine if needed
+                            // Use the new method that returns a List to handle multiple stocks
+                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                            if(!stocks.isEmpty()){
+                                // Use the first stock if multiple exist
                                 Stock stock = stocks.get(0);
-
                                 double price = stock.getMrp();
                                 medicine.setMrp(price);
-
                                 double discountPercentage = stock.getDiscount();
-
-                                double tempTotalCartValue = price * qty;
-                                return tempTotalCartValue;
-                            } else {
-                                return 0.0;
+                                double tempTotalCartValue =  price * qty;
+                                return  tempTotalCartValue;
+                            }else {
+                                return  0.0;
                             }
                         }))
                 .mapToDouble(Double::doubleValue) // Map to double for summing
