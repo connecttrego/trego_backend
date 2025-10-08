@@ -17,7 +17,4 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     List<Stock> findByVendorId(long id);
     Page<Stock> findByVendorId(Long vendorId, Pageable pageable);
     Optional<Stock> findByMedicineIdAndVendorId(long medicineId, long vendorId);
-    
-    // Method to get all stocks (inherited from JpaRepository)
-    // List<Stock> findAll();
 }
