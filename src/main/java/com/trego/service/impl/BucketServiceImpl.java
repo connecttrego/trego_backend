@@ -108,12 +108,6 @@ public class BucketServiceImpl implements IBucketService {
             }
         }
         
-        // Also create mixed vendor buckets (one medicine from each vendor at best price)
-        BucketDTO mixedBucket = createMixedVendorBucketWithPartialAvailability(medicines, relevantStocks, medicineQuantities, unavailableMedicineIds);
-        if (mixedBucket != null && (!mixedBucket.getAvailableItems().isEmpty() || !mixedBucket.getUnavailableItems().isEmpty())) {
-            buckets.add(mixedBucket);
-        }
-        
         // Sort buckets by total price
         buckets.sort(Comparator.comparingDouble(BucketDTO::getTotalPrice));
         
@@ -233,19 +227,6 @@ public class BucketServiceImpl implements IBucketService {
                 }
             } else {
                 System.out.println("Skipping vendor ID: " + vendorId + " (not selected by user)");
-            }
-        }
-        
-        // Also create mixed vendor buckets (one medicine from each vendor at best price)
-        // But only consider vendors selected by the user
-        List<Stock> userSelectedStocks = relevantStocks.stream()
-                .filter(stock -> selectedVendorIds.contains(stock.getVendor().getId()))
-                .collect(Collectors.toList());
-                
-        if (!userSelectedStocks.isEmpty()) {
-            BucketDTO mixedBucket = createMixedVendorBucketWithPartialAvailability(medicines, userSelectedStocks, medicineQuantities, unavailableMedicineIds);
-            if (mixedBucket != null && (!mixedBucket.getAvailableItems().isEmpty() || !mixedBucket.getUnavailableItems().isEmpty())) {
-                buckets.add(mixedBucket);
             }
         }
         
