@@ -29,7 +29,7 @@ public class Address {
     private String name;
 
     @Column(nullable = true, name = "address_type")
-    private int addressType;
+    private int addressTypeValue;
 
 
 /*    @Column(name = "address_type")

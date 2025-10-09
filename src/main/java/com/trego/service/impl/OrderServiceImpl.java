@@ -168,7 +168,7 @@ public class OrderServiceImpl implements IOrderService {
                         address.getLandmark(),
                         address.getPincode(),
                         address.getLat(),
-                        address.getLng(), address.getUser().getId(), address.getMobileNo(), address.getName(), address.getAddressType());
+                        address.getLng(), address.getUser().getId(), address.getMobileNo(), address.getName(), address.getAddressTypeValue());
                 responseDTO.setAddress(addressDTO);
             }
 
