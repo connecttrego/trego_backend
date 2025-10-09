@@ -17,4 +17,6 @@ public class BucketDTO {
     private double totalDiscount; // Total discount across all items in the bucket
     private Long vendorId; // If all items are from the same vendor
     private String vendorName; // If all items are from the same vendor
+    private String logo;
+    private String deliveryTime;
 }

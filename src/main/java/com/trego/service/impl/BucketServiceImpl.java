@@ -254,9 +254,11 @@ public class BucketServiceImpl implements IBucketService {
         bucket.setName(vendor != null ? "Complete bucket from " + vendor.getName() : "Complete bucket from vendor " + vendorId);
         bucket.setVendorId(vendorId);
         bucket.setVendorName(vendor != null ? vendor.getName() : "");
+        bucket.setLogo(vendor != null ? vendor.getLogo() : "");
 
         List<BucketItemDTO> availableItems = new ArrayList<>();
         List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
+        String deliveryTime = "1 hrs extra";
         double totalPrice = 0.0;
         double deliveryCharges = 0.0;
         double totalDiscount = 0.0; // Track total discount
@@ -367,6 +369,7 @@ public class BucketServiceImpl implements IBucketService {
         bucket.setAvailableItems(availableItems);
         bucket.setUnavailableItems(unavailableItems);
         bucket.setTotalPrice(totalPrice);
+        bucket.setDeliveryTime(deliveryTime);
         bucket.setTotalDiscount(totalDiscount); // Set the total discount
         bucket.setDeliveryCharges(deliveryCharges);
         double amountToPay = totalPrice - totalDiscount - deliveryCharges;
@@ -375,387 +378,388 @@ public class BucketServiceImpl implements IBucketService {
         return bucket;
     }
 
-    private BucketDTO createMixedVendorBucketWithPartialAvailability(List<Medicine> medicines, List<Stock> allStocks, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
-        System.out.println("Creating mixed vendor bucket for " + medicines.size() + " medicines");
+//    private BucketDTO createMixedVendorBucketWithPartialAvailability(List<Medicine> medicines, List<Stock> allStocks, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
+//        System.out.println("Creating mixed vendor bucket for " + medicines.size() + " medicines");
+//
+//        // Check if medicines list is empty
+//        if (medicines.isEmpty()) {
+//            System.out.println("No medicines to create mixed vendor bucket");
+//            return null;
+//        }
+//
+//        List<BucketItemDTO> availableItems = new ArrayList<>();
+//        List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
+//        double totalPrice = 0.0;
+//        double totalDiscount = 0.0;
+//        double deliveryCharges = 0.0;// Track total discount
+//
+//        // Process available medicines
+//        for (Medicine medicine : medicines) {
+//            Long medicineId = medicine.getId();
+//            int requestedQuantity = medicineQuantities.get(medicineId);
+//
+//            System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
+//
+//            // Find the best price for this medicine across all vendors
+//            List<Stock> medicineStocks = allStocks.stream()
+//                    .filter(stock -> stock.getMedicine().getId() == medicineId)
+//                    .collect(Collectors.toList());
+//
+//            System.out.println("Found " + medicineStocks.size() + " stocks for medicine ID: " + medicineId);
+//
+//            if (!medicineStocks.isEmpty()) {
+//                // Filter stocks that have enough quantity
+//                List<Stock> sufficientStocks = medicineStocks.stream()
+//                        .filter(stock -> stock.getQty() >= requestedQuantity)
+//                        .collect(Collectors.toList());
+//
+//                System.out.println("Found " + sufficientStocks.size() + " stocks with sufficient quantity");
+//
+//                if (!sufficientStocks.isEmpty()) {
+//                    // Find the stock with the lowest final price
+//                    Optional<Stock> bestStockOptional = sufficientStocks.stream()
+//                            .min(Comparator.comparingDouble(stock -> calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity)));
+//
+//                    if (bestStockOptional.isPresent()) {
+//                        Stock bestStock = bestStockOptional.get();
+//                        Vendor vendor = bestStock.getVendor();
+//
+//                        System.out.println("Selected best stock from vendor ID: " + vendor.getId() + " with price: " + bestStock.getMrp() + ", discount: " + bestStock.getDiscount());
+//
+//                        BucketItemDTO item = new BucketItemDTO();
+//                        item.setMedicineId(medicineId);
+//                        item.setMedicineName(medicine.getName());
+//                        item.setMedicineImage(medicine.getPhoto1());
+//                        item.setMedicineStrip(medicine.getPacking());
+//                        //item.setVendorId(vendor.getId());
+//                        //item.setVendorName(vendor.getName());
+//                        item.setPrice(calculateUnitPrice(bestStock.getMrp(), bestStock.getDiscount()));
+//                        item.setDiscount(bestStock.getDiscount());
+//                        item.setAvailableQuantity(bestStock.getQty());
+//                        item.setRequestedQuantity(requestedQuantity);
+//                        double itemTotalPrice = calculateTotalPrice(bestStock.getMrp(), bestStock.getDiscount(), requestedQuantity);
+//                        item.setTotalPrice(itemTotalPrice);
+//
+//                        availableItems.add(item);
+//                        totalPrice += itemTotalPrice;
+//                        // Calculate discount amount for this item and add to total discount
+//                        double itemDiscountAmount = (bestStock.getMrp() * bestStock.getDiscount() / 100) * requestedQuantity;
+//                        totalDiscount += itemDiscountAmount;
+//                    }
+//                } else {
+//                    // No stock with sufficient quantity, add to unavailable items
+//                    System.out.println("No vendor has sufficient quantity for medicine ID: " + medicineId);
+//                    Stock bestStock = medicineStocks.get(0); // Just take the first one for info
+//                    Vendor vendor = bestStock.getVendor();
+//
+//                    UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+//                    unavailableItem.setMedicineId(medicineId);
+//                    unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
+//                    unavailableItem.setRequestedQuantity(requestedQuantity);
+//                    // Get substitutes for this medicine
+//                    try {
+//                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+//                        unavailableItem.setSubstitutes(substitutes);
+//                    } catch (Exception e) {
+//                        System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
+//                    }
+//                    unavailableItems.add(unavailableItem);
+//                }
+//            } else {
+//                // Medicine not available from any vendor, add to unavailable items
+//                System.out.println("Medicine ID: " + medicineId + " not available from any vendor");
+//                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+//                unavailableItem.setMedicineId(medicineId);
+//                unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
+//                unavailableItem.setRequestedQuantity(requestedQuantity);
+//                // Get substitutes for this medicine
+//                try {
+//                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+//                    unavailableItem.setSubstitutes(substitutes);
+//                } catch (Exception e) {
+//                    System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
+//                }
+//                unavailableItems.add(unavailableItem);
+//            }
+//        }
+//
+//        // Add unavailable medicines to the bucket with appropriate information
+//        for (Long unavailableMedicineId : unavailableMedicineIds) {
+//            Optional<Medicine> medicineOpt = medicines.stream()
+//                    .filter(m -> m.getId() == unavailableMedicineId)
+//                    .findFirst();
+//
+//            if (medicineOpt.isPresent()) {
+//                Medicine medicine = medicineOpt.get();
+//                int requestedQuantity = medicineQuantities.getOrDefault(unavailableMedicineId, 0);
+//
+//                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+//                unavailableItem.setMedicineId(unavailableMedicineId);
+//                unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
+//                unavailableItem.setRequestedQuantity(requestedQuantity);
+//                // Get substitutes for this medicine
+//                try {
+//                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId);
+//                    unavailableItem.setSubstitutes(substitutes);
+//                } catch (Exception e) {
+//                    System.out.println("Error fetching substitutes for medicine ID: " + unavailableMedicineId + ", error: " + e.getMessage());
+//                }
+//                unavailableItems.add(unavailableItem);
+//            }
+//        }
+//
+//        System.out.println("Mixed vendor bucket items - available: " + availableItems.size() + ", unavailable: " + unavailableItems.size());
+//
+//        // Create bucket even if we don't have all medicines
+//        if (!availableItems.isEmpty() || !unavailableItems.isEmpty()) {
+//            BucketDTO bucket = new BucketDTO();
+//            bucket.setId(System.currentTimeMillis()); // Unique ID for mixed bucket
+//            bucket.setName("Best price mixed vendor bucket");
+//            bucket.setAvailableItems(availableItems);
+//            bucket.setUnavailableItems(unavailableItems);
+//            bucket.setTotalPrice(totalPrice);
+//            bucket.setTotalDiscount(totalDiscount); // Set the total discount
+//            bucket.setDeliveryCharges(deliveryCharges);
+//            double amountToPay = totalPrice - totalDiscount - deliveryCharges;
+//            bucket.setAmountToPay(amountToPay);
+//            System.out.println("Returning mixed vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount + ", amountToPay: " + amountToPay );
+//            return bucket;
+//        }
+//
+//        System.out.println("Not returning mixed vendor bucket - no items");
+//        return null;
+//    }
 
-        // Check if medicines list is empty
-        if (medicines.isEmpty()) {
-            System.out.println("No medicines to create mixed vendor bucket");
-            return null;
-        }
+//    private BucketDTO createBucketForVendor(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities) {
+//        System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");
+//
+//        // Check if medicines list is empty
+//        if (medicines.isEmpty()) {
+//            System.out.println("No medicines to create bucket for vendor ID: " + vendorId);
+//            return null;
+//        }
+//
+//        BucketDTO bucket = new BucketDTO();
+//        bucket.setId(vendorId); // Use vendor ID as bucket ID
+//        Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
+//        bucket.setName(vendor != null ? "Complete bucket from " + vendor.getName() : "Complete bucket from vendor " + vendorId);
+//        bucket.setVendorId(vendorId);
+//        bucket.setVendorName(vendor != null ? vendor.getName() : "");
+//        bucket.setLogo(vendor != null ? vendor.getLogo() : "");
+//
+//        List<BucketItemDTO> availableItems = new ArrayList<>();
+//        List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
+//        double totalPrice = 0.0;
+//        double deliveryCharges = 0.0;
+//        double totalDiscount = 0.0; // Track total discount
+//
+//        for (Medicine medicine : medicines) {
+//            Long medicineId = medicine.getId();
+//            int requestedQuantity = medicineQuantities.get(medicineId);
+//
+//            System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
+//
+//            // Find the stock for this medicine from this vendor
+//            Optional<Stock> stockOptional = vendorStocks.stream()
+//                    .filter(s -> s.getMedicine().getId() == medicineId)
+//                    .findFirst();
+//
+//            if (stockOptional.isPresent()) {
+//                Stock stock = stockOptional.get();
+//
+//                System.out.println("Found stock for medicine ID: " + medicineId + " with quantity: " + stock.getQty() + ", MRP: " + stock.getMrp() + ", discount: " + stock.getDiscount());
+//
+//                // Check if vendor has enough quantity
+//                if (stock.getQty() >= requestedQuantity) {
+//                    BucketItemDTO item = new BucketItemDTO();
+//                    item.setMedicineId(medicineId);
+//                    item.setMedicineName(medicine.getName());
+//                    item.setMedicineImage(medicine.getPhoto1());
+//                    item.setMedicineStrip(medicine.getPacking());
+////                    item.setVendorId(vendorId);
+////                    item.setVendorName(vendor != null ? vendor.getName() : "");
+//                    item.setPrice(calculateUnitPrice(stock.getMrp(), stock.getDiscount()));
+//                    item.setDiscount(stock.getDiscount());
+//                    item.setAvailableQuantity(stock.getQty());
+//                    item.setRequestedQuantity(requestedQuantity);
+//                    double itemTotalPrice = calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity);
+//                    item.setTotalPrice(itemTotalPrice);
+//
+//                    availableItems.add(item);
+//                    totalPrice += itemTotalPrice;
+//                    // Calculate discount amount for this item and add to total discount
+//                    double itemDiscountAmount = (stock.getMrp() * stock.getDiscount() / 100) * requestedQuantity;
+//                    totalDiscount += itemDiscountAmount;
+//
+//                    System.out.println("Added item to bucket - total price so far: " + totalPrice + ", total discount so far: " + totalDiscount);
+//                } else {
+//                    // Vendor doesn't have enough quantity, add to unavailable items
+//                    System.out.println("Vendor doesn't have enough quantity for medicine ID: " + medicineId + " (required: " + requestedQuantity + ", available: " + stock.getQty() + ")");
+//                    UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+//                    unavailableItem.setMedicineId(medicineId);
+//                    unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
+//                    unavailableItem.setRequestedQuantity(requestedQuantity);
+//                    // Get substitutes for this medicine
+//                    try {
+//                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+//                        unavailableItem.setSubstitutes(substitutes);
+//                    } catch (Exception e) {
+//                        System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
+//                    }
+//                    unavailableItems.add(unavailableItem);
+//                }
+//            } else {
+//                // Vendor doesn't have this medicine, add to unavailable items
+//                System.out.println("Vendor doesn't have medicine ID: " + medicineId);
+//                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+//                unavailableItem.setMedicineId(medicineId);
+//                unavailableItem.setMedicineName(medicine.getName());
+//                unavailableItem.setRequestedQuantity(requestedQuantity);
+//                // Get substitutes for this medicine
+//                try {
+//                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+//                    unavailableItem.setSubstitutes(substitutes);
+//                } catch (Exception e) {
+//                    System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
+//                }
+//                unavailableItems.add(unavailableItem);
+//            }
+//        }
+//
+//        System.out.println("Vendor bucket items - available: " + availableItems.size() + ", unavailable: " + unavailableItems.size());
+//
+//        bucket.setAvailableItems(availableItems);
+//        bucket.setUnavailableItems(unavailableItems);
+//        bucket.setTotalPrice(totalPrice);
+//        bucket.setTotalDiscount(totalDiscount); // Set the total discount
+//        bucket.setDeliveryCharges(deliveryCharges);
+//        double amountToPay = totalPrice - totalDiscount - deliveryCharges;
+//        bucket.setAmountToPay(amountToPay);
+//        System.out.println("Returning vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
+//        return bucket;
+//    }
 
-        List<BucketItemDTO> availableItems = new ArrayList<>();
-        List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
-        double totalPrice = 0.0;
-        double totalDiscount = 0.0;
-        double deliveryCharges = 0.0;// Track total discount
-
-        // Process available medicines
-        for (Medicine medicine : medicines) {
-            Long medicineId = medicine.getId();
-            int requestedQuantity = medicineQuantities.get(medicineId);
-
-            System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
-
-            // Find the best price for this medicine across all vendors
-            List<Stock> medicineStocks = allStocks.stream()
-                    .filter(stock -> stock.getMedicine().getId() == medicineId)
-                    .collect(Collectors.toList());
-
-            System.out.println("Found " + medicineStocks.size() + " stocks for medicine ID: " + medicineId);
-
-            if (!medicineStocks.isEmpty()) {
-                // Filter stocks that have enough quantity
-                List<Stock> sufficientStocks = medicineStocks.stream()
-                        .filter(stock -> stock.getQty() >= requestedQuantity)
-                        .collect(Collectors.toList());
-
-                System.out.println("Found " + sufficientStocks.size() + " stocks with sufficient quantity");
-
-                if (!sufficientStocks.isEmpty()) {
-                    // Find the stock with the lowest final price
-                    Optional<Stock> bestStockOptional = sufficientStocks.stream()
-                            .min(Comparator.comparingDouble(stock -> calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity)));
-
-                    if (bestStockOptional.isPresent()) {
-                        Stock bestStock = bestStockOptional.get();
-                        Vendor vendor = bestStock.getVendor();
-
-                        System.out.println("Selected best stock from vendor ID: " + vendor.getId() + " with price: " + bestStock.getMrp() + ", discount: " + bestStock.getDiscount());
-
-                        BucketItemDTO item = new BucketItemDTO();
-                        item.setMedicineId(medicineId);
-                        item.setMedicineName(medicine.getName());
-                        item.setMedicineImage(medicine.getPhoto1());
-                        item.setMedicineStrip(medicine.getPacking());
-                        //item.setVendorId(vendor.getId());
-                        //item.setVendorName(vendor.getName());
-                        item.setPrice(calculateUnitPrice(bestStock.getMrp(), bestStock.getDiscount()));
-                        item.setDiscount(bestStock.getDiscount());
-                        item.setAvailableQuantity(bestStock.getQty());
-                        item.setRequestedQuantity(requestedQuantity);
-                        double itemTotalPrice = calculateTotalPrice(bestStock.getMrp(), bestStock.getDiscount(), requestedQuantity);
-                        item.setTotalPrice(itemTotalPrice);
-
-                        availableItems.add(item);
-                        totalPrice += itemTotalPrice;
-                        // Calculate discount amount for this item and add to total discount
-                        double itemDiscountAmount = (bestStock.getMrp() * bestStock.getDiscount() / 100) * requestedQuantity;
-                        totalDiscount += itemDiscountAmount;
-                    }
-                } else {
-                    // No stock with sufficient quantity, add to unavailable items
-                    System.out.println("No vendor has sufficient quantity for medicine ID: " + medicineId);
-                    Stock bestStock = medicineStocks.get(0); // Just take the first one for info
-                    Vendor vendor = bestStock.getVendor();
-
-                    UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                    unavailableItem.setMedicineId(medicineId);
-                    unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
-                    unavailableItem.setRequestedQuantity(requestedQuantity);
-                    // Get substitutes for this medicine
-                    try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
-                        unavailableItem.setSubstitutes(substitutes);
-                    } catch (Exception e) {
-                        System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
-                    }
-                    unavailableItems.add(unavailableItem);
-                }
-            } else {
-                // Medicine not available from any vendor, add to unavailable items
-                System.out.println("Medicine ID: " + medicineId + " not available from any vendor");
-                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(medicineId);
-                unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
-                unavailableItem.setRequestedQuantity(requestedQuantity);
-                // Get substitutes for this medicine
-                try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
-                    unavailableItem.setSubstitutes(substitutes);
-                } catch (Exception e) {
-                    System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
-                }
-                unavailableItems.add(unavailableItem);
-            }
-        }
-
-        // Add unavailable medicines to the bucket with appropriate information
-        for (Long unavailableMedicineId : unavailableMedicineIds) {
-            Optional<Medicine> medicineOpt = medicines.stream()
-                    .filter(m -> m.getId() == unavailableMedicineId)
-                    .findFirst();
-
-            if (medicineOpt.isPresent()) {
-                Medicine medicine = medicineOpt.get();
-                int requestedQuantity = medicineQuantities.getOrDefault(unavailableMedicineId, 0);
-
-                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(unavailableMedicineId);
-                unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
-                unavailableItem.setRequestedQuantity(requestedQuantity);
-                // Get substitutes for this medicine
-                try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId);
-                    unavailableItem.setSubstitutes(substitutes);
-                } catch (Exception e) {
-                    System.out.println("Error fetching substitutes for medicine ID: " + unavailableMedicineId + ", error: " + e.getMessage());
-                }
-                unavailableItems.add(unavailableItem);
-            }
-        }
-
-        System.out.println("Mixed vendor bucket items - available: " + availableItems.size() + ", unavailable: " + unavailableItems.size());
-
-        // Create bucket even if we don't have all medicines
-        if (!availableItems.isEmpty() || !unavailableItems.isEmpty()) {
-            BucketDTO bucket = new BucketDTO();
-            bucket.setId(System.currentTimeMillis()); // Unique ID for mixed bucket
-            bucket.setName("Best price mixed vendor bucket");
-            bucket.setAvailableItems(availableItems);
-            bucket.setUnavailableItems(unavailableItems);
-            bucket.setTotalPrice(totalPrice);
-            bucket.setTotalDiscount(totalDiscount); // Set the total discount
-            bucket.setDeliveryCharges(deliveryCharges);
-            double amountToPay = totalPrice - totalDiscount - deliveryCharges;
-            bucket.setAmountToPay(amountToPay);
-            System.out.println("Returning mixed vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount + ", amountToPay: " + amountToPay );
-            return bucket;
-        }
-
-        System.out.println("Not returning mixed vendor bucket - no items");
-        return null;
-    }
-
-    private BucketDTO createBucketForVendor(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities) {
-        System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");
-
-        // Check if medicines list is empty
-        if (medicines.isEmpty()) {
-            System.out.println("No medicines to create bucket for vendor ID: " + vendorId);
-            return null;
-        }
-
-        BucketDTO bucket = new BucketDTO();
-        bucket.setId(vendorId); // Use vendor ID as bucket ID
-        Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
-        bucket.setName(vendor != null ? "Complete bucket from " + vendor.getName() : "Complete bucket from vendor " + vendorId);
-        bucket.setVendorId(vendorId);
-        bucket.setVendorName(vendor != null ? vendor.getName() : "");
-
-        List<BucketItemDTO> availableItems = new ArrayList<>();
-        List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
-        double totalPrice = 0.0;
-        double deliveryCharges = 0.0;
-        double totalDiscount = 0.0; // Track total discount
-
-        for (Medicine medicine : medicines) {
-            Long medicineId = medicine.getId();
-            int requestedQuantity = medicineQuantities.get(medicineId);
-
-            System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
-
-            // Find the stock for this medicine from this vendor
-            Optional<Stock> stockOptional = vendorStocks.stream()
-                    .filter(s -> s.getMedicine().getId() == medicineId)
-                    .findFirst();
-
-            if (stockOptional.isPresent()) {
-                Stock stock = stockOptional.get();
-
-                System.out.println("Found stock for medicine ID: " + medicineId + " with quantity: " + stock.getQty() + ", MRP: " + stock.getMrp() + ", discount: " + stock.getDiscount());
-
-                // Check if vendor has enough quantity
-                if (stock.getQty() >= requestedQuantity) {
-                    BucketItemDTO item = new BucketItemDTO();
-                    item.setMedicineId(medicineId);
-                    item.setMedicineName(medicine.getName());
-                    item.setMedicineImage(medicine.getPhoto1());
-                    item.setMedicineStrip(medicine.getPacking());
-//                    item.setVendorId(vendorId);
-//                    item.setVendorName(vendor != null ? vendor.getName() : "");
-                    item.setPrice(calculateUnitPrice(stock.getMrp(), stock.getDiscount()));
-                    item.setDiscount(stock.getDiscount());
-                    item.setAvailableQuantity(stock.getQty());
-                    item.setRequestedQuantity(requestedQuantity);
-                    double itemTotalPrice = calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity);
-                    item.setTotalPrice(itemTotalPrice);
-
-                    availableItems.add(item);
-                    totalPrice += itemTotalPrice;
-                    // Calculate discount amount for this item and add to total discount
-                    double itemDiscountAmount = (stock.getMrp() * stock.getDiscount() / 100) * requestedQuantity;
-                    totalDiscount += itemDiscountAmount;
-
-                    System.out.println("Added item to bucket - total price so far: " + totalPrice + ", total discount so far: " + totalDiscount);
-                } else {
-                    // Vendor doesn't have enough quantity, add to unavailable items
-                    System.out.println("Vendor doesn't have enough quantity for medicine ID: " + medicineId + " (required: " + requestedQuantity + ", available: " + stock.getQty() + ")");
-                    UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                    unavailableItem.setMedicineId(medicineId);
-                    unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
-                    unavailableItem.setRequestedQuantity(requestedQuantity);
-                    // Get substitutes for this medicine
-                    try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
-                        unavailableItem.setSubstitutes(substitutes);
-                    } catch (Exception e) {
-                        System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
-                    }
-                    unavailableItems.add(unavailableItem);
-                }
-            } else {
-                // Vendor doesn't have this medicine, add to unavailable items
-                System.out.println("Vendor doesn't have medicine ID: " + medicineId);
-                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(medicineId);
-                unavailableItem.setMedicineName(medicine.getName());
-                unavailableItem.setRequestedQuantity(requestedQuantity);
-                // Get substitutes for this medicine
-                try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
-                    unavailableItem.setSubstitutes(substitutes);
-                } catch (Exception e) {
-                    System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
-                }
-                unavailableItems.add(unavailableItem);
-            }
-        }
-
-        System.out.println("Vendor bucket items - available: " + availableItems.size() + ", unavailable: " + unavailableItems.size());
-
-        bucket.setAvailableItems(availableItems);
-        bucket.setUnavailableItems(unavailableItems);
-        bucket.setTotalPrice(totalPrice);
-        bucket.setTotalDiscount(totalDiscount); // Set the total discount
-        bucket.setDeliveryCharges(deliveryCharges);
-        double amountToPay = totalPrice - totalDiscount - deliveryCharges;
-        bucket.setAmountToPay(amountToPay);
-        System.out.println("Returning vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
-        return bucket;
-    }
-
-    private BucketDTO createMixedVendorBucket(List<Medicine> medicines, List<Stock> allStocks, Map<Long, Integer> medicineQuantities) {
-        System.out.println("Creating mixed vendor bucket for " + medicines.size() + " medicines");
-
-        // Check if medicines list is empty
-        if (medicines.isEmpty()) {
-            System.out.println("No medicines to create mixed vendor bucket");
-            return null;
-        }
-
-        List<BucketItemDTO> availableItems = new ArrayList<>();
-        List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
-        double totalPrice = 0.0;
-        double totalDiscount = 0.0; // Track total discount
-
-        for (Medicine medicine : medicines) {
-            Long medicineId = medicine.getId();
-            int requestedQuantity = medicineQuantities.get(medicineId);
-
-            System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
-
-            // Find the best price for this medicine across all vendors
-            List<Stock> medicineStocks = allStocks.stream()
-                    .filter(stock -> stock.getMedicine().getId() == medicineId)
-                    .collect(Collectors.toList());
-
-            System.out.println("Found " + medicineStocks.size() + " stocks for medicine ID: " + medicineId);
-
-            if (!medicineStocks.isEmpty()) {
-                // Filter stocks that have enough quantity
-                List<Stock> sufficientStocks = medicineStocks.stream()
-                        .filter(stock -> stock.getQty() >= requestedQuantity)
-                        .collect(Collectors.toList());
-
-                System.out.println("Found " + sufficientStocks.size() + " stocks with sufficient quantity");
-
-                if (!sufficientStocks.isEmpty()) {
-                    // Find the stock with the lowest final price
-                    Optional<Stock> bestStockOptional = sufficientStocks.stream()
-                            .min(Comparator.comparingDouble(stock -> calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity)));
-
-                    if (bestStockOptional.isPresent()) {
-                        Stock bestStock = bestStockOptional.get();
-                        Vendor vendor = bestStock.getVendor();
-
-                        System.out.println("Selected best stock from vendor ID: " + vendor.getId() + " with price: " + bestStock.getMrp() + ", discount: " + bestStock.getDiscount());
-
-                        BucketItemDTO item = new BucketItemDTO();
-                        item.setMedicineId(medicineId);
-                        item.setMedicineName(medicine.getName());
-                        item.setMedicineImage(medicine.getPhoto1());
-                        item.setMedicineStrip(medicine.getPacking());
-//                        item.setVendorId(vendor.getId());
-//                        item.setVendorName(vendor.getName());
-                        item.setPrice(calculateUnitPrice(bestStock.getMrp(), bestStock.getDiscount()));
-                        item.setDiscount(bestStock.getDiscount());
-                        item.setAvailableQuantity(bestStock.getQty());
-                        item.setRequestedQuantity(requestedQuantity);
-                        double itemTotalPrice = calculateTotalPrice(bestStock.getMrp(), bestStock.getDiscount(), requestedQuantity);
-                        item.setTotalPrice(itemTotalPrice);
-
-                        availableItems.add(item);
-                        totalPrice += itemTotalPrice;
-                        // Calculate discount amount for this item and add to total discount
-                        double itemDiscountAmount = (bestStock.getMrp() * bestStock.getDiscount() / 100) * requestedQuantity;
-                        totalDiscount += itemDiscountAmount;
-                    }
-                } else {
-                    // No stock with sufficient quantity, add to unavailable items
-                    System.out.println("No vendor has sufficient quantity for medicine ID: " + medicineId);
-                    Stock bestStock = medicineStocks.get(0); // Just take the first one for info
-                    Vendor vendor = bestStock.getVendor();
-
-                    UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                    unavailableItem.setMedicineId(medicineId);
-                    unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
-                    unavailableItem.setRequestedQuantity(requestedQuantity);
-                    // Get substitutes for this medicine
-                    try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
-                        unavailableItem.setSubstitutes(substitutes);
-                    } catch (Exception e) {
-                        System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
-                    }
-                    unavailableItems.add(unavailableItem);
-                }
-            } else {
-                // Medicine not available from any vendor, add to unavailable items
-                System.out.println("Medicine ID: " + medicineId + " not available from any vendor");
-                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(medicineId);
-                unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
-                unavailableItem.setRequestedQuantity(requestedQuantity);
-                // Get substitutes for this medicine
-                try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
-                    unavailableItem.setSubstitutes(substitutes);
-                } catch (Exception e) {
-                    System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
-                }
-                unavailableItems.add(unavailableItem);
-            }
-        }
-
-        System.out.println("Mixed vendor bucket items - available: " + availableItems.size() + ", unavailable: " + unavailableItems.size());
-
-        // Only return bucket if we have items
-        if (!availableItems.isEmpty() || !unavailableItems.isEmpty()) {
-            BucketDTO bucket = new BucketDTO();
-            bucket.setId(System.currentTimeMillis()); // Unique ID for mixed bucket
-            bucket.setName("Best price mixed vendor bucket");
-            bucket.setAvailableItems(availableItems);
-            bucket.setUnavailableItems(unavailableItems);
-            bucket.setTotalPrice(totalPrice);
-            bucket.setTotalDiscount(totalDiscount); // Set the total discount
-            System.out.println("Returning mixed vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
-            return bucket;
-        }
-
-        System.out.println("Not returning mixed vendor bucket - no items");
-        return null;
-    }
+//    private BucketDTO createMixedVendorBucket(List<Medicine> medicines, List<Stock> allStocks, Map<Long, Integer> medicineQuantities) {
+//        System.out.println("Creating mixed vendor bucket for " + medicines.size() + " medicines");
+//
+//        // Check if medicines list is empty
+//        if (medicines.isEmpty()) {
+//            System.out.println("No medicines to create mixed vendor bucket");
+//            return null;
+//        }
+//
+//        List<BucketItemDTO> availableItems = new ArrayList<>();
+//        List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
+//        double totalPrice = 0.0;
+//        double totalDiscount = 0.0; // Track total discount
+//
+//        for (Medicine medicine : medicines) {
+//            Long medicineId = medicine.getId();
+//            int requestedQuantity = medicineQuantities.get(medicineId);
+//
+//            System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
+//
+//            // Find the best price for this medicine across all vendors
+//            List<Stock> medicineStocks = allStocks.stream()
+//                    .filter(stock -> stock.getMedicine().getId() == medicineId)
+//                    .collect(Collectors.toList());
+//
+//            System.out.println("Found " + medicineStocks.size() + " stocks for medicine ID: " + medicineId);
+//
+//            if (!medicineStocks.isEmpty()) {
+//                // Filter stocks that have enough quantity
+//                List<Stock> sufficientStocks = medicineStocks.stream()
+//                        .filter(stock -> stock.getQty() >= requestedQuantity)
+//                        .collect(Collectors.toList());
+//
+//                System.out.println("Found " + sufficientStocks.size() + " stocks with sufficient quantity");
+//
+//                if (!sufficientStocks.isEmpty()) {
+//                    // Find the stock with the lowest final price
+//                    Optional<Stock> bestStockOptional = sufficientStocks.stream()
+//                            .min(Comparator.comparingDouble(stock -> calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity)));
+//
+//                    if (bestStockOptional.isPresent()) {
+//                        Stock bestStock = bestStockOptional.get();
+//                        Vendor vendor = bestStock.getVendor();
+//
+//                        System.out.println("Selected best stock from vendor ID: " + vendor.getId() + " with price: " + bestStock.getMrp() + ", discount: " + bestStock.getDiscount());
+//
+//                        BucketItemDTO item = new BucketItemDTO();
+//                        item.setMedicineId(medicineId);
+//                        item.setMedicineName(medicine.getName());
+//                        item.setMedicineImage(medicine.getPhoto1());
+//                        item.setMedicineStrip(medicine.getPacking());
+////                        item.setVendorId(vendor.getId());
+////                        item.setVendorName(vendor.getName());
+//                        item.setPrice(calculateUnitPrice(bestStock.getMrp(), bestStock.getDiscount()));
+//                        item.setDiscount(bestStock.getDiscount());
+//                        item.setAvailableQuantity(bestStock.getQty());
+//                        item.setRequestedQuantity(requestedQuantity);
+//                        double itemTotalPrice = calculateTotalPrice(bestStock.getMrp(), bestStock.getDiscount(), requestedQuantity);
+//                        item.setTotalPrice(itemTotalPrice);
+//
+//                        availableItems.add(item);
+//                        totalPrice += itemTotalPrice;
+//                        // Calculate discount amount for this item and add to total discount
+//                        double itemDiscountAmount = (bestStock.getMrp() * bestStock.getDiscount() / 100) * requestedQuantity;
+//                        totalDiscount += itemDiscountAmount;
+//                    }
+//                } else {
+//                    // No stock with sufficient quantity, add to unavailable items
+//                    System.out.println("No vendor has sufficient quantity for medicine ID: " + medicineId);
+//                    Stock bestStock = medicineStocks.get(0); // Just take the first one for info
+//                    Vendor vendor = bestStock.getVendor();
+//
+//                    UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+//                    unavailableItem.setMedicineId(medicineId);
+//                    unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
+//                    unavailableItem.setRequestedQuantity(requestedQuantity);
+//                    // Get substitutes for this medicine
+//                    try {
+//                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+//                        unavailableItem.setSubstitutes(substitutes);
+//                    } catch (Exception e) {
+//                        System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
+//                    }
+//                    unavailableItems.add(unavailableItem);
+//                }
+//            } else {
+//                // Medicine not available from any vendor, add to unavailable items
+//                System.out.println("Medicine ID: " + medicineId + " not available from any vendor");
+//                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+//                unavailableItem.setMedicineId(medicineId);
+//                unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
+//                unavailableItem.setRequestedQuantity(requestedQuantity);
+//                // Get substitutes for this medicine
+//                try {
+//                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+//                    unavailableItem.setSubstitutes(substitutes);
+//                } catch (Exception e) {
+//                    System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
+//                }
+//                unavailableItems.add(unavailableItem);
+//            }
+//        }
+//
+//        System.out.println("Mixed vendor bucket items - available: " + availableItems.size() + ", unavailable: " + unavailableItems.size());
+//
+//        // Only return bucket if we have items
+//        if (!availableItems.isEmpty() || !unavailableItems.isEmpty()) {
+//            BucketDTO bucket = new BucketDTO();
+//            bucket.setId(System.currentTimeMillis()); // Unique ID for mixed bucket
+//            bucket.setName("Best price mixed vendor bucket");
+//            bucket.setAvailableItems(availableItems);
+//            bucket.setUnavailableItems(unavailableItems);
+//            bucket.setTotalPrice(totalPrice);
+//            bucket.setTotalDiscount(totalDiscount); // Set the total discount
+//            System.out.println("Returning mixed vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
+//            return bucket;
+//        }
+//
+//        System.out.println("Not returning mixed vendor bucket - no items");
+//        return null;
+//    }
 
     private double calculateUnitPrice(double mrp, double discount) {
         return mrp - (mrp * discount / 100);
