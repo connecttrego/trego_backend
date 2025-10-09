@@ -372,7 +372,7 @@ public class BucketServiceImpl implements IBucketService {
         bucket.setDeliveryTime(deliveryTime);
         bucket.setTotalDiscount(totalDiscount); // Set the total discount
         bucket.setDeliveryCharges(deliveryCharges);
-        double amountToPay = totalPrice - totalDiscount - deliveryCharges;
+        double amountToPay = totalPrice - totalDiscount + deliveryCharges;
         bucket.setAmountToPay(amountToPay);
         System.out.println("Returning vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
         return bucket;
@@ -520,7 +520,7 @@ public class BucketServiceImpl implements IBucketService {
 //            bucket.setTotalPrice(totalPrice);
 //            bucket.setTotalDiscount(totalDiscount); // Set the total discount
 //            bucket.setDeliveryCharges(deliveryCharges);
-//            double amountToPay = totalPrice - totalDiscount - deliveryCharges;
+//            double amountToPay = totalPrice - totalDiscount + deliveryCharges;
 //            bucket.setAmountToPay(amountToPay);
 //            System.out.println("Returning mixed vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount + ", amountToPay: " + amountToPay );
 //            return bucket;
@@ -633,7 +633,7 @@ public class BucketServiceImpl implements IBucketService {
 //        bucket.setTotalPrice(totalPrice);
 //        bucket.setTotalDiscount(totalDiscount); // Set the total discount
 //        bucket.setDeliveryCharges(deliveryCharges);
-//        double amountToPay = totalPrice - totalDiscount - deliveryCharges;
+//        double amountToPay = totalPrice - totalDiscount + deliveryCharges;
 //        bucket.setAmountToPay(amountToPay);
 //        System.out.println("Returning vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
 //        return bucket;

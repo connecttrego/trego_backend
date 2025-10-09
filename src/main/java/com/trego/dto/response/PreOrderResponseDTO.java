@@ -16,6 +16,8 @@ public class PreOrderResponseDTO {
     private double totalCartValue;
     private double amountToPay;
     private double discount;
+    private double deliveryCharges;
+
     private List<CartResponseDTO> carts;
 
 }

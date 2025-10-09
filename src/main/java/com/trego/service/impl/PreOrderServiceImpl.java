@@ -190,9 +190,9 @@ public class PreOrderServiceImpl implements IPreOrderService {
               cart.setVendorId(vendor.getId());
               cart.setName(vendor.getName());
               if(vendor.getCategory().equalsIgnoreCase("retail")) {
-                  cart.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL+ vendor.getLogo());
+                  cart.setLogo(vendor.getLogo());
               }else{
-                  cart.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL+ vendor.getLogo());
+                  cart.setLogo(vendor.getLogo());
               }
               cart.setGstNumber(vendor.getGistin());
               cart.setLicence(vendor.getDruglicense());
@@ -206,8 +206,10 @@ public class PreOrderServiceImpl implements IPreOrderService {
       }).collect(Collectors.toList());
 
         double totalCartValue = getTotalCartValue(cartDTOs);
+        double deliveryCharges = 0;
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
-        preOrderResponseDTO.setAmountToPay(totalCartValue - getDiscount(cartDTOs));
+        preOrderResponseDTO.setDeliveryCharges(deliveryCharges);
+        preOrderResponseDTO.setAmountToPay(totalCartValue - getDiscount(cartDTOs) + deliveryCharges);
         preOrderResponseDTO.setCarts(cartDTOs);
     }
 
