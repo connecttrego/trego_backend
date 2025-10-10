@@ -132,23 +132,25 @@ public class OrderServiceImpl implements IOrderService {
                 throw new Exception("Selected bucket not found");
             }
             
-            // Calculate the actual bucket amount
-            double bucketAmount = selectedBucket.getTotalPrice();
+            // Calculate the actual bucket amount and discount
+            double bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
+            double bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
+            double originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
             
             // Create a PreOrder entity for the bucket-based order
             PreOrder preOrder = new PreOrder();
             preOrder.setUserId(bucketOrderRequest.getUserId());
             preOrder.setAddressId(bucketOrderRequest.getAddressId());
             preOrder.setPaymentStatus("unpaid");
-            preOrder.setTotalPayAmount(bucketAmount);
+            preOrder.setTotalPayAmount(bucketAmount); // Amount after discount
             preOrder.setCreatedBy("SYSTEM"); // Set the required createdBy field
             
             // Create a payload with bucket information
             PreOrderResponseDTO preOrderResponseDTO = new PreOrderResponseDTO();
             preOrderResponseDTO.setUserId(bucketOrderRequest.getUserId());
-            preOrderResponseDTO.setAmountToPay(bucketAmount);
-            preOrderResponseDTO.setTotalCartValue(bucketAmount); // For simplicity, using the same value
-            preOrderResponseDTO.setDiscount(selectedBucket.getTotalDiscount());
+            preOrderResponseDTO.setAmountToPay(bucketAmount); // Final amount to pay after discount
+            preOrderResponseDTO.setTotalCartValue(originalTotal); // Original price before discount
+            preOrderResponseDTO.setDiscount(bucketDiscount); // Total discount amount
             
             // Convert to JSON and set as payload BEFORE saving
             Gson gson = new Gson();
