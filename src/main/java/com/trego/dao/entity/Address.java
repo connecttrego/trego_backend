@@ -29,7 +29,7 @@ public class Address {
     private String name;
 
     @Column(nullable = true, name = "address_type")
-    private int addressType;
+    private int addressTypeValue;
 
 
 /*    @Column(name = "address_type")
@@ -45,6 +45,16 @@ public class Address {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    // Getter for addressType using the enum
+    public AddressType getAddressType() {
+        return AddressType.fromCode(this.addressTypeValue);
+    }
+
+    // Setter for addressType using the enum
+    public void setAddressType(AddressType addressType) {
+        this.addressTypeValue = addressType.getCode();
+    }
+
     @Override
     public String toString() {
         return "Address{" +
@@ -57,7 +67,7 @@ public class Address {
                 ", lng=" + lng +
                 ", mobileNo='" + mobileNo + '\'' +
                 ", name='" + name + '\'' +
-                ", addressType='" + addressType + '\'' +
+                ", addressTypeValue=" + addressTypeValue +
                 ", user=" + user +
                 '}';
     }

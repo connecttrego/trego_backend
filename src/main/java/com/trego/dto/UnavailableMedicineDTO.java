@@ -8,6 +8,8 @@ import java.util.List;
 public class UnavailableMedicineDTO {
     private Long medicineId;
     private String medicineName;
+    private String medicineImage;
+    private String medicineStrip;
     private int requestedQuantity;
     private List<SubstituteDetailView> substitutes;
 }
