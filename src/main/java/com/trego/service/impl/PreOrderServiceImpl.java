@@ -51,7 +51,14 @@ public class PreOrderServiceImpl implements IPreOrderService {
         calculateAmountToPay(preOrderRequest);
 
         Gson gson = new Gson();
-        PreOrder preOrder = preOrderRepository.findByUserIdAndPaymentStatus(preOrderRequest.getUserId(), "unpaid");
+        List<PreOrder> preOrders = preOrderRepository.findByUserIdAndPaymentStatus(preOrderRequest.getUserId(), "unpaid");
+        PreOrder preOrder = null;
+        
+        // If there are multiple pre-orders, use the first one or create a new one if none exist
+        if (preOrders != null && !preOrders.isEmpty()) {
+            preOrder = preOrders.get(0); // Use the first one
+        }
+        
         if (preOrder == null) {
             preOrder = new PreOrder();
             preOrder.setPaymentStatus("unpaid");
@@ -78,9 +85,9 @@ public class PreOrderServiceImpl implements IPreOrderService {
     public PreOrderResponseDTO getOrdersByUserId(Long userId) {
         Gson gson = new Gson();
         PreOrderResponseDTO preOrderResponseDTO = new PreOrderResponseDTO();
-        Optional<PreOrder> preOrder = Optional.ofNullable(preOrderRepository.findByUserIdAndPaymentStatus(userId, "unpaid"));
-        if (preOrder.isPresent()) {
-            PreOrder tempPreOrder = preOrder.get();
+        List<PreOrder> preOrders = preOrderRepository.findByUserIdAndPaymentStatus(userId, "unpaid");
+        if (preOrders != null && !preOrders.isEmpty()) {
+            PreOrder tempPreOrder = preOrders.get(0); // Use the first one
             preOrderResponseDTO = gson.fromJson(tempPreOrder.getPayload(), PreOrderResponseDTO.class);
             preOrderResponseDTO.setOrderId(tempPreOrder.getId());
             populateCartResponse(preOrderResponseDTO);

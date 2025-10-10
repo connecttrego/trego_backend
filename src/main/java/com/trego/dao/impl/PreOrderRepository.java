@@ -14,7 +14,7 @@ import java.util.List;
 
 public interface PreOrderRepository extends JpaRepository<PreOrder, Long> {
     PreOrder findByUserId(long userId);
-    PreOrder findByUserIdAndPaymentStatus(Long userId, String paymentStatus);
+    List<PreOrder> findByUserIdAndPaymentStatus(Long userId, String paymentStatus);
     PreOrder findByIdAndPaymentStatus(Long id, String paymentStatus);
 
     @Query("SELECT p FROM preorders p JOIN FETCH p.orders o WHERE p.userId = :userId ORDER BY p.createdAt desc")
