@@ -7,7 +7,9 @@ import com.trego.dao.entity.*;
 import com.trego.dao.impl.*;
 import com.trego.dto.*;
 import com.trego.dto.response.*;
+import com.trego.service.IBucketService;
 import com.trego.service.IOrderService;
+import com.trego.service.IPreOrderService;
 import com.trego.utils.Constants;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +57,12 @@ public class OrderServiceImpl implements IOrderService {
 
     @Autowired
     private AddressRepository addressRepository;
+    
+    @Autowired
+    private IBucketService bucketService;
+    
+    @Autowired
+    private IPreOrderService preOrderService;
 
 
     @Override
@@ -85,6 +93,89 @@ public class OrderServiceImpl implements IOrderService {
 
         orderResponseDTO.setRazorpayOrderId(razorpayOrderId);
         orderResponseDTO.setAmountToPay(preOrderResponseDTO.getAmountToPay());
+
+        return orderResponseDTO;
+    }
+    
+    @Override
+    public OrderResponseDTO placeOrderFromBucket(BucketOrderRequestDTO bucketOrderRequest) throws Exception {
+        OrderResponseDTO orderResponseDTO = new OrderResponseDTO();
+        
+        // Set user ID
+        orderResponseDTO.setUserId(bucketOrderRequest.getUserId());
+        
+        // Get the original preorder to recreate buckets
+        PreOrder originalPreOrder = preOrderRepository.findById(bucketOrderRequest.getPreOrderId()).orElse(null);
+        if (originalPreOrder == null) {
+            throw new Exception("Original preorder not found");
+        }
+        
+        try {
+            // Recreate buckets from the original preorder
+            VandorCartResponseDTO vendorCartData = preOrderService.vendorSpecificPrice(bucketOrderRequest.getPreOrderId());
+            
+            // Check if carts is null and handle it
+            if (vendorCartData.getCarts() == null) {
+                throw new Exception("No cart data found in preorder");
+            }
+            
+            List<BucketDTO> buckets = bucketService.createOptimizedBucketsFromPreorder(vendorCartData);
+            
+            // Find the selected bucket
+            BucketDTO selectedBucket = buckets.stream()
+                    .filter(bucket -> bucket.getId().equals(bucketOrderRequest.getBucketId()))
+                    .findFirst()
+                    .orElse(null);
+                    
+            if (selectedBucket == null) {
+                throw new Exception("Selected bucket not found");
+            }
+            
+            // Calculate the actual bucket amount
+            double bucketAmount = selectedBucket.getTotalPrice();
+            
+            // Create a PreOrder entity for the bucket-based order
+            PreOrder preOrder = new PreOrder();
+            preOrder.setUserId(bucketOrderRequest.getUserId());
+            preOrder.setAddressId(bucketOrderRequest.getAddressId());
+            preOrder.setPaymentStatus("unpaid");
+            preOrder.setTotalPayAmount(bucketAmount);
+            preOrder.setCreatedBy("SYSTEM"); // Set the required createdBy field
+            
+            // Create a payload with bucket information
+            PreOrderResponseDTO preOrderResponseDTO = new PreOrderResponseDTO();
+            preOrderResponseDTO.setUserId(bucketOrderRequest.getUserId());
+            preOrderResponseDTO.setAmountToPay(bucketAmount);
+            preOrderResponseDTO.setTotalCartValue(bucketAmount); // For simplicity, using the same value
+            preOrderResponseDTO.setDiscount(selectedBucket.getTotalDiscount());
+            
+            // Convert to JSON and set as payload BEFORE saving
+            Gson gson = new Gson();
+            String payload = gson.toJson(preOrderResponseDTO);
+            preOrder.setPayload(payload);
+            
+            // Save the preorder 
+            PreOrder savedPreOrder = preOrderRepository.save(preOrder);
+            
+            // Add the order ID to the response DTO
+            preOrderResponseDTO.setOrderId(savedPreOrder.getId());
+            
+            // Generate RazorPay order
+            String razorpayOrderId = createRazorPayOrderForBucket(bucketOrderRequest, preOrderResponseDTO);
+            savedPreOrder.setRazorpayOrderId(razorpayOrderId);
+            
+            // Save the updated preorder
+            preOrderRepository.save(savedPreOrder);
+            
+            orderResponseDTO.setRazorpayOrderId(razorpayOrderId);
+            orderResponseDTO.setAmountToPay(bucketAmount);
+            orderResponseDTO.setOrderId(savedPreOrder.getId());
+        } catch (Exception e) {
+            // Log the exception for debugging
+            System.err.println("Error in placeOrderFromBucket: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
 
         return orderResponseDTO;
     }
@@ -389,8 +480,78 @@ public class OrderServiceImpl implements IOrderService {
         }
         return orderId;
     }
+    
+    public String createRazorPayOrderForBucket(BucketOrderRequestDTO bucketOrderRequest, PreOrderResponseDTO preOrderResponseDTO) throws Exception {
+        String keyId = "rzp_test_oZBGm1luIG1Rpl"; // Replace with actual key
+        String keySecret = "S0Pxnueo7AdCYS2HFIa7LXK6"; // Replace with actual key
+        String credentials = keyId + ":" + keySecret;
+        String encodedAuth = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+        // API URL
+        String url = "https://api.razorpay.com/v1/orders";
+        // Create a JSON object
+        JsonObject jsonObject = new JsonObject();
+        // Add fields to the JSON object
+        BigDecimal amount = new BigDecimal(preOrderResponseDTO.getAmountToPay())
+                .setScale(2, BigDecimal.ROUND_HALF_UP);
+        int convertedAmount = amount.multiply(BigDecimal.valueOf(100)).intValue();
+
+
+        jsonObject.addProperty("amount",  convertedAmount);
+        jsonObject.addProperty("currency", "INR");
+        jsonObject.addProperty("receipt", "receipt#123");
+
+        // Create a nested JSON object
+        JsonObject notes = new JsonObject();
+        notes.addProperty("userId", preOrderResponseDTO.getUserId());
+        if (bucketOrderRequest.getBucketId() != null) {
+            notes.addProperty("bucketId", bucketOrderRequest.getBucketId());
+        }
+        if (bucketOrderRequest.getVendorId() != null) {
+            notes.addProperty("vendorId", bucketOrderRequest.getVendorId());
+        }
+        notes.addProperty("preOrderId", bucketOrderRequest.getPreOrderId());
+        notes.addProperty("orderType", "bucket");
+
+        // Add the nested JSON object to the main object
+        jsonObject.add("notes", notes);
+
+        // Create HTTP Client
+        HttpClient client = HttpClient.newHttpClient();
+        // Create HTTP Request
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Basic " + encodedAuth)
+                .POST(HttpRequest.BodyPublishers.ofString(jsonObject.toString()))
+                .build();
+
+        // Send Request
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        // Print Response
+        System.out.println("Response Code: " + response.statusCode());
+        System.out.println("Response Body: " + response.body());
+        String orderId = null;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode rootNode = mapper.readTree(response.body());
+
+            // Extract individual fields
+            orderId = rootNode.get("id").asText();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return orderId;
+    }
 
     private void populateCartResponse(PreOrderResponseDTO preOrderResponseDTO) {
+        // Check if carts is null before processing
+        if (preOrderResponseDTO.getCarts() == null) {
+            preOrderResponseDTO.setCarts(new ArrayList<>());
+            return;
+        }
+        
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
         List<MedicineDTO> medicines = cart.getMedicine().stream()
                     .map(medicine -> {
@@ -433,81 +594,121 @@ public class OrderServiceImpl implements IOrderService {
     }
 
     private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
+        // Handle null carts
+        if (cartDTOs == null) {
+            return 0.0;
+        }
+        
         return cartDTOs.stream()
-                .flatMap(cart -> cart.getMedicine().stream())
+                .flatMap(cart -> {
+                    // Handle null medicine list
+                    if (cart.getMedicine() == null) {
+                        return new ArrayList<MedicineDTO>().stream();
+                    }
+                    return cart.getMedicine().stream();
+                })
                 .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
                 .sum();
     }
 
     private static double getDiscount(List<CartResponseDTO> cartDTOs) {
+        // Handle null carts
+        if (cartDTOs == null) {
+            return 0.0;
+        }
+        
         return cartDTOs.stream()
-                .flatMap(cart -> cart.getMedicine().stream())
+                .flatMap(cart -> {
+                    // Handle null medicine list
+                    if (cart.getMedicine() == null) {
+                        return new ArrayList<MedicineDTO>().stream();
+                    }
+                    return cart.getMedicine().stream();
+                })
                 .mapToDouble(medicine -> (medicine.getMrp() * medicine.getQty()) * medicine.getDiscount() / 100.0)
                 .sum();
     }
 
 
     public PreOrderDTO calculateAmountToPay(PreOrderDTO preOrderResponseDTO) {
+        // Handle null carts
+        if (preOrderResponseDTO.getCarts() == null) {
+            preOrderResponseDTO.setAmountToPay(0.0);
+            return preOrderResponseDTO;
+        }
+        
         List<CartDTO> carts = preOrderResponseDTO.getCarts();
-        double amountToPay =  carts.stream()
-                .flatMap(cart -> cart.getMedicine().stream()
-                        .map(medicine -> {
-                            long vendorId = cart.getVendorId();
-                            long medicineId = medicine.getId();
-                            int qty = medicine.getQty();
+        double amountToPay = 0.0;
+        
+        // Process each cart
+        for (CartDTO cart : carts) {
+            // Handle null medicine list
+            if (cart.getMedicine() == null) {
+                continue;
+            }
+            
+            // Process each medicine in the cart
+            for (MedicinePreOrderDTO medicine : cart.getMedicine()) {
+                long vendorId = cart.getVendorId();
+                long medicineId = medicine.getId();
+                int qty = medicine.getQty();
 
-                            // Use the new method that returns a List to handle multiple stocks
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
-                            if(!stocks.isEmpty()){
-                                Stock stock = stocks.get(0);
-                                double price = stock.getMrp();
-                                double discountPercentage = stock.getDiscount();
-                                double totalCartValue=  price * qty;
-                                totalCartValue = totalCartValue - (totalCartValue * discountPercentage / 100.0);
-                                return  totalCartValue;
-                            }else {
-                                return  0.0;
-                            }
-
-                        }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
+                // Use the new method that returns a List to handle multiple stocks
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                if(!stocks.isEmpty()){
+                    Stock stock = stocks.get(0);
+                    double price = stock.getMrp();
+                    double discountPercentage = stock.getDiscount();
+                    double totalCartValue=  price * qty;
+                    totalCartValue = totalCartValue - (totalCartValue * discountPercentage / 100.0);
+                    amountToPay += totalCartValue;
+                }
+            }
+        }
+        
         preOrderResponseDTO.setAmountToPay(amountToPay);
-        return  preOrderResponseDTO;
+        return preOrderResponseDTO;
     }
 
     private void calculateTotalCartValue(PreOrderDTO preOrderResponseDTO) {
+        // Handle null carts
+        if (preOrderResponseDTO.getCarts() == null) {
+            preOrderResponseDTO.setTotalCartValue(0.0);
+            return;
+        }
 
-        double totalCartValue =  preOrderResponseDTO.getCarts().stream()
-                .flatMap(cart -> cart.getMedicine().stream()
-                        .map(medicine -> {
-                            long vendorId = cart.getVendorId();
-                            long medicineId = medicine.getId();
-                            int qty = medicine.getQty();
+        double totalCartValue = 0.0;
+        
+        // Process each cart
+        for (CartDTO cart : preOrderResponseDTO.getCarts()) {
+            // Handle null medicine list
+            if (cart.getMedicine() == null) {
+                continue;
+            }
+            
+            // Process each medicine in the cart
+            for (MedicinePreOrderDTO medicine : cart.getMedicine()) {
+                long vendorId = cart.getVendorId();
+                long medicineId = medicine.getId();
+                int qty = medicine.getQty();
 
-                            // Use the new method that returns a List to handle multiple stocks
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
-                            if(!stocks.isEmpty()){
-                                Stock stock = stocks.get(0);
-                                double price = stock.getMrp();
-                                medicine.setMrp(price);
-                                double discountPercentage = stock.getDiscount();
-                                double tempTotalCartValue =  price * qty;
-                                return  tempTotalCartValue;
-                            }else {
-                                return  0.0;
-                            }
-
-                        }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
+                // Use the new method that returns a List to handle multiple stocks
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                if(!stocks.isEmpty()){
+                    Stock stock = stocks.get(0);
+                    double price = stock.getMrp();
+                    medicine.setMrp(price);
+                    double discountPercentage = stock.getDiscount();
+                    double tempTotalCartValue =  price * qty;
+                    totalCartValue += tempTotalCartValue;
+                }
+            }
+        }
+        
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
-
     }
 
     private Order populateOrder(PreOrderResponseDTO orderRequest) {
-
-
         Address address = addressRepository.findById(orderRequest.getAddressId()).get();
         Order order = new Order();
         User user = userRepository.findById(orderRequest.getUserId()).get();

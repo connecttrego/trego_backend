@@ -5,6 +5,7 @@ import com.trego.dao.entity.*;
 import com.trego.dao.impl.*;
 import com.trego.dto.CartDTO;
 import com.trego.dto.MedicineDTO;
+import com.trego.dto.MedicinePreOrderDTO;
 import com.trego.dto.PreOrderDTO;
 import com.trego.dto.VendorDTO;
 import com.trego.dto.response.CartResponseDTO;
@@ -17,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -96,11 +98,23 @@ public class PreOrderServiceImpl implements IPreOrderService {
         Gson gson = new Gson();
         PreOrderResponseDTO preOrderResponseDTO =  gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
+        
+        // Handle null carts
+        if (preOrderResponseDTO.getCarts() == null) {
+            vandorCartResponseDTO.setCarts(new ArrayList<>());
+            return vandorCartResponseDTO;
+        }
 
         // Get all unique medicine IDs from all carts
         List<Medicine> allMedicines = medicineRepository.findAllById(
                 preOrderResponseDTO.getCarts().stream()
-                        .flatMap(cart -> cart.getMedicine().stream())
+                        .flatMap(cart -> {
+                            // Handle null medicine list
+                            if (cart.getMedicine() == null) {
+                                return new ArrayList<MedicineDTO>().stream();
+                            }
+                            return cart.getMedicine().stream();
+                        })
                         .map(MedicineDTO::getId)
                         .distinct()
                         .collect(Collectors.toList())
@@ -108,6 +122,11 @@ public class PreOrderServiceImpl implements IPreOrderService {
 
 
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
+            // Handle null medicine list
+            if (cart.getMedicine() == null) {
+                cart.setMedicine(new ArrayList<>());
+            }
+            
             List<MedicineDTO> medicines = cart.getMedicine().stream()
                     .map(medicine -> {
                         // Use the new method that returns a List to handle multiple stocks
@@ -161,7 +180,17 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     private void populateCartResponse(PreOrderResponseDTO preOrderResponseDTO) {
+        // Handle null carts
+        if (preOrderResponseDTO.getCarts() == null) {
+            preOrderResponseDTO.setCarts(new ArrayList<>());
+            return;
+        }
+        
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
+            // Handle null medicine list
+            if (cart.getMedicine() == null) {
+                cart.setMedicine(new ArrayList<>());
+            }
 
             List<MedicineDTO> medicines = cart.getMedicine().stream()
                     .map(medicine -> {
@@ -252,77 +281,117 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
+        // Handle null carts
+        if (cartDTOs == null) {
+            return 0.0;
+        }
+        
         return cartDTOs.stream()
-                .flatMap(cart -> cart.getMedicine().stream())
+                .flatMap(cart -> {
+                    // Handle null medicine list
+                    if (cart.getMedicine() == null) {
+                        return new ArrayList<MedicineDTO>().stream();
+                    }
+                    return cart.getMedicine().stream();
+                })
                 .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
                 .sum();
     }
 
     private static double getDiscount(List<CartResponseDTO> cartDTOs) {
+        // Handle null carts
+        if (cartDTOs == null) {
+            return 0.0;
+        }
+        
         return cartDTOs.stream()
-                .flatMap(cart -> cart.getMedicine().stream())
+                .flatMap(cart -> {
+                    // Handle null medicine list
+                    if (cart.getMedicine() == null) {
+                        return new ArrayList<MedicineDTO>().stream();
+                    }
+                    return cart.getMedicine().stream();
+                })
                 .mapToDouble(medicine -> (medicine.getMrp() * medicine.getQty()) * medicine.getDiscount() / 100.0)
                 .sum();
     }
 
 
     public PreOrderDTO calculateAmountToPay( PreOrderDTO preOrderResponseDTO) {
+        // Handle null carts
+        if (preOrderResponseDTO.getCarts() == null) {
+            preOrderResponseDTO.setAmountToPay(0.0);
+            return preOrderResponseDTO;
+        }
+        
         List<CartDTO> carts = preOrderResponseDTO.getCarts();
-        double amountToPay =  carts.stream()
-                .flatMap(cart -> cart.getMedicine().stream()
-                        .map(medicine -> {
-                            long vendorId = cart.getVendorId();
-                            long medicineId = medicine.getId();
-                            int qty = medicine.getQty();
+        double amountToPay = 0.0;
+        
+        // Process each cart
+        for (CartDTO cart : carts) {
+            // Handle null medicine list
+            if (cart.getMedicine() == null) {
+                continue;
+            }
+            
+            // Process each medicine in the cart
+            for (MedicinePreOrderDTO medicine : cart.getMedicine()) {
+                long vendorId = cart.getVendorId();
+                long medicineId = medicine.getId();
+                int qty = medicine.getQty();
 
-                            // Use the new method that returns a List to handle multiple stocks
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
-                            if(!stocks.isEmpty()){
-                                Stock stock = stocks.get(0);
-                                double price = stock.getMrp();
-                                double discountPercentage = stock.getDiscount();
-                                double totalCartValue=  price * qty;
-                                totalCartValue = totalCartValue - (totalCartValue * discountPercentage / 100.0);
-                                return  totalCartValue;
-                            }else {
-                                return  0.0;
-                            }
-
-                        }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
+                // Use the new method that returns a List to handle multiple stocks
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                if(!stocks.isEmpty()){
+                    Stock stock = stocks.get(0);
+                    double price = stock.getMrp();
+                    double discountPercentage = stock.getDiscount();
+                    double totalCartValue=  price * qty;
+                    totalCartValue = totalCartValue - (totalCartValue * discountPercentage / 100.0);
+                    amountToPay += totalCartValue;
+                }
+            }
+        }
+        
         preOrderResponseDTO.setAmountToPay(amountToPay);
-        return  preOrderResponseDTO;
+        return preOrderResponseDTO;
     }
 
     private void calculateTotalCartValue(PreOrderDTO preOrderResponseDTO) {
+        // Handle null carts
+        if (preOrderResponseDTO.getCarts() == null) {
+            preOrderResponseDTO.setTotalCartValue(0.0);
+            return;
+        }
 
-        double totalCartValue =  preOrderResponseDTO.getCarts().stream()
-                .flatMap(cart -> cart.getMedicine().stream()
-                        .map(medicine -> {
-                            long vendorId = cart.getVendorId();
-                            long medicineId = medicine.getId();
-                            int qty = medicine.getQty();
+        double totalCartValue = 0.0;
+        
+        // Process each cart
+        for (CartDTO cart : preOrderResponseDTO.getCarts()) {
+            // Handle null medicine list
+            if (cart.getMedicine() == null) {
+                continue;
+            }
+            
+            // Process each medicine in the cart
+            for (MedicinePreOrderDTO medicine : cart.getMedicine()) {
+                long vendorId = cart.getVendorId();
+                long medicineId = medicine.getId();
+                int qty = medicine.getQty();
 
-                            // Use the new method that returns a List to handle multiple stocks
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
-                            if(!stocks.isEmpty()){
-                                // Use the first stock if multiple exist
-                                Stock stock = stocks.get(0);
-                                double price = stock.getMrp();
-                                medicine.setMrp(price);
-                                double discountPercentage = stock.getDiscount();
-                                double tempTotalCartValue =  price * qty;
-                                return  tempTotalCartValue;
-                            }else {
-                                return  0.0;
-                            }
-
-                        }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
+                // Use the new method that returns a List to handle multiple stocks
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                if(!stocks.isEmpty()){
+                    Stock stock = stocks.get(0);
+                    double price = stock.getMrp();
+                    medicine.setMrp(price);
+                    double discountPercentage = stock.getDiscount();
+                    double tempTotalCartValue =  price * qty;
+                    totalCartValue += tempTotalCartValue;
+                }
+            }
+        }
+        
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
-
     }
-
 }

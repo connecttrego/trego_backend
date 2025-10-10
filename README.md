@@ -335,6 +335,7 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
 
 ### Order Management
 - `POST /orders` - Place a new order (creates Razorpay order and pre-order)
+- `POST /orders/fromBucket` - Place a new order from a selected bucket (creates Razorpay order and pre-order based on bucket selection)
 - `POST /orders/validateOrder` - Validate and confirm order payment with Razorpay verification
 - `GET /orders/user/{userId}` - Fetch all orders for a user with pagination
 - `POST /orders/cancel` - Cancel orders with reason tracking
@@ -1597,6 +1598,28 @@ API documentation is available through Swagger UI:
      - Each item includes both available quantity from the vendor and requested quantity from the preorder
    - **Solution**: Verify the resource ID exists in the database
 
+8. **Place Order from Selected Bucket**:
+   - **Method**: POST
+   - **URL**: `http://localhost:8080/orders/fromBucket`
+   - **Headers**: 
+     - `Content-Type: application/json`
+     - `Accept: application/json`
+   - **Body**:
+     ```json
+     {
+       "userId": 1,
+       "addressId": 1,
+       "preOrderId": 11,
+       "bucketId": 1,
+       "vendorId": 1
+     }
+     ```
+   - **Expected Response**: 
+     - Status Code: 200 OK
+     - Response Body: OrderResponseDTO with Razorpay order ID and amount to pay
+     - Creates a new pre-order and order based on the selected bucket instead of the original cart
+   - **Use Case**: Allows users to "switch to cheaper" by selecting a bucket and proceeding with payment for the bucket amount instead of the original cart amount
+
 3. **500 Internal Server Error**:
    - **Cause**: Server-side exception or database error
    - **Example**: Database connection failure or unhandled exception in code
@@ -1848,6 +1871,36 @@ The "Substitute Product Management" feature allows users to find substitute prod
    - Meaningful error messages for troubleshooting
 
 This feature provides a comprehensive system for managing substitute products with detailed information that is essential for pharmaceutical e-commerce platforms. The implementation follows best practices for REST API design, data transfer, and error handling, with automatic sorting and limiting of results.
+
+### Bucket-Based Order Management
+
+The "Bucket-Based Order Management" feature allows users to "switch to cheaper" by selecting an optimized bucket and proceeding with payment for the bucket amount instead of the original cart amount. This feature includes:
+
+1. **BucketOrderRequestDTO**:
+   - Added a [BucketOrderRequestDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/BucketOrderRequestDTO.java#L5-L11) to handle requests for placing orders from selected buckets
+   - Fields include: userId, addressId, preOrderId, bucketId, and vendorId
+
+2. **New API Endpoint**:
+   - Added `POST /orders/fromBucket` endpoint to place orders from selected buckets
+   - Takes a BucketOrderRequestDTO as input
+   - Returns an OrderResponseDTO with Razorpay order ID and amount to pay
+
+3. **Service Layer Implementation**:
+   - Updated [IOrderService](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/IOrderService.java#L12-L32) interface with new placeOrderFromBucket method
+   - Implemented bucket-based order placement in [OrderServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/service/impl/OrderServiceImpl.java#L35-L526)
+   - Creates a new pre-order and order based on the selected bucket instead of the original cart
+   - Processes payments for the bucket amount instead of the cart amount
+
+4. **Controller Layer**:
+   - Added new endpoint in [OrderController](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/api/OrderController.java#L20-L62) to handle bucket-based order requests
+
+5. **Error Handling**:
+   - Proper error handling with meaningful exception messages
+   - Handles cases where selected buckets are not found
+   - Ensures data integrity when creating new pre-orders
+
+This feature enhances the user experience by allowing customers to choose the most cost-effective option when placing orders, providing significant savings compared to the original cart total.
+
 - Shows all endpoints with request/response schemas
 - Includes example requests and responses
 
