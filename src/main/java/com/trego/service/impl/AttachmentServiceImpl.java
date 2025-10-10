@@ -4,17 +4,11 @@ import com.trego.dao.entity.Attachment;
 import com.trego.dao.impl.AttachmentRepository;
 import com.trego.dto.AttachmentDTO;
 import com.trego.service.IAttachmentService;
+import com.trego.service.IS3Service;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,8 +17,8 @@ public class AttachmentServiceImpl implements IAttachmentService {
     @Autowired
     private AttachmentRepository attachmentRepository;
 
-    @Value("${file.upload-dir:/tmp/uploads}")
-    private String uploadDir;
+    @Autowired
+    private IS3Service s3Service;
 
     @Override
     public AttachmentDTO uploadAttachment(MultipartFile file, Long orderId, Long orderItemId, Long userId, String description) throws Exception {
@@ -36,34 +30,21 @@ public class AttachmentServiceImpl implements IAttachmentService {
         if (file.isEmpty()) {
             throw new Exception("File cannot be empty");
         }
-        
-        // Create upload directory if it doesn't exist
-        Path uploadPath = Paths.get(uploadDir);
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
 
-        // Generate unique filename
+        // Generate original filename
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || originalFilename.isEmpty()) {
             throw new Exception("File must have a name");
         }
-        
-        String fileExtension = "";
-        if (originalFilename.contains(".")) {
-            fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
-        String uniqueFilename = UUID.randomUUID().toString() + fileExtension;
 
-        // Save file to disk
-        Path filePath = uploadPath.resolve(uniqueFilename);
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        // Upload file to S3
+        String fileUrl = s3Service.uploadFile(file, originalFilename);
 
         // Save attachment metadata to database
         Attachment attachment = new Attachment();
         attachment.setFileName(originalFilename);
         attachment.setFileType(file.getContentType());
-        attachment.setFileUrl(filePath.toString());
+        attachment.setFileUrl(fileUrl);
         attachment.setOrderId(orderId);
         attachment.setOrderItemId(orderItemId);
         attachment.setUserId(userId);
@@ -109,11 +90,11 @@ public class AttachmentServiceImpl implements IAttachmentService {
         Attachment attachment = attachmentRepository.findById(id)
                 .orElseThrow(() -> new Exception("Attachment not found with id: " + id));
 
-        // Delete file from disk
-        Path filePath = Paths.get(attachment.getFileUrl());
-        if (Files.exists(filePath)) {
-            Files.delete(filePath);
-        }
+        // Delete file from S3
+        String fileUrl = attachment.getFileUrl();
+        // Extract the file name from the S3 URL
+        String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        s3Service.deleteFile(fileName);
 
         // Delete from database
         attachmentRepository.deleteById(id);

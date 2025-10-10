@@ -26,6 +26,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import com.google.gson.JsonObject;
@@ -152,6 +153,36 @@ public class OrderServiceImpl implements IOrderService {
             preOrderResponseDTO.setTotalCartValue(originalTotal); // Original price before discount
             preOrderResponseDTO.setDiscount(bucketDiscount); // Total discount amount
             
+            // For bucket orders, we need to create a cart for the selected vendor only
+            CartResponseDTO bucketCart = new CartResponseDTO();
+            bucketCart.setVendorId(selectedBucket.getVendorId());
+            bucketCart.setTotalCartValue(originalTotal);
+            bucketCart.setAmountToPay(bucketAmount);
+            bucketCart.setDiscount(bucketDiscount);
+            
+            // Convert bucket items to medicine DTOs
+            List<MedicineDTO> medicineDTOs = new ArrayList<>();
+            if (selectedBucket.getAvailableItems() != null) {
+                for (BucketItemDTO bucketItem : selectedBucket.getAvailableItems()) {
+                    MedicineDTO medicineDTO = new MedicineDTO();
+                    medicineDTO.setId(bucketItem.getMedicineId());
+                    medicineDTO.setName(bucketItem.getMedicineName());
+                    medicineDTO.setStrip(bucketItem.getMedicineStrip());
+                    medicineDTO.setMrp(bucketItem.getPrice()); // Discounted price
+                    medicineDTO.setDiscount(bucketItem.getDiscount());
+                    medicineDTO.setQty(bucketItem.getRequestedQuantity());
+                    // Calculate original price before discount
+                    double originalPrice = bucketItem.getDiscount() < 100 ? 
+                        bucketItem.getPrice() / (1 - bucketItem.getDiscount() / 100) : 
+                        bucketItem.getPrice();
+                    medicineDTO.setActualPrice(originalPrice); // Original price before discount
+                    medicineDTOs.add(medicineDTO);
+                }
+            }
+            bucketCart.setMedicine(medicineDTOs);
+            
+            preOrderResponseDTO.setCarts(Arrays.asList(bucketCart));
+            
             // Convert to JSON and set as payload BEFORE saving
             Gson gson = new Gson();
             String payload = gson.toJson(preOrderResponseDTO);
@@ -194,38 +225,26 @@ public class OrderServiceImpl implements IOrderService {
             Gson gson = new Gson();
             PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
             preOrderResponseDTO.setOrderId(preOrder.getId());
-            populateCartResponse(preOrderResponseDTO);
+            
+            // Only populate cart response for regular orders, not bucket orders
+            // Bucket orders already have the correct cart data
+            if (!isBucketOrder(preOrder)) {
+                populateCartResponse(preOrderResponseDTO);
+            }
 
             if (preOrderResponseDTO.getAddressId() == 0) {
                 preOrderResponseDTO.setAddressId(preOrder.getAddressId());
             }
 
-
-            preOrderResponseDTO.getCarts().forEach(cart -> {
-                Order order = populateOrder(preOrderResponseDTO);
-                Vendor vendor = new Vendor();
-                vendor.setId(cart.getVendorId());
-                order.setVendor(vendor);
-                order.setPreOrder(preOrder);
-                // Save the order
-                Order savedOrder = orderRepository.save(order);
-                cart.setOrderId(savedOrder.getId());
-                List<OrderItem> orderItems = cart.getMedicine().stream()
-                        .map(medicine -> {
-                            OrderItem item = new OrderItem();
-                            Medicine med = new Medicine();
-                            med.setId(medicine.getId());
-                            item.setMedicine(med);
-                            item.setQty(medicine.getQty());
-                            item.setMrp(medicine.getMrp());
-                            item.setOrderStatus("pending");
-                            item.setOrder(savedOrder);  // Ensure the order reference is set
-                            return item;
-                        })
-                        .collect(Collectors.toList());
-                // Save all order items in one go
-                orderItemRepository.saveAll(orderItems);
-            });
+            // Check if this is a bucket order (single vendor) or regular order (multiple vendors)
+            // For bucket orders, we only process the specific vendor selected in the bucket
+            if (isBucketOrder(preOrder)) {
+                // For bucket orders, process only the vendor specified in the bucket
+                processBucketOrder(preOrder, preOrderResponseDTO);
+            } else {
+                // Regular order processing - create orders for all vendors
+                processRegularOrder(preOrder, preOrderResponseDTO);
+            }
 
             preOrderRepository.save(preOrder);
         }
@@ -681,5 +700,73 @@ public class OrderServiceImpl implements IOrderService {
             e.printStackTrace();
         }
         return orderId;
+    }
+
+    // Helper method to determine if an order is a bucket order
+    public boolean isBucketOrder(PreOrder preOrder) {
+        // Bucket orders are created by "SYSTEM" and have a single cart
+        return "SYSTEM".equals(preOrder.getCreatedBy());
+    }
+
+    // Process bucket orders (single vendor)
+    private void processBucketOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO) {
+        if (preOrderResponseDTO.getCarts() != null && !preOrderResponseDTO.getCarts().isEmpty()) {
+            CartResponseDTO selectedCart = preOrderResponseDTO.getCarts().get(0); // First cart for bucket order
+            Order order = populateOrder(preOrderResponseDTO);
+            Vendor vendor = new Vendor();
+            vendor.setId(selectedCart.getVendorId());
+            order.setVendor(vendor);
+            order.setPreOrder(preOrder);
+            // Save the order
+            Order savedOrder = orderRepository.save(order);
+            selectedCart.setOrderId(savedOrder.getId());
+            
+            // For bucket orders, we need to create order items from the medicine data already in the cart
+            List<OrderItem> orderItems = new ArrayList<>();
+            if (selectedCart.getMedicine() != null) {
+                for (MedicineDTO medicine : selectedCart.getMedicine()) {
+                    OrderItem item = new OrderItem();
+                    Medicine med = new Medicine();
+                    med.setId(medicine.getId());
+                    item.setMedicine(med);
+                    item.setQty(medicine.getQty());
+                    item.setMrp(medicine.getMrp()); // This is the discounted price
+                    item.setOrderStatus("pending");
+                    item.setOrder(savedOrder);
+                    orderItems.add(item);
+                }
+            }
+            // Save all order items in one go
+            orderItemRepository.saveAll(orderItems);
+        }
+    }
+
+    // Process regular orders (multiple vendors)
+    private void processRegularOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO) {
+        preOrderResponseDTO.getCarts().forEach(cart -> {
+            Order order = populateOrder(preOrderResponseDTO);
+            Vendor vendor = new Vendor();
+            vendor.setId(cart.getVendorId());
+            order.setVendor(vendor);
+            order.setPreOrder(preOrder);
+            // Save the order
+            Order savedOrder = orderRepository.save(order);
+            cart.setOrderId(savedOrder.getId());
+            List<OrderItem> orderItems = cart.getMedicine().stream()
+                    .map(medicine -> {
+                        OrderItem item = new OrderItem();
+                        Medicine med = new Medicine();
+                        med.setId(medicine.getId());
+                        item.setMedicine(med);
+                        item.setQty(medicine.getQty());
+                        item.setMrp(medicine.getMrp());
+                        item.setOrderStatus("pending");
+                        item.setOrder(savedOrder);  // Ensure the order reference is set
+                        return item;
+                    })
+                    .collect(Collectors.toList());
+            // Save all order items in one go
+            orderItemRepository.saveAll(orderItems);
+        });
     }
 }

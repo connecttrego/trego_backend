@@ -125,6 +125,7 @@ The system follows a microservices-inspired architecture with clearly separated 
 - **Apache Commons Lang 3**: Utility library for string manipulation and other common operations
 - **JUnit 5**: Testing framework with parameterized tests and assertions
 - **Razorpay API**: Payment processing integration with order creation and verification
+- **AWS SDK for Java v2**: For interacting with Amazon S3 cloud storage service
 
 ## Project Structure
 
@@ -222,7 +223,8 @@ src/main/java/com/trego/
 │   │   ├── SubcategoryServiceImpl.java
 │   │   ├── ProductServiceImpl.java
 │   │   ├── OtcProductServiceImpl.java
-│   │   └── AttachmentServiceImpl.java
+│   │   ├── AttachmentServiceImpl.java
+│   │   └── S3ServiceImpl.java      # S3 service implementation for file storage
 │   ├── IAddressService.java      # Service interfaces with method declarations
 │   ├── IMainService.java
 │   ├── IMasterService.java
@@ -235,7 +237,10 @@ src/main/java/com/trego/
 │   ├── ISubcategoryService.java
 │   ├── IProductService.java
 │   ├── IOtcProductService.java
-│   └── IAttachmentService.java
+│   ├── IAttachmentService.java
+│   └── IS3Service.java           # S3 service interface
+├── config/                       # Configuration classes
+│   └── S3Config.java             # AWS S3 client configuration
 └── utils/                        # Utility classes and constants
     ├── Constants.java            # Application-wide constants
     └── DataSeeder.java           # Data seeder for initial categories
@@ -247,8 +252,8 @@ src/test/java/com/trego/          # Test directory
 │   ├── OtcProductControllerTest.java # OTC Product controller tests
 │   └── AttachmentControllerTest.java # Attachment controller tests
 └── service/impl/                 # Service implementation tests
-    └── AttachmentServiceImplTest.java # Attachment service implementation tests
-```
+    ├── AttachmentServiceImplTest.java # Attachment service implementation tests
+    └── S3ServiceImplTest.java         # S3 service implementation tests
 
 ## Core Features
 
@@ -469,54 +474,77 @@ The API does not implement JWT or OAuth authentication. Authentication is handle
   - `totalPrice` (Double) - Total price (price per unit * requested quantity)
 
 ### Attachment and Prescription Management
-The Attachment and Prescription Management feature allows users to upload prescriptions and other attachments related to their orders.
+The Attachment and Prescription Management feature allows users to upload prescriptions and other attachments related to their orders. Files are now stored in AWS S3 cloud storage for better scalability and reliability.
 
 **API Endpoints:**
+
 - `POST /api/attachments/upload` - Upload a prescription or attachment
-  - Request Parameters:
+  - **Description**: Uploads a file to AWS S3 and creates an attachment record in the database
+  - **Request Parameters**:
     - `file` (MultipartFile) - The file to upload (required)
     - `orderId` (Long) - Order ID to associate with the attachment (optional, but at least one of orderId, orderItemId, or userId must be provided)
     - `orderItemId` (Long) - Order item ID to associate with the attachment (optional)
     - `userId` (Long) - User ID to associate with the attachment (optional)
     - `description` (String) - Description of the attachment (optional)
-  - Response: Returns an AttachmentDTO with the uploaded file details
-  - Example: `POST /api/attachments/upload` with form data including file and orderId=1
+  - **Response**: Returns an AttachmentDTO with the uploaded file details
+  - **Example**: `POST /api/attachments/upload` with form data including file and orderId=1
+  - **Success Response**: HTTP 200 OK with AttachmentDTO
+  - **Error Responses**: 
+    - HTTP 400 Bad Request if validation fails (missing file or association parameters)
+    - HTTP 500 Internal Server Error if upload fails
 
 - `GET /api/attachments/order/{orderId}` - Retrieve all attachments for an order
-  - Path Parameters:
+  - **Description**: Gets all attachments associated with a specific order
+  - **Path Parameters**:
     - `orderId` (Long) - The ID of the order
-  - Response: Returns an array of AttachmentDTO objects
-  - Example: `GET /api/attachments/order/1`
+  - **Response**: Returns an array of AttachmentDTO objects
+  - **Example**: `GET /api/attachments/order/1`
+  - **Success Response**: HTTP 200 OK with array of AttachmentDTO objects
+  - **Error Responses**: HTTP 500 Internal Server Error if retrieval fails
 
 - `GET /api/attachments/order-item/{orderItemId}` - Retrieve all attachments for an order item
-  - Path Parameters:
+  - **Description**: Gets all attachments associated with a specific order item
+  - **Path Parameters**:
     - `orderItemId` (Long) - The ID of the order item
-  - Response: Returns an array of AttachmentDTO objects
-  - Example: `GET /api/attachments/order-item/1`
+  - **Response**: Returns an array of AttachmentDTO objects
+  - **Example**: `GET /api/attachments/order-item/1`
+  - **Success Response**: HTTP 200 OK with array of AttachmentDTO objects
+  - **Error Responses**: HTTP 500 Internal Server Error if retrieval fails
 
 - `GET /api/attachments/user/{userId}` - Retrieve all attachments for a user
-  - Path Parameters:
+  - **Description**: Gets all attachments associated with a specific user
+  - **Path Parameters**:
     - `userId` (Long) - The ID of the user
-  - Response: Returns an array of AttachmentDTO objects
-  - Example: `GET /api/attachments/user/1`
+  - **Response**: Returns an array of AttachmentDTO objects
+  - **Example**: `GET /api/attachments/user/1`
+  - **Success Response**: HTTP 200 OK with array of AttachmentDTO objects
+  - **Error Responses**: HTTP 500 Internal Server Error if retrieval fails
 
 - `GET /api/attachments/{id}` - Retrieve a specific attachment by ID
-  - Path Parameters:
+  - **Description**: Gets a specific attachment by its ID
+  - **Path Parameters**:
     - `id` (Long) - The ID of the attachment
-  - Response: Returns an AttachmentDTO object
-  - Example: `GET /api/attachments/1`
+  - **Response**: Returns an AttachmentDTO object
+  - **Example**: `GET /api/attachments/1`
+  - **Success Response**: HTTP 200 OK with AttachmentDTO
+  - **Error Responses**: 
+    - HTTP 404 Not Found if attachment doesn't exist
+    - HTTP 500 Internal Server Error if retrieval fails
 
 - `DELETE /api/attachments/{id}` - Delete an attachment
-  - Path Parameters:
+  - **Description**: Deletes an attachment from both the database and AWS S3 storage
+  - **Path Parameters**:
     - `id` (Long) - The ID of the attachment to delete
-  - Response: Returns HTTP 200 OK on success
-  - Example: `DELETE /api/attachments/1`
+  - **Response**: HTTP 200 OK on success
+  - **Example**: `DELETE /api/attachments/1`
+  - **Success Response**: HTTP 200 OK
+  - **Error Responses**: HTTP 500 Internal Server Error if deletion fails
 
 **AttachmentDTO Fields:**
 - `id` (Long) - The attachment ID
 - `fileName` (String) - Original name of the uploaded file
 - `fileType` (String) - MIME type of the uploaded file
-- `fileUrl` (String) - Path to the stored file
+- `fileUrl` (String) - Public URL to access the file in S3 storage
 - `orderId` (Long) - Order ID associated with the attachment (if any)
 - `orderItemId` (Long) - Order item ID associated with the attachment (if any)
 - `userId` (Long) - User ID associated with the attachment (if any)
@@ -1009,6 +1037,38 @@ The user management system handles customer profiles and authentication:
    - Comprehensive order history tracking
    - Association with pre-orders for complete transaction view
 
+### Attachment Management
+
+The attachment management system handles file uploads and storage for prescriptions and other documents:
+
+1. **File Upload Process**:
+   - Users upload files through the `/api/attachments/upload` endpoint
+   - Files are stored in AWS S3 cloud storage for scalability and reliability
+   - Metadata is stored in the database with references to orders, order items, or users
+   - System generates unique filenames to prevent conflicts
+
+2. **File Storage**:
+   - Files are stored in S3 with public read access for direct client access
+   - S3 URLs are returned in API responses for immediate access
+   - Content type is preserved for proper file handling
+   - Original filenames are stored in metadata for user reference
+
+3. **File Retrieval**:
+   - Users can retrieve attachments by order, order item, user, or attachment ID
+   - System returns S3 URLs for direct file access without server proxying
+   - Metadata is provided alongside file URLs for context
+
+4. **File Deletion**:
+   - Users can delete attachments through the API
+   - System removes both database metadata and S3 files
+   - Deletion is atomic - if S3 deletion fails, database record is preserved
+
+5. **Security Considerations**:
+   - Files are associated with specific users, orders, or order items
+   - Access control is managed through the application layer
+   - AWS credentials are configured through environment variables
+   - Public read access is limited to files with proper URLs
+
 ## Service Layer Implementation
 
 ### Order Service
@@ -1157,6 +1217,33 @@ The [SubstituteServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/treg
    - Follows Spring Boot best practices for service layer implementation
    - Limits results at the service layer to reduce data transfer
 
+### S3 Service
+
+The [S3ServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/src/main/java/com/trego/service/impl/S3ServiceImpl.java) class handles file storage operations with AWS S3:
+
+1. **File Upload**:
+   - Uploads files to AWS S3 with unique filenames to prevent conflicts
+   - Preserves original content type for proper file handling
+   - Generates public URLs for direct file access
+   - Handles IOException and S3Exception for robust error handling
+
+2. **File Deletion**:
+   - Deletes files from AWS S3 by filename
+   - Gracefully handles S3Exception without interrupting the operation
+   - Logs errors for monitoring and debugging purposes
+
+3. **Configuration**:
+   - Uses AWS SDK v2 for S3 operations
+   - Configured through application.properties with bucket name and region
+   - Uses static credentials provider with access key and secret key
+   - Region configuration for proper S3 endpoint selection
+
+4. **Security Considerations**:
+   - AWS credentials are configured through environment variables
+   - Files are stored with public read access for direct client access
+   - Unique filenames prevent accidental overwrites
+   - Proper exception handling prevents information leakage
+
 ## Repository Layer
 
 ### Custom Queries
@@ -1289,6 +1376,7 @@ The Substitute Controller specifically:
 - Java 17 JDK
 - Maven 3.8+
 - MySQL 8.0+ (or Google Cloud SQL)
+- AWS Account with S3 access (for file storage)
 - IDE with Spring Boot support
 
 ### Database Setup
@@ -1297,6 +1385,30 @@ The Substitute Controller specifically:
    ```sql
    CREATE DATABASE trego_db;
    ```
+
+### AWS S3 Setup
+1. Create an S3 bucket in your AWS account
+2. Create an IAM user with programmatic access
+3. Attach a policy to the user with S3 permissions:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "s3:PutObject",
+           "s3:GetObject",
+           "s3:DeleteObject"
+         ],
+         "Resource": [
+           "arn:aws:s3:::your-bucket-name/*"
+         ]
+       }
+     ]
+   }
+   ```
+4. Note the Access Key ID and Secret Access Key for configuration
 
 ### Installation Steps
 
@@ -1308,17 +1420,19 @@ The Substitute Controller specifically:
 
 2. Configure database settings in `src/main/resources/application.properties`
 
-3. Build the project:
+3. Configure AWS S3 settings in `src/main/resources/application.properties`
+
+4. Build the project:
    ```bash
    mvn clean install
    ```
 
-4. Run the application:
+5. Run the application:
    ```bash
    mvn spring-boot:run
    ```
 
-5. Access the application at `http://localhost:8080`
+6. Access the application at `http://localhost:8080`
 
 ## Configuration
 
@@ -1355,6 +1469,37 @@ Swagger UI configuration:
 ```properties
 springdoc.swagger-ui.path=/swagger-ui.html
 ```
+
+### AWS S3 Configuration
+The application now stores file attachments in AWS S3 cloud storage. The following configuration properties must be set:
+
+```properties
+# AWS S3 Configuration
+aws.s3.bucket-name=your-s3-bucket-name
+aws.s3.region=us-east-1
+aws.s3.access-key-id=your-access-key-id
+aws.s3.secret-access-key=your-secret-access-key
+```
+
+**Configuration Details:**
+- `aws.s3.bucket-name`: The name of your S3 bucket where files will be stored
+- `aws.s3.region`: The AWS region where your S3 bucket is located
+- `aws.s3.access-key-id`: Your AWS access key ID for authentication
+- `aws.s3.secret-access-key`: Your AWS secret access key for authentication
+
+**Security Note:** Never commit AWS credentials to version control. Use environment variables or secure configuration management systems in production environments.
+
+**S3 Bucket Permissions:**
+The AWS credentials must have the following permissions for the specified bucket:
+- `s3:PutObject` - To upload files
+- `s3:DeleteObject` - To delete files
+- `s3:GetObject` - To retrieve files (public read access recommended for direct access)
+
+**File Access:**
+Files uploaded to S3 are accessible via public URLs in the format:
+`https://{bucket-name}.s3.{region}.amazonaws.com/{filename}`
+
+These URLs are returned in the AttachmentDTO when retrieving attachment information, allowing clients to directly access the files without proxying through the application server.
 
 ## Database Schema
 

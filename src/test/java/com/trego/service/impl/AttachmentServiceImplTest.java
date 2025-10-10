@@ -3,17 +3,17 @@ package com.trego.service.impl;
 import com.trego.dao.entity.Attachment;
 import com.trego.dao.impl.AttachmentRepository;
 import com.trego.dto.AttachmentDTO;
+import com.trego.service.IS3Service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -22,6 +22,9 @@ public class AttachmentServiceImplTest {
 
     @Mock
     private AttachmentRepository attachmentRepository;
+
+    @Mock
+    private IS3Service s3Service;
 
     @InjectMocks
     private AttachmentServiceImpl attachmentService;
