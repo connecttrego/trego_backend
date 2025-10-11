@@ -17,7 +17,7 @@ public class AttachmentServiceImpl implements IAttachmentService {
     @Autowired
     private AttachmentRepository attachmentRepository;
 
-    @Autowired
+    @Autowired(required = false)
     private IS3Service s3Service;
 
     @Override
@@ -37,8 +37,11 @@ public class AttachmentServiceImpl implements IAttachmentService {
             throw new Exception("File must have a name");
         }
 
-        // Upload file to S3
-        String fileUrl = s3Service.uploadFile(file, originalFilename);
+        // Upload file to S3 or local storage
+        String fileUrl = originalFilename; // Default to filename
+        if (s3Service != null) {
+            fileUrl = s3Service.uploadFile(file, originalFilename);
+        }
 
         // Save attachment metadata to database
         Attachment attachment = new Attachment();
@@ -90,11 +93,13 @@ public class AttachmentServiceImpl implements IAttachmentService {
         Attachment attachment = attachmentRepository.findById(id)
                 .orElseThrow(() -> new Exception("Attachment not found with id: " + id));
 
-        // Delete file from S3
-        String fileUrl = attachment.getFileUrl();
-        // Extract the file name from the S3 URL
-        String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-        s3Service.deleteFile(fileName);
+        // Delete file from S3 or local storage if S3 service is available
+        if (s3Service != null) {
+            String fileUrl = attachment.getFileUrl();
+            // Extract the file name from the S3 URL
+            String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            s3Service.deleteFile(fileName);
+        }
 
         // Delete from database
         attachmentRepository.deleteById(id);

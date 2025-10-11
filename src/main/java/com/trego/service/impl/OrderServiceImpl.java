@@ -101,6 +101,9 @@ public class OrderServiceImpl implements IOrderService {
     
     @Override
     public OrderResponseDTO placeOrderFromBucket(BucketOrderRequestDTO bucketOrderRequest) throws Exception {
+        System.out.println("Placing bucket order for user ID: " + bucketOrderRequest.getUserId() + 
+                          ", PreOrder ID: " + bucketOrderRequest.getPreOrderId() + 
+                          ", Bucket ID: " + bucketOrderRequest.getBucketId());
         OrderResponseDTO orderResponseDTO = new OrderResponseDTO();
         
         // Set user ID
@@ -109,6 +112,7 @@ public class OrderServiceImpl implements IOrderService {
         // Get the original preorder to recreate buckets
         PreOrder originalPreOrder = preOrderRepository.findById(bucketOrderRequest.getPreOrderId()).orElse(null);
         if (originalPreOrder == null) {
+            System.out.println("Original preorder not found for ID: " + bucketOrderRequest.getPreOrderId());
             throw new Exception("Original preorder not found");
         }
         
@@ -118,10 +122,14 @@ public class OrderServiceImpl implements IOrderService {
             
             // Check if carts is null and handle it
             if (vendorCartData.getCarts() == null) {
+                System.out.println("No cart data found in preorder");
                 throw new Exception("No cart data found in preorder");
             }
             
+            System.out.println("Number of carts in vendorCartData: " + vendorCartData.getCarts().size());
+            
             List<BucketDTO> buckets = bucketService.createOptimizedBucketsFromPreorder(vendorCartData);
+            System.out.println("Created " + buckets.size() + " buckets");
             
             // Find the selected bucket
             BucketDTO selectedBucket = buckets.stream()
@@ -130,8 +138,11 @@ public class OrderServiceImpl implements IOrderService {
                     .orElse(null);
                     
             if (selectedBucket == null) {
+                System.out.println("Selected bucket not found for ID: " + bucketOrderRequest.getBucketId());
                 throw new Exception("Selected bucket not found");
             }
+            
+            System.out.println("Selected bucket vendor ID: " + selectedBucket.getVendorId());
             
             // Calculate the actual bucket amount and discount
             double bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
@@ -183,6 +194,9 @@ public class OrderServiceImpl implements IOrderService {
             
             preOrderResponseDTO.setCarts(Arrays.asList(bucketCart));
             
+            System.out.println("Created bucket cart with vendor ID: " + bucketCart.getVendorId() + 
+                              " and " + medicineDTOs.size() + " medicines");
+            
             // Convert to JSON and set as payload BEFORE saving
             Gson gson = new Gson();
             String payload = gson.toJson(preOrderResponseDTO);
@@ -190,6 +204,7 @@ public class OrderServiceImpl implements IOrderService {
             
             // Save the preorder 
             PreOrder savedPreOrder = preOrderRepository.save(preOrder);
+            System.out.println("Saved new PreOrder ID: " + savedPreOrder.getId());
             
             // Add the order ID to the response DTO
             preOrderResponseDTO.setOrderId(savedPreOrder.getId());
@@ -216,10 +231,12 @@ public class OrderServiceImpl implements IOrderService {
 
     @Override
     public OrderValidateResponseDTO validateOrder(OrderValidateRequestDTO orderValidateRequestDTO) throws Exception {
+        System.out.println("Validating order with Order ID: " + orderValidateRequestDTO.getOrderId());
         OrderValidateResponseDTO validateResponseDTO = new OrderValidateResponseDTO();
         boolean isValidate = verifyRazorPayOrder(orderValidateRequestDTO);
         if (isValidate) {
             PreOrder preOrder = preOrderRepository.findById(orderValidateRequestDTO.getOrderId()).get();
+            System.out.println("Found PreOrder ID: " + preOrder.getId() + " with payment status: " + preOrder.getPaymentStatus());
             preOrder.setPaymentStatus("paid");
 
             Gson gson = new Gson();
@@ -229,7 +246,10 @@ public class OrderServiceImpl implements IOrderService {
             // Only populate cart response for regular orders, not bucket orders
             // Bucket orders already have the correct cart data
             if (!isBucketOrder(preOrder)) {
+                System.out.println("Populating cart response for regular order");
                 populateCartResponse(preOrderResponseDTO);
+            } else {
+                System.out.println("Skipping cart response population for bucket order");
             }
 
             if (preOrderResponseDTO.getAddressId() == 0) {
@@ -240,9 +260,11 @@ public class OrderServiceImpl implements IOrderService {
             // For bucket orders, we only process the specific vendor selected in the bucket
             if (isBucketOrder(preOrder)) {
                 // For bucket orders, process only the vendor specified in the bucket
+                System.out.println("Processing as bucket order");
                 processBucketOrder(preOrder, preOrderResponseDTO);
             } else {
                 // Regular order processing - create orders for all vendors
+                System.out.println("Processing as regular order");
                 processRegularOrder(preOrder, preOrderResponseDTO);
             }
 
@@ -326,9 +348,11 @@ public class OrderServiceImpl implements IOrderService {
     }
 
     private List<OrderDTO> populateOrders(PreOrder preOrder) {
+        System.out.println("Populating orders for PreOrder ID: " + preOrder.getId() + " with " + preOrder.getOrders().size() + " orders");
         List<OrderDTO> orderDTOList = new ArrayList<>();
 // Iterate over orders in PreOrder
         preOrder.getOrders().forEach(order -> {
+            System.out.println("Processing order ID: " + order.getId() + " for vendor ID: " + order.getVendor().getId());
             OrderDTO orderDTO = new OrderDTO();
 
             // Populate fields of OrderDTO based on Order entity
@@ -705,13 +729,18 @@ public class OrderServiceImpl implements IOrderService {
     // Helper method to determine if an order is a bucket order
     public boolean isBucketOrder(PreOrder preOrder) {
         // Bucket orders are created by "SYSTEM" and have a single cart
-        return "SYSTEM".equals(preOrder.getCreatedBy());
+        boolean isBucket = "SYSTEM".equals(preOrder.getCreatedBy());
+        System.out.println("Checking if PreOrder ID: " + preOrder.getId() + " is bucket order. CreatedBy: " + preOrder.getCreatedBy() + ", IsBucket: " + isBucket);
+        return isBucket;
     }
 
     // Process bucket orders (single vendor)
     private void processBucketOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO) {
+        System.out.println("Processing bucket order for PreOrder ID: " + preOrder.getId());
         if (preOrderResponseDTO.getCarts() != null && !preOrderResponseDTO.getCarts().isEmpty()) {
+            System.out.println("Number of carts in bucket order: " + preOrderResponseDTO.getCarts().size());
             CartResponseDTO selectedCart = preOrderResponseDTO.getCarts().get(0); // First cart for bucket order
+            System.out.println("Processing cart for vendor ID: " + selectedCart.getVendorId());
             Order order = populateOrder(preOrderResponseDTO);
             Vendor vendor = new Vendor();
             vendor.setId(selectedCart.getVendorId());
@@ -719,11 +748,13 @@ public class OrderServiceImpl implements IOrderService {
             order.setPreOrder(preOrder);
             // Save the order
             Order savedOrder = orderRepository.save(order);
+            System.out.println("Saved order ID: " + savedOrder.getId() + " for vendor ID: " + selectedCart.getVendorId());
             selectedCart.setOrderId(savedOrder.getId());
             
             // For bucket orders, we need to create order items from the medicine data already in the cart
             List<OrderItem> orderItems = new ArrayList<>();
             if (selectedCart.getMedicine() != null) {
+                System.out.println("Number of medicines in cart: " + selectedCart.getMedicine().size());
                 for (MedicineDTO medicine : selectedCart.getMedicine()) {
                     OrderItem item = new OrderItem();
                     Medicine med = new Medicine();
@@ -738,12 +769,20 @@ public class OrderServiceImpl implements IOrderService {
             }
             // Save all order items in one go
             orderItemRepository.saveAll(orderItems);
+            System.out.println("Saved " + orderItems.size() + " order items for order ID: " + savedOrder.getId());
+        } else {
+            System.out.println("No carts found in bucket order");
         }
     }
 
     // Process regular orders (multiple vendors)
     private void processRegularOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO) {
+        System.out.println("Processing regular order for PreOrder ID: " + preOrder.getId());
+        if (preOrderResponseDTO.getCarts() != null) {
+            System.out.println("Number of carts in regular order: " + preOrderResponseDTO.getCarts().size());
+        }
         preOrderResponseDTO.getCarts().forEach(cart -> {
+            System.out.println("Processing cart for vendor ID: " + cart.getVendorId());
             Order order = populateOrder(preOrderResponseDTO);
             Vendor vendor = new Vendor();
             vendor.setId(cart.getVendorId());
@@ -751,6 +790,7 @@ public class OrderServiceImpl implements IOrderService {
             order.setPreOrder(preOrder);
             // Save the order
             Order savedOrder = orderRepository.save(order);
+            System.out.println("Saved order ID: " + savedOrder.getId() + " for vendor ID: " + cart.getVendorId());
             cart.setOrderId(savedOrder.getId());
             List<OrderItem> orderItems = cart.getMedicine().stream()
                     .map(medicine -> {
@@ -767,6 +807,7 @@ public class OrderServiceImpl implements IOrderService {
                     .collect(Collectors.toList());
             // Save all order items in one go
             orderItemRepository.saveAll(orderItems);
+            System.out.println("Saved " + orderItems.size() + " order items for order ID: " + savedOrder.getId());
         });
     }
 }
