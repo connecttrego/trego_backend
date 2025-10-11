@@ -22,6 +22,7 @@ public class AttachmentController {
      * @param orderId optional order ID
      * @param orderItemId optional order item ID
      * @param userId optional user ID
+     * @param medicineId optional medicine ID
      * @param description optional description
      * @return the uploaded attachment details
      */
@@ -31,11 +32,12 @@ public class AttachmentController {
             @RequestParam(value = "orderId", required = false) Long orderId,
             @RequestParam(value = "orderItemId", required = false) Long orderItemId,
             @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "medicineId", required = false) Long medicineId,
             @RequestParam(value = "description", required = false) String description) {
         try {
-            // Validate that at least one of orderId, orderItemId, or userId is provided
-            if (orderId == null && orderItemId == null && userId == null) {
-                return ResponseEntity.badRequest().body("At least one of orderId, orderItemId, or userId must be provided");
+            // Validate that at least one of orderId, orderItemId, userId, or medicineId is provided
+            if (orderId == null && orderItemId == null && userId == null && medicineId == null) {
+                return ResponseEntity.badRequest().body("At least one of orderId, orderItemId, userId, or medicineId must be provided");
             }
             
             // Validate that file is not empty
@@ -43,7 +45,7 @@ public class AttachmentController {
                 return ResponseEntity.badRequest().body("File is required and cannot be empty");
             }
             
-            AttachmentDTO attachment = attachmentService.uploadAttachment(file, orderId, orderItemId, userId, description);
+            AttachmentDTO attachment = attachmentService.uploadAttachment(file, orderId, orderItemId, userId, medicineId, description);
             return ResponseEntity.ok(attachment);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading file: " + e.getMessage());
@@ -80,6 +82,17 @@ public class AttachmentController {
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<AttachmentDTO>> getAttachmentsByUserId(@PathVariable Long userId) {
         List<AttachmentDTO> attachments = attachmentService.getAttachmentsByUserId(userId);
+        return ResponseEntity.ok(attachments);
+    }
+    
+    /**
+     * Get all attachments for a medicine
+     * @param medicineId the medicine ID
+     * @return list of attachments
+     */
+    @GetMapping("/medicine/{medicineId}")
+    public ResponseEntity<List<AttachmentDTO>> getAttachmentsByMedicineId(@PathVariable Long medicineId) {
+        List<AttachmentDTO> attachments = attachmentService.getAttachmentsByMedicineId(medicineId);
         return ResponseEntity.ok(attachments);
     }
 

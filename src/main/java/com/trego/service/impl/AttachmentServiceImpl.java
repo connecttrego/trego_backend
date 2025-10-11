@@ -22,6 +22,11 @@ public class AttachmentServiceImpl implements IAttachmentService {
 
     @Override
     public AttachmentDTO uploadAttachment(MultipartFile file, Long orderId, Long orderItemId, Long userId, String description) throws Exception {
+        return uploadAttachment(file, orderId, orderItemId, userId, null, description);
+    }
+    
+    @Override
+    public AttachmentDTO uploadAttachment(MultipartFile file, Long orderId, Long orderItemId, Long userId, Long medicineId, String description) throws Exception {
         // Validate input
         if (file == null) {
             throw new Exception("File is required");
@@ -51,6 +56,7 @@ public class AttachmentServiceImpl implements IAttachmentService {
         attachment.setOrderId(orderId);
         attachment.setOrderItemId(orderItemId);
         attachment.setUserId(userId);
+        attachment.setMedicineId(medicineId);
         attachment.setDescription(description);
 
         Attachment savedAttachment = attachmentRepository.save(attachment);
@@ -77,6 +83,14 @@ public class AttachmentServiceImpl implements IAttachmentService {
     @Override
     public List<AttachmentDTO> getAttachmentsByUserId(Long userId) {
         return attachmentRepository.findByUserId(userId)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    public List<AttachmentDTO> getAttachmentsByMedicineId(Long medicineId) {
+        return attachmentRepository.findByMedicineId(medicineId)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -114,6 +128,7 @@ public class AttachmentServiceImpl implements IAttachmentService {
         dto.setOrderId(attachment.getOrderId());
         dto.setOrderItemId(attachment.getOrderItemId());
         dto.setUserId(attachment.getUserId());
+        dto.setMedicineId(attachment.getMedicineId());
         dto.setDescription(attachment.getDescription());
         dto.setCreatedAt(attachment.getCreatedAt());
         dto.setUpdatedAt(attachment.getUpdatedAt());

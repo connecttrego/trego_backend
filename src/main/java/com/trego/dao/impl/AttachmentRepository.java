@@ -10,4 +10,5 @@ public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
     List<Attachment> findByOrderId(Long orderId);
     List<Attachment> findByOrderItemId(Long orderItemId);
     List<Attachment> findByUserId(Long userId);
+    List<Attachment> findByMedicineId(Long medicineId);
 }

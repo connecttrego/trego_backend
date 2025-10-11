@@ -482,9 +482,10 @@ The Attachment and Prescription Management feature allows users to upload prescr
   - **Description**: Uploads a file to AWS S3 and creates an attachment record in the database
   - **Request Parameters**:
     - `file` (MultipartFile) - The file to upload (required)
-    - `orderId` (Long) - Order ID to associate with the attachment (optional, but at least one of orderId, orderItemId, or userId must be provided)
+    - `orderId` (Long) - Order ID to associate with the attachment (optional, but at least one of orderId, orderItemId, userId, or medicineId must be provided)
     - `orderItemId` (Long) - Order item ID to associate with the attachment (optional)
     - `userId` (Long) - User ID to associate with the attachment (optional)
+    - `medicineId` (Long) - Medicine ID to associate with the attachment (optional)
     - `description` (String) - Description of the attachment (optional)
   - **Response**: Returns an AttachmentDTO with the uploaded file details
   - **Example**: `POST /api/attachments/upload` with form data including file and orderId=1
@@ -520,6 +521,15 @@ The Attachment and Prescription Management feature allows users to upload prescr
   - **Success Response**: HTTP 200 OK with array of AttachmentDTO objects
   - **Error Responses**: HTTP 500 Internal Server Error if retrieval fails
 
+- `GET /api/attachments/medicine/{medicineId}` - Retrieve all attachments for a medicine
+  - **Description**: Gets all attachments associated with a specific medicine
+  - **Path Parameters**:
+    - `medicineId` (Long) - The ID of the medicine
+  - **Response**: Returns an array of AttachmentDTO objects
+  - **Example**: `GET /api/attachments/medicine/1`
+  - **Success Response**: HTTP 200 OK with array of AttachmentDTO objects
+  - **Error Responses**: HTTP 500 Internal Server Error if retrieval fails
+
 - `GET /api/attachments/{id}` - Retrieve a specific attachment by ID
   - **Description**: Gets a specific attachment by its ID
   - **Path Parameters**:
@@ -548,6 +558,7 @@ The Attachment and Prescription Management feature allows users to upload prescr
 - `orderId` (Long) - Order ID associated with the attachment (if any)
 - `orderItemId` (Long) - Order item ID associated with the attachment (if any)
 - `userId` (Long) - User ID associated with the attachment (if any)
+- `medicineId` (Long) - Medicine ID associated with the attachment (if any)
 - `description` (String) - Description of the attachment
 - `createdAt` (LocalDateTime) - Timestamp when the attachment was created
 - `updatedAt` (LocalDateTime) - Timestamp when the attachment was last updated
@@ -788,6 +799,7 @@ The Attachment entity represents uploaded files such as prescriptions and other 
 - `orderId`: Reference to an order (Long, optional)
 - `orderItemId`: Reference to an order item (Long, optional)
 - `userId`: Reference to a user (Long, optional)
+- `medicineId`: Reference to a medicine (Long, optional)
 - `description`: Description of the attachment (String, optional)
 - `createdAt`: Timestamp when the attachment was created (LocalDateTime)
 - `updatedAt`: Timestamp when the attachment was last updated (LocalDateTime)
@@ -1044,7 +1056,7 @@ The attachment management system handles file uploads and storage for prescripti
 1. **File Upload Process**:
    - Users upload files through the `/api/attachments/upload` endpoint
    - Files are stored in AWS S3 cloud storage for scalability and reliability
-   - Metadata is stored in the database with references to orders, order items, or users
+   - Metadata is stored in the database with references to orders, order items, users, or medicines
    - System generates unique filenames to prevent conflicts
 
 2. **File Storage**:
@@ -1054,7 +1066,7 @@ The attachment management system handles file uploads and storage for prescripti
    - Original filenames are stored in metadata for user reference
 
 3. **File Retrieval**:
-   - Users can retrieve attachments by order, order item, user, or attachment ID
+   - Users can retrieve attachments by order, order item, user, medicine, or attachment ID
    - System returns S3 URLs for direct file access without server proxying
    - Metadata is provided alongside file URLs for context
 
@@ -1064,7 +1076,7 @@ The attachment management system handles file uploads and storage for prescripti
    - Deletion is atomic - if S3 deletion fails, database record is preserved
 
 5. **Security Considerations**:
-   - Files are associated with specific users, orders, or order items
+   - Files are associated with specific users, orders, order items, or medicines
    - Access control is managed through the application layer
    - AWS credentials are configured through environment variables
    - Public read access is limited to files with proper URLs
@@ -1217,6 +1229,37 @@ The [SubstituteServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/treg
    - Follows Spring Boot best practices for service layer implementation
    - Limits results at the service layer to reduce data transfer
 
+### Attachment Service
+
+The [AttachmentServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/src/main/java/com/trego/service/impl/AttachmentServiceImpl.java) class handles attachment operations:
+
+1. **File Upload**:
+   - Uploads files to AWS S3 with unique filenames to prevent conflicts
+   - Preserves original content type for proper file handling
+   - Generates public URLs for direct file access
+   - Associates attachments with orders, order items, users, or medicines
+   - Stores metadata in the database with references to associated entities
+
+2. **File Retrieval**:
+   - Retrieves attachments by order ID, order item ID, user ID, medicine ID, or attachment ID
+   - Maps entity data to AttachmentDTOs for API responses
+   - Returns S3 URLs for direct file access
+
+3. **File Deletion**:
+   - Deletes attachments from both database and S3 storage
+   - Gracefully handles deletion failures
+   - Logs errors for monitoring and debugging purposes
+
+4. **Error Handling**:
+   - Wraps all operations in try-catch blocks for proper exception handling
+   - Throws Exception with meaningful error messages for debugging
+   - Logs exceptions to the console for troubleshooting purposes
+
+5. **Performance Considerations**:
+   - Uses Java 8 Streams for efficient data transformation
+   - Implements proper validation before database queries
+   - Follows Spring Boot best practices for service layer implementation
+
 ### S3 Service
 
 The [S3ServiceImpl](file:///c%3A/Users/ASUS/Downloads/trego_backend/src/main/java/com/trego/service/impl/S3ServiceImpl.java) class handles file storage operations with AWS S3:
@@ -1283,6 +1326,13 @@ The repository layer extends JpaRepository and includes custom queries:
    - Returns List<Substitute> for easy integration with service layer
    - Sorts results by best price in ascending order at the database level for efficiency
 
+8. **AttachmentRepository**:
+   - Added [AttachmentRepository](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dao/impl/AttachmentRepository.java#L9-L15) with methods to find attachments by order ID, order item ID, user ID, or medicine ID
+   - Extends JpaRepository<Attachment, Long> for standard CRUD operations
+   - Custom methods: findByOrderId(Long orderId), findByOrderItemId(Long orderItemId), findByUserId(Long userId), findByMedicineId(Long medicineId)
+   - Uses Spring Data JPA naming conventions for automatic query generation
+   - Returns List<Attachment> for easy integration with service layer
+
 ### Relationship Management
 
 The repository layer handles complex entity relationships:
@@ -1298,6 +1348,7 @@ Request DTOs handle incoming data from API clients:
 - [OrderRequestDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/OrderRequestDTO.java#L5-L9): Order placement requests
 - [OrderValidateRequestDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/OrderValidateRequestDTO.java#L5-L10): Payment verification requests
 - [CancelOrderRequestDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/CancelOrderRequestDTO.java#L3-L8): Order cancellation requests
+- [AttachmentDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/AttachmentDTO.java#L5-L17): Attachment information with file metadata and URLs
 
 ### Response DTOs
 
@@ -1312,6 +1363,7 @@ Response DTOs handle outgoing data to API clients:
 - [SubstituteDetailDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/SubstituteDetailDTO.java#L5-L47): Substitute Product information with comprehensive medical and e-commerce fields including name, manufacturers, saltComposition, medicineType, stock, introduction, benefits, description, howToUse, safetyAdvise, ifMiss, packaging, packagingType, mrp, bestPrice, discountPercent, views, bought, prescriptionRequired, label, factBox, primaryUse, storage, useOf, commonSideEffect, alcoholInteraction, pregnancyInteraction, lactationInteraction, drivingInteraction, kidneyInteraction, liverInteraction, manufacturerAddress, countryOfOrigin, forSale, and qa
 - [BannerDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/BannerDTO.java#L3-L12): Banner information with proper URL processing
 - [VendorDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/VendorDTO.java#L3-L22): Vendor information with delivery time and reviews
+- [AttachmentDTO](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/main/java/com/trego/dto/AttachmentDTO.java#L5-L17): Attachment information with file metadata and URLs
 
 ## API Controllers
 
@@ -1333,6 +1385,14 @@ The Substitute Controller specifically:
 - Uses @RestController annotation for automatic JSON serialization
 - Maps to the base URL path: /api/medicines
 - Implements the GET /{medicineId}/substitutes endpoint for retrieving substitute products by medicine ID
+- Follows standard Spring Boot controller patterns
+- Returns properly formatted JSON responses with appropriate HTTP status codes
+
+The Attachment Controller specifically:
+- Uses @RestController annotation for automatic JSON serialization
+- Maps to the base URL path: /api/attachments
+- Implements endpoints for uploading, retrieving, and deleting attachments
+- Supports attachment associations with orders, order items, users, and medicines
 - Follows standard Spring Boot controller patterns
 - Returns properly formatted JSON responses with appropriate HTTP status codes
 
@@ -1581,6 +1641,13 @@ These URLs are returned in the AttachmentDTO when retrieving attachment informat
     - Foreign key references: None
     - Referenced by: None
 
+15. **attachments** table:
+    - Primary key: `id`
+    - Foreign keys: `order_id` references `orders.id`, `order_item_id` references `order_items.id`, `user_id` references `users.id`, `medicine_id` references `medicines.id`
+    - Referenced by: None
+    - Fields: `file_name`, `file_type`, `file_url`, `description`, `created_at`, `updated_at`
+    - Appropriate data types for file metadata and associations
+
 ### Indexing Strategy
 
 The database schema should include appropriate indexes for performance:
@@ -1593,6 +1660,7 @@ The database schema should include appropriate indexes for performance:
 - Index on `subcategory_id` in the `otc_products` table for efficient OTC product retrieval
 - Index on `medicine_id` in the `substitutes` table for efficient substitute retrieval
 - Index on `best_price` in the `substitutes` table for efficient sorting
+- Index on `order_id`, `order_item_id`, `user_id`, and `medicine_id` in the `attachments` table for efficient retrieval
 - Additional indexes on frequently queried fields like `name`, `category`, and `prescription_required` in the `otc_products` table
 
 ## Testing
@@ -1625,6 +1693,17 @@ The OTC Product functionality includes dedicated integration tests:
 - Tests handle invalid subcategory IDs gracefully
 - Uses in-memory H2 database for test isolation
 - Tests verify all OTC product fields are properly serialized
+
+### Attachment Controller Testing
+
+The Attachment functionality includes dedicated integration tests:
+- [AttachmentControllerTest](file:///c%3A/Users/ASUS/Downloads/trego_backend/trego_backend/src/test/java/com/trego/api/AttachmentControllerTest.java#L35-L146) for testing attachment endpoints
+- Tests cover successful file upload, retrieval, and deletion
+- Tests handle different attachment associations (order, order item, user, medicine)
+- Tests handle invalid attachment IDs gracefully
+- Uses in-memory H2 database for test isolation
+- Tests verify all attachment fields are properly serialized
+- Tests verify proper error handling for missing files or invalid parameters
 
 ## API Documentation
 

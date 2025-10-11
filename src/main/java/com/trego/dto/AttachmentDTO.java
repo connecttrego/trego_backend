@@ -12,6 +12,7 @@ public class AttachmentDTO {
     private Long orderId;
     private Long orderItemId;
     private Long userId;
+    private Long medicineId;
     private String description;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

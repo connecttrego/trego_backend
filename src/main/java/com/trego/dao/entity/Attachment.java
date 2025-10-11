@@ -30,6 +30,9 @@ public class Attachment {
     @Column(name = "user_id")
     private Long userId;
 
+    @Column(name = "medicine_id")
+    private Long medicineId;
+
     @Column(name = "description")
     private String description;
 
