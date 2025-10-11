@@ -144,7 +144,7 @@ public class OrderServiceImpl implements IOrderService {
             
             System.out.println("Selected bucket vendor ID: " + selectedBucket.getVendorId());
             
-            // Calculate the actual bucket amount and discount
+            // Use the exact amount from the bucket to ensure consistency
             double bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
             double bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
             double originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
@@ -209,7 +209,7 @@ public class OrderServiceImpl implements IOrderService {
             // Add the order ID to the response DTO
             preOrderResponseDTO.setOrderId(savedPreOrder.getId());
             
-            // Generate RazorPay order
+            // Generate RazorPay order using the exact same amount
             String razorpayOrderId = createRazorPayOrderForBucket(bucketOrderRequest, preOrderResponseDTO);
             savedPreOrder.setRazorpayOrderId(razorpayOrderId);
             
@@ -762,6 +762,8 @@ public class OrderServiceImpl implements IOrderService {
                     item.setMedicine(med);
                     item.setQty(medicine.getQty());
                     item.setMrp(medicine.getMrp()); // This is the discounted price
+                    item.setSellingPrice(medicine.getMrp()); // Selling price is the same as MRP for bucket orders
+                    item.setAmount(medicine.getMrp() * medicine.getQty()); // Total amount
                     item.setOrderStatus("pending");
                     item.setOrder(savedOrder);
                     orderItems.add(item);
@@ -800,6 +802,8 @@ public class OrderServiceImpl implements IOrderService {
                         item.setMedicine(med);
                         item.setQty(medicine.getQty());
                         item.setMrp(medicine.getMrp());
+                        item.setSellingPrice(medicine.getMrp()); // Selling price is the same as MRP
+                        item.setAmount(medicine.getMrp() * medicine.getQty()); // Total amount
                         item.setOrderStatus("pending");
                         item.setOrder(savedOrder);  // Ensure the order reference is set
                         return item;
