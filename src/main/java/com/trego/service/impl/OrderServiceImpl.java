@@ -133,10 +133,10 @@ public class OrderServiceImpl implements IOrderService {
             
             // Find the selected bucket
             BucketDTO selectedBucket = buckets.stream()
-                    .filter(bucket -> bucket.getId().equals(bucketOrderRequest.getBucketId()))
-                    .findFirst()
-                    .orElse(null);
-                    
+                .filter(bucket -> bucket.getId().equals(bucketOrderRequest.getBucketId()))
+                .findFirst()
+                .orElse(null);
+                
             if (selectedBucket == null) {
                 System.out.println("Selected bucket not found for ID: " + bucketOrderRequest.getBucketId());
                 throw new Exception("Selected bucket not found");
@@ -183,7 +183,7 @@ public class OrderServiceImpl implements IOrderService {
                     medicineDTO.setDiscount(bucketItem.getDiscount());
                     medicineDTO.setQty(bucketItem.getRequestedQuantity());
                     // Calculate original price before discount
-                    double originalPrice = bucketItem.getDiscount() < 100 ? 
+                    double originalPrice = bucketItem.getDiscount() > 0 ? 
                         bucketItem.getPrice() / (1 - bucketItem.getDiscount() / 100) : 
                         bucketItem.getPrice();
                     medicineDTO.setActualPrice(originalPrice); // Original price before discount
