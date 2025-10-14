@@ -77,7 +77,18 @@ public class OrderServiceImpl implements IOrderService {
         Gson gson = new Gson();
         PreOrderResponseDTO preOrderResponseDTO =  gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
-       // populateCartResponse(preOrderResponseDTO);
+        
+        // If a specific vendor is selected, filter the carts to only include that vendor
+        if (orderRequest.getSelectedVendorId() != null) {
+            System.out.println("Filtering carts for selected vendor ID: " + orderRequest.getSelectedVendorId());
+            List<CartResponseDTO> filteredCarts = preOrderResponseDTO.getCarts().stream()
+                .filter(cart -> cart.getVendorId().equals(orderRequest.getSelectedVendorId()))
+                .collect(Collectors.toList());
+            preOrderResponseDTO.setCarts(filteredCarts);
+            
+            // Store the selected vendor ID in the preorder for later use during validation
+            preOrder.setSelectedVendorId(orderRequest.getSelectedVendorId());
+        }
 
         String razorpayOrderId = null;
         if(StringUtils.isEmpty(preOrder.getRazorpayOrderId()) || !(preOrderResponseDTO.getAmountToPay()> 0 && Double.compare(preOrderResponseDTO.getAmountToPay(), preOrder.getTotalPayAmount()) == 0)){
@@ -243,15 +254,19 @@ public class OrderServiceImpl implements IOrderService {
             PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
             preOrderResponseDTO.setOrderId(preOrder.getId());
             
-            // Only populate cart response for regular orders, not bucket orders
-            // Bucket orders already have the correct cart data
-            if (!isBucketOrder(preOrder)) {
-                System.out.println("Populating cart response for regular order");
-                populateCartResponse(preOrderResponseDTO);
-            } else {
-                System.out.println("Skipping cart response population for bucket order");
+            // Preserve original cart data for both regular and bucket orders during validation
+            // This prevents quantity and vendor data from being recalculated incorrectly
+            System.out.println("Preserving original cart data during validation");
+            
+            // If a specific vendor was selected during order placement, filter the carts to only include that vendor
+            if (preOrder.getSelectedVendorId() != null) {
+                System.out.println("Filtering carts for selected vendor ID: " + preOrder.getSelectedVendorId());
+                List<CartResponseDTO> filteredCarts = preOrderResponseDTO.getCarts().stream()
+                    .filter(cart -> cart.getVendorId().equals(preOrder.getSelectedVendorId()))
+                    .collect(Collectors.toList());
+                preOrderResponseDTO.setCarts(filteredCarts);
             }
-
+            
             if (preOrderResponseDTO.getAddressId() == 0) {
                 preOrderResponseDTO.setAddressId(preOrder.getAddressId());
             }
@@ -263,8 +278,9 @@ public class OrderServiceImpl implements IOrderService {
                 System.out.println("Processing as bucket order");
                 processBucketOrder(preOrder, preOrderResponseDTO);
             } else {
-                // Regular order processing - create orders for all vendors
-                System.out.println("Processing as regular order");
+                // Regular order processing - create orders for selected vendors only
+                // Use the original cart data without recalculating
+                System.out.println("Processing as regular order with preserved cart data");
                 processRegularOrder(preOrder, preOrderResponseDTO);
             }
 

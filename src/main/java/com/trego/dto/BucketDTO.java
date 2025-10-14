@@ -11,6 +11,7 @@ public class BucketDTO {
     private String name;
     private List<BucketItemDTO> availableItems; // Available medicines
     private List<UnavailableMedicineDTO> unavailableItems; // Unavailable medicines with substitutes
+    private List<SelectedSubstituteDTO> selectedSubstitutes; // User-selected substitutes
     private double totalPrice;
     private double deliveryCharges;
     private double amountToPay;

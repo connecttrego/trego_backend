@@ -10,6 +10,7 @@ import com.trego.dto.BucketDTO;
 import com.trego.dto.BucketItemDTO;
 import com.trego.dto.BucketRequestDTO;
 import com.trego.dto.MedicineDTO;
+import com.trego.dto.SelectedSubstituteDTO;
 import com.trego.dto.response.CartResponseDTO;
 import com.trego.dto.response.VandorCartResponseDTO;
 import com.trego.dto.UnavailableMedicineDTO;
@@ -118,29 +119,43 @@ public class BucketServiceImpl implements IBucketService {
     @Override
     public List<BucketDTO> createOptimizedBucketsFromPreorder(VandorCartResponseDTO preorderData) {
         // Extract medicine IDs and quantities from preorder data
-        Map<Long, Integer> medicineQuantities = new HashMap<>();
+        // Key change: Track quantities per vendor instead of aggregating across vendors
+        Map<Long, Map<Long, Integer>> vendorMedicineQuantities = new HashMap<>(); // vendorId -> (medicineId -> quantity)
         List<Long> medicineIds = new ArrayList<>();
         Set<Long> selectedVendorIds = new HashSet<>(); // Track vendors selected by user
 
         System.out.println("Processing preorder data with " + preorderData.getCarts().size() + " carts");
 
         for (CartResponseDTO cart : preorderData.getCarts()) {
-            System.out.println("Processing cart with vendor ID: " + cart.getVendorId() + " and " + cart.getMedicine().size() + " medicines");
+            Long vendorId = cart.getVendorId();
+            System.out.println("Processing cart with vendor ID: " + vendorId + " and " + cart.getMedicine().size() + " medicines");
             // Track which vendors were selected by the user
-            selectedVendorIds.add(cart.getVendorId());
+            selectedVendorIds.add(vendorId);
+            
+            // Initialize the vendor's medicine quantity map
+            vendorMedicineQuantities.putIfAbsent(vendorId, new HashMap<>());
 
             for (MedicineDTO medicine : cart.getMedicine()) {
                 Long medicineId = medicine.getId();
                 int quantity = medicine.getQty();
 
-                System.out.println("Medicine ID: " + medicineId + ", Quantity: " + quantity);
-
-                // If we already have this medicine, add the quantity
-                if (medicineQuantities.containsKey(medicineId)) {
-                    quantity += medicineQuantities.get(medicineId);
+                // Skip medicines with zero quantity
+                if (quantity <= 0) {
+                    System.out.println("Skipping medicine ID: " + medicineId + " with zero or negative quantity: " + quantity);
+                    continue;
                 }
 
-                medicineQuantities.put(medicineId, quantity);
+                // Check if medicine is marked as unavailable (MRP 0.0 and expiry "Not Available")
+                if (medicine.getMrp() == 0.0 && "Not Available".equals(medicine.getExpiryDate())) {
+                    System.out.println("Skipping unavailable medicine ID: " + medicineId);
+                    continue;
+                }
+
+                System.out.println("Medicine ID: " + medicineId + ", Quantity: " + quantity);
+
+                // Store quantity per vendor instead of aggregating
+                vendorMedicineQuantities.get(vendorId).put(medicineId, quantity);
+                
                 if (!medicineIds.contains(medicineId)) {
                     medicineIds.add(medicineId);
                 }
@@ -148,7 +163,7 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         System.out.println("Total unique medicines: " + medicineIds.size());
-        System.out.println("Medicine quantities: " + medicineQuantities);
+        System.out.println("Vendor medicine quantities: " + vendorMedicineQuantities);
         System.out.println("User selected vendors: " + selectedVendorIds);
 
         // Check if medicineIds is empty
@@ -189,7 +204,6 @@ public class BucketServiceImpl implements IBucketService {
 
         // Remove medicines that are not available from any vendor
         medicineIds.removeIf(id -> !availableMedicineIds.contains(id));
-        medicineQuantities.entrySet().removeIf(entry -> !availableMedicineIds.contains(entry.getKey()));
 
         // Update the medicines list to only include available medicines
         medicines = medicines.stream()
@@ -197,7 +211,6 @@ public class BucketServiceImpl implements IBucketService {
                 .collect(Collectors.toList());
 
         System.out.println("After filtering, " + medicineIds.size() + " medicines are available from at least one vendor");
-        System.out.println("Available medicine quantities: " + medicineQuantities);
 
         // If no medicines are available, return empty list
         if (medicineIds.isEmpty()) {
@@ -222,7 +235,9 @@ public class BucketServiceImpl implements IBucketService {
             if (selectedVendorIds.contains(vendorId)) {
                 System.out.println("Creating bucket for user-selected vendor ID: " + vendorId);
                 // Create a bucket for this vendor with available medicines only
-                BucketDTO bucket = createBucketForVendorWithPartialAvailability(vendorId, vendorStocks, medicines, medicineQuantities, unavailableMedicineIds);
+                // Pass the vendor-specific medicine quantities
+                Map<Long, Integer> medicineQuantities = vendorMedicineQuantities.getOrDefault(vendorId, new HashMap<>());
+                BucketDTO bucket = createBucketForVendorWithSpecificQuantities(vendorId, vendorStocks, medicines, medicineQuantities, unavailableMedicineIds);
                 if (bucket != null && (!bucket.getAvailableItems().isEmpty() || !bucket.getUnavailableItems().isEmpty())) {
                     buckets.add(bucket);
                 }
@@ -375,6 +390,256 @@ public class BucketServiceImpl implements IBucketService {
         double amountToPay = totalPrice - totalDiscount + deliveryCharges;
         bucket.setAmountToPay(amountToPay);
         System.out.println("Returning vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
+        return bucket;
+    }
+
+    private BucketDTO createBucketForVendorWithSpecificQuantities(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
+        System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");
+
+        // Check if medicines list is empty
+        if (medicines.isEmpty()) {
+            System.out.println("No medicines to create bucket for vendor ID: " + vendorId);
+            return null;
+        }
+
+        BucketDTO bucket = new BucketDTO();
+        bucket.setId(vendorId); // Use vendor ID as bucket ID
+        Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
+        bucket.setName(vendor != null ? "Complete bucket from " + vendor.getName() : "Complete bucket from vendor " + vendorId);
+        bucket.setVendorId(vendorId);
+        bucket.setVendorName(vendor != null ? vendor.getName() : "");
+        bucket.setLogo(vendor != null ? vendor.getLogo() : "");
+        bucket.setSelectedSubstitutes(new ArrayList<>()); // Initialize selected substitutes list
+
+        List<BucketItemDTO> availableItems = new ArrayList<>();
+        List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
+        List<SelectedSubstituteDTO> selectedSubstitutes = new ArrayList<>(); // Track selected substitutes
+        String deliveryTime = "1 hrs extra";
+        double totalPrice = 0.0;
+        double deliveryCharges = 0.0;
+        double totalDiscount = 0.0; // Track total discount
+
+        // Process available medicines
+        for (Medicine medicine : medicines) {
+            Long medicineId = medicine.getId();
+            
+            // Check if this medicine is requested from this vendor
+            if (!medicineQuantities.containsKey(medicineId)) {
+                System.out.println("Medicine ID: " + medicineId + " not requested from vendor ID: " + vendorId);
+                continue;
+            }
+            
+            int requestedQuantity = medicineQuantities.get(medicineId);
+
+            // Skip medicines with zero quantity
+            if (requestedQuantity <= 0) {
+                System.out.println("Skipping medicine ID: " + medicineId + " with zero or negative quantity: " + requestedQuantity);
+                continue;
+            }
+
+            System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
+
+            // Find the stock for this medicine from this vendor
+            Optional<Stock> stockOptional = vendorStocks.stream()
+                    .filter(s -> s.getMedicine().getId() == medicineId)
+                    .findFirst();
+
+            if (stockOptional.isPresent()) {
+                Stock stock = stockOptional.get();
+
+                System.out.println("Found stock for medicine ID: " + medicineId + " with quantity: " + stock.getQty() + ", MRP: " + stock.getMrp() + ", discount: " + stock.getDiscount());
+
+                // Check if vendor has enough quantity
+                if (stock.getQty() >= requestedQuantity) {
+                    BucketItemDTO item = new BucketItemDTO();
+                    item.setMedicineId(medicineId);
+                    item.setMedicineName(medicine.getName());
+                    item.setMedicineImage(medicine.getPhoto1());
+                    item.setMedicineStrip(medicine.getPacking());
+                    //item.setVendorId(vendorId);
+                    //item.setVendorName(vendor != null ? vendor.getName() : "");
+                    item.setPrice(calculateUnitPrice(stock.getMrp(), stock.getDiscount()));
+                    item.setDiscount(stock.getDiscount());
+                    item.setAvailableQuantity(stock.getQty());
+                    item.setRequestedQuantity(requestedQuantity);
+                    double itemTotalPrice = calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity);
+                    item.setTotalPrice(itemTotalPrice);
+
+                    availableItems.add(item);
+                    totalPrice += itemTotalPrice;
+                    // Calculate discount amount for this item and add to total discount
+                    double itemDiscountAmount = (stock.getMrp() * stock.getDiscount() / 100) * requestedQuantity;
+                    totalDiscount += itemDiscountAmount;
+
+                    System.out.println("Added item to bucket - total price so far: " + totalPrice + ", total discount so far: " + totalDiscount);
+                } else {
+                    // Vendor doesn't have enough quantity, add to unavailable items
+                    System.out.println("Vendor doesn't have enough quantity for medicine ID: " + medicineId + " (required: " + requestedQuantity + ", available: " + stock.getQty() + ")");
+                    UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+                    unavailableItem.setMedicineId(medicineId);
+                    unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
+                    unavailableItem.setRequestedQuantity(requestedQuantity);
+                    unavailableItem.setMedicineImage(medicine.getPhoto1());
+                    unavailableItem.setMedicineStrip(medicine.getPacking());
+                    // Get substitutes for this medicine
+                    try {
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                        unavailableItem.setSubstitutes(substitutes);
+                    } catch (Exception e) {
+                        System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
+                    }
+                    unavailableItems.add(unavailableItem);
+                }
+            } else {
+                // Vendor doesn't have this medicine, add to unavailable items
+                System.out.println("Vendor doesn't have medicine ID: " + medicineId);
+                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+                unavailableItem.setMedicineId(medicineId);
+                unavailableItem.setMedicineName(medicine.getName());
+                unavailableItem.setMedicineImage(medicine.getPhoto1());
+                unavailableItem.setMedicineStrip(medicine.getPacking());
+                unavailableItem.setRequestedQuantity(requestedQuantity);
+                // Get substitutes for this medicine
+                try {
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                    unavailableItem.setSubstitutes(substitutes);
+                } catch (Exception e) {
+                    System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: " + e.getMessage());
+                }
+                unavailableItems.add(unavailableItem);
+            }
+        }
+
+        // Add unavailable medicines to the bucket with appropriate information
+        for (Long unavailableMedicineId : unavailableMedicineIds) {
+            // Check if this unavailable medicine was requested from this vendor
+            if (!medicineQuantities.containsKey(unavailableMedicineId)) {
+                System.out.println("Unavailable medicine ID: " + unavailableMedicineId + " not requested from vendor ID: " + vendorId);
+                continue;
+            }
+            
+            int requestedQuantity = medicineQuantities.getOrDefault(unavailableMedicineId, 0);
+            
+            // Skip medicines with zero quantity
+            if (requestedQuantity <= 0) {
+                System.out.println("Skipping unavailable medicine ID: " + unavailableMedicineId + " with zero or negative quantity: " + requestedQuantity);
+                continue;
+            }
+
+            Optional<Medicine> medicineOpt = medicines.stream()
+                    .filter(m -> m.getId() == unavailableMedicineId)
+                    .findFirst();
+
+            if (medicineOpt.isPresent()) {
+                Medicine medicine = medicineOpt.get();
+
+                UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
+                unavailableItem.setMedicineId(unavailableMedicineId);
+                unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
+                unavailableItem.setRequestedQuantity(requestedQuantity);
+                unavailableItem.setMedicineImage(medicine.getPhoto1());
+                unavailableItem.setMedicineStrip(medicine.getPacking());
+                // Get substitutes for this medicine
+                try {
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId);
+                    unavailableItem.setSubstitutes(substitutes);
+                } catch (Exception e) {
+                    System.out.println("Error fetching substitutes for medicine ID: " + unavailableMedicineId + ", error: " + e.getMessage());
+                }
+                unavailableItems.add(unavailableItem);
+            }
+        }
+
+        System.out.println("Vendor bucket items - available: " + availableItems.size() + ", unavailable: " + unavailableItems.size());
+
+        bucket.setAvailableItems(availableItems);
+        bucket.setUnavailableItems(unavailableItems);
+        bucket.setSelectedSubstitutes(selectedSubstitutes); // Set selected substitutes (initially empty)
+        bucket.setTotalPrice(totalPrice);
+        bucket.setDeliveryTime(deliveryTime);
+        bucket.setTotalDiscount(totalDiscount); // Set the total discount
+        bucket.setDeliveryCharges(deliveryCharges);
+        double amountToPay = totalPrice - totalDiscount + deliveryCharges;
+        bucket.setAmountToPay(amountToPay);
+        System.out.println("Returning vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
+        return bucket;
+    }
+
+    /**
+     * Add a selected substitute to a bucket and update the total amount
+     * @param bucket The bucket to update
+     * @param originalMedicineId The ID of the original unavailable medicine
+     * @param substitute The substitute medicine details
+     * @param quantity The quantity of the substitute to add
+     * @return The updated bucket
+     */
+    public BucketDTO addSubstituteToBucket(BucketDTO bucket, Long originalMedicineId, SubstituteDetailView substitute, int quantity) {
+        System.out.println("Adding substitute to bucket - original medicine ID: " + originalMedicineId + 
+                          ", substitute ID: " + substitute.getId() + ", quantity: " + quantity);
+        
+        // Create a selected substitute DTO
+        SelectedSubstituteDTO selectedSubstitute = new SelectedSubstituteDTO();
+        selectedSubstitute.setOriginalMedicineId(originalMedicineId);
+        selectedSubstitute.setSubstituteMedicineId(substitute.getId());
+        selectedSubstitute.setSubstituteMedicineName(substitute.getName());
+        selectedSubstitute.setQuantity(quantity);
+        selectedSubstitute.setUnitPrice(substitute.getBestPrice().doubleValue());
+        selectedSubstitute.setDiscount(substitute.getDiscount().doubleValue());
+        
+        // Calculate total price for this substitute
+        double totalPrice = calculateTotalPrice(substitute.getBestPrice().doubleValue(), substitute.getDiscount().doubleValue(), quantity);
+        selectedSubstitute.setTotalPrice(totalPrice);
+        selectedSubstitute.setMedicineImage(substitute.getPhoto1());
+        selectedSubstitute.setMedicineStrip(substitute.getPacking());
+        
+        // Add to the selected substitutes list
+        bucket.getSelectedSubstitutes().add(selectedSubstitute);
+        
+        // Update bucket totals
+        bucket.setTotalPrice(bucket.getTotalPrice() + totalPrice);
+        double discountAmount = (substitute.getBestPrice().doubleValue() * substitute.getDiscount().doubleValue() / 100) * quantity;
+        bucket.setTotalDiscount(bucket.getTotalDiscount() + discountAmount);
+        bucket.setAmountToPay(bucket.getTotalPrice() - bucket.getTotalDiscount() + bucket.getDeliveryCharges());
+        
+        System.out.println("Updated bucket - total price: " + bucket.getTotalPrice() + 
+                          ", total discount: " + bucket.getTotalDiscount() + 
+                          ", amount to pay: " + bucket.getAmountToPay());
+        
+        return bucket;
+    }
+
+    /**
+     * Remove a selected substitute from a bucket and update the total amount
+     * @param bucket The bucket to update
+     * @param substituteMedicineId The ID of the substitute medicine to remove
+     * @return The updated bucket
+     */
+    public BucketDTO removeSubstituteFromBucket(BucketDTO bucket, Long substituteMedicineId) {
+        System.out.println("Removing substitute from bucket - substitute ID: " + substituteMedicineId);
+        
+        // Find and remove the substitute
+        SelectedSubstituteDTO substituteToRemove = null;
+        for (SelectedSubstituteDTO substitute : bucket.getSelectedSubstitutes()) {
+            if (substitute.getSubstituteMedicineId().equals(substituteMedicineId)) {
+                substituteToRemove = substitute;
+                break;
+            }
+        }
+        
+        if (substituteToRemove != null) {
+            bucket.getSelectedSubstitutes().remove(substituteToRemove);
+            
+            // Update bucket totals
+            bucket.setTotalPrice(bucket.getTotalPrice() - substituteToRemove.getTotalPrice());
+            double discountAmount = (substituteToRemove.getUnitPrice() * substituteToRemove.getDiscount() / 100) * substituteToRemove.getQuantity();
+            bucket.setTotalDiscount(bucket.getTotalDiscount() - discountAmount);
+            bucket.setAmountToPay(bucket.getTotalPrice() - bucket.getTotalDiscount() + bucket.getDeliveryCharges());
+            
+            System.out.println("Updated bucket - total price: " + bucket.getTotalPrice() + 
+                              ", total discount: " + bucket.getTotalDiscount() + 
+                              ", amount to pay: " + bucket.getAmountToPay());
+        }
+        
         return bucket;
     }
 
