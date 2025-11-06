@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -53,8 +54,8 @@ public class PreOrder {
         this.createdAt = LocalDateTime.now();
     }
 
-    @OneToMany(mappedBy = "preOrder")
-    private List<Order> orders;  // Related to Stock
+    @OneToMany(mappedBy = "preOrder", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Order> orders = new ArrayList<>();
 
     // Getters and Setters
 }
