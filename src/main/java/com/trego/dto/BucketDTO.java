@@ -20,4 +20,13 @@ public class BucketDTO {
     private String vendorName; // If all items are from the same vendor
     private String logo;
     private String deliveryTime;
+
+    @Override
+    public String toString() {
+        return "BucketDTO{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", amountToPay=" + amountToPay +
+                '}';
+    }
 }

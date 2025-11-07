@@ -10,6 +10,8 @@ public class BucketItemDTO {
     private String medicineStrip;
     //private Long vendorId;
     //private String vendorName;
+
+    private double mrp; // Price per unit
     private double price; // Price per unit
     private double discount;
     private int availableQuantity; // Available quantity from vendor

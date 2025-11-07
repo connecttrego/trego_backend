@@ -109,53 +109,36 @@ public class BucketServiceImpl implements IBucketService {
                 buckets.add(bucket);
             }
         }
-
         // Sort buckets by total price
-        buckets.sort(Comparator.comparingDouble(BucketDTO::getTotalPrice));
-
+        buckets.sort(Comparator.comparingDouble(BucketDTO::getAmountToPay));
         return buckets;
     }
 
-    @Override
     public List<BucketDTO> createOptimizedBucketsFromPreorder(VandorCartResponseDTO preorderData) {
         // Extract medicine IDs and quantities from preorder data
-        // Key change: Track quantities per vendor instead of aggregating across vendors
-        Map<Long, Map<Long, Integer>> vendorMedicineQuantities = new HashMap<>(); // vendorId -> (medicineId -> quantity)
+        Map<Long, Integer> medicineQuantities = new HashMap<>();
         List<Long> medicineIds = new ArrayList<>();
         Set<Long> selectedVendorIds = new HashSet<>(); // Track vendors selected by user
 
         System.out.println("Processing preorder data with " + preorderData.getCarts().size() + " carts");
 
         for (CartResponseDTO cart : preorderData.getCarts()) {
-            Long vendorId = cart.getVendorId();
-            System.out.println("Processing cart with vendor ID: " + vendorId + " and " + cart.getMedicine().size() + " medicines");
+            System.out.println("Processing cart with vendor ID: " + cart.getVendorId() + " and " + cart.getMedicine().size() + " medicines");
             // Track which vendors were selected by the user
-            selectedVendorIds.add(vendorId);
-            
-            // Initialize the vendor's medicine quantity map
-            vendorMedicineQuantities.putIfAbsent(vendorId, new HashMap<>());
+            selectedVendorIds.add(cart.getVendorId());
 
             for (MedicineDTO medicine : cart.getMedicine()) {
                 Long medicineId = medicine.getId();
                 int quantity = medicine.getQty();
 
-                // Skip medicines with zero quantity
-                if (quantity <= 0) {
-                    System.out.println("Skipping medicine ID: " + medicineId + " with zero or negative quantity: " + quantity);
-                    continue;
-                }
-
-                // Check if medicine is marked as unavailable (MRP 0.0 and expiry "Not Available")
-                if (medicine.getMrp() == 0.0 && "Not Available".equals(medicine.getExpiryDate())) {
-                    System.out.println("Skipping unavailable medicine ID: " + medicineId);
-                    continue;
-                }
-
                 System.out.println("Medicine ID: " + medicineId + ", Quantity: " + quantity);
 
-                // Store quantity per vendor instead of aggregating
-                vendorMedicineQuantities.get(vendorId).put(medicineId, quantity);
-                
+                // If we already have this medicine, add the quantity
+                if (medicineQuantities.containsKey(medicineId)) {
+                    quantity += medicineQuantities.get(medicineId);
+                }
+
+                medicineQuantities.put(medicineId, quantity);
                 if (!medicineIds.contains(medicineId)) {
                     medicineIds.add(medicineId);
                 }
@@ -163,7 +146,7 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         System.out.println("Total unique medicines: " + medicineIds.size());
-        System.out.println("Vendor medicine quantities: " + vendorMedicineQuantities);
+        System.out.println("Medicine quantities: " + medicineQuantities);
         System.out.println("User selected vendors: " + selectedVendorIds);
 
         // Check if medicineIds is empty
@@ -204,6 +187,7 @@ public class BucketServiceImpl implements IBucketService {
 
         // Remove medicines that are not available from any vendor
         medicineIds.removeIf(id -> !availableMedicineIds.contains(id));
+        medicineQuantities.entrySet().removeIf(entry -> !availableMedicineIds.contains(entry.getKey()));
 
         // Update the medicines list to only include available medicines
         medicines = medicines.stream()
@@ -211,6 +195,7 @@ public class BucketServiceImpl implements IBucketService {
                 .collect(Collectors.toList());
 
         System.out.println("After filtering, " + medicineIds.size() + " medicines are available from at least one vendor");
+        System.out.println("Available medicine quantities: " + medicineQuantities);
 
         // If no medicines are available, return empty list
         if (medicineIds.isEmpty()) {
@@ -235,9 +220,7 @@ public class BucketServiceImpl implements IBucketService {
             if (selectedVendorIds.contains(vendorId)) {
                 System.out.println("Creating bucket for user-selected vendor ID: " + vendorId);
                 // Create a bucket for this vendor with available medicines only
-                // Pass the vendor-specific medicine quantities
-                Map<Long, Integer> medicineQuantities = vendorMedicineQuantities.getOrDefault(vendorId, new HashMap<>());
-                BucketDTO bucket = createBucketForVendorWithSpecificQuantities(vendorId, vendorStocks, medicines, medicineQuantities, unavailableMedicineIds);
+                BucketDTO bucket = createBucketForVendorWithPartialAvailability(vendorId, vendorStocks, medicines, medicineQuantities, unavailableMedicineIds);
                 if (bucket != null && (!bucket.getAvailableItems().isEmpty() || !bucket.getUnavailableItems().isEmpty())) {
                     buckets.add(bucket);
                 }
@@ -249,7 +232,7 @@ public class BucketServiceImpl implements IBucketService {
         System.out.println("Created " + buckets.size() + " buckets");
 
         // Sort buckets by total price
-        buckets.sort(Comparator.comparingDouble(BucketDTO::getTotalPrice));
+        buckets.sort(Comparator.comparingDouble(BucketDTO::getAmountToPay));
 
         return buckets;
     }
@@ -304,17 +287,19 @@ public class BucketServiceImpl implements IBucketService {
                     item.setMedicineStrip(medicine.getPacking());
                     //item.setVendorId(vendorId);
                     //item.setVendorName(vendor != null ? vendor.getName() : "");
+                    item.setMrp(stock.getMrp());
                     item.setPrice(calculateUnitPrice(stock.getMrp(), stock.getDiscount()));
                     item.setDiscount(stock.getDiscount());
                     item.setAvailableQuantity(stock.getQty());
                     item.setRequestedQuantity(requestedQuantity);
-                    double itemTotalPrice = calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity);
+                    double itemTotalPrice = calculateTotalPrice(stock.getMrp(), 0, requestedQuantity);
+                    double itemDiscountedPrice = calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity);
                     item.setTotalPrice(itemTotalPrice);
 
                     availableItems.add(item);
                     totalPrice += itemTotalPrice;
                     // Calculate discount amount for this item and add to total discount
-                    double itemDiscountAmount = (stock.getMrp() * stock.getDiscount() / 100) * requestedQuantity;
+                    double itemDiscountAmount =itemTotalPrice - itemDiscountedPrice;
                     totalDiscount += itemDiscountAmount;
 
                     System.out.println("Added item to bucket - total price so far: " + totalPrice + ", total discount so far: " + totalDiscount);
