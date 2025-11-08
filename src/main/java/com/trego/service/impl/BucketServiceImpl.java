@@ -232,7 +232,16 @@ public class BucketServiceImpl implements IBucketService {
         System.out.println("Created " + buckets.size() + " buckets");
 
         // Sort buckets by total price
-        buckets.sort(Comparator.comparingDouble(BucketDTO::getAmountToPay));
+        buckets.sort(Comparator
+                .comparingInt((BucketDTO b) -> b.getAvailableItems().size())   // 1. by item count
+                .reversed()                                                    // 2. max first
+                .thenComparingDouble(BucketDTO::getAmountToPay));              // 3. by amountToPay if tie
+
+        System.out.println("Buckets sorted by available items count (desc) and amountToPay (asc)");
+
+
+
+
 
         return buckets;
     }
