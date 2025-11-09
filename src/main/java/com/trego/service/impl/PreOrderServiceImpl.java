@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 import java.util.Objects;
@@ -51,14 +52,14 @@ public class PreOrderServiceImpl implements IPreOrderService {
         calculateAmountToPay(preOrderRequest);
 
         Gson gson = new Gson();
-        List<PreOrder> preOrders = preOrderRepository.findByUserIdAndPaymentStatus(preOrderRequest.getUserId(), "unpaid");
+        List<PreOrder> preOrders =
+                preOrderRepository.findByUserIdAndPaymentStatus(preOrderRequest.getUserId(), "unpaid");
         PreOrder preOrder = null;
-        
+
         // If there are multiple pre-orders, use the first one or create a new one if none exist
         if (preOrders != null && !preOrders.isEmpty()) {
             preOrder = preOrders.get(0); // Use the first one
         }
-        
         if (preOrder == null) {
             preOrder = new PreOrder();
             preOrder.setPaymentStatus("unpaid");
@@ -70,14 +71,16 @@ public class PreOrderServiceImpl implements IPreOrderService {
             preOrder.setAddressId(preOrderRequest.getAddressId());
 
         } else {
-            preOrder.setPayload(gson.toJson(preOrderRequest));
+        preOrder.setPayload(gson.toJson(preOrderRequest));
 
         }
         preOrderRepository.save(preOrder);
 
         PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
+
         populateCartResponse(preOrderResponseDTO);
+
         return preOrderResponseDTO;
     }
 
@@ -96,13 +99,14 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     @Override
-    public VandorCartResponseDTO vendorSpecificPrice( long orderId) {
+    public VandorCartResponseDTO vendorSpecificPrice(long orderId) {
         PreOrder preOrder = preOrderRepository.findById(orderId).orElse(null);
         VandorCartResponseDTO vandorCartResponseDTO = new VandorCartResponseDTO();
         vandorCartResponseDTO.setUserId(preOrder.getUserId());
         vandorCartResponseDTO.setOrderId(orderId);
+
         Gson gson = new Gson();
-        PreOrderResponseDTO preOrderResponseDTO =  gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
+        PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
 
         // Get all unique medicine IDs from all carts
@@ -114,20 +118,18 @@ public class PreOrderServiceImpl implements IPreOrderService {
                         .collect(Collectors.toList())
         );
 
-
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
-            List<MedicineDTO> medicines = cart.getMedicine().stream()
-                    .map(medicine -> {
+            List<MedicineDTO> medicines = cart.getMedicine().stream().map(medicine -> {
                         // Use the new method that returns a List to handle multiple stocks
-                        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
                         Optional<Stock> optionalStock = stocks.isEmpty() ? Optional.empty() : Optional.of(stocks.get(0));
                         // Instead of returning null, return the medicine with indication of unavailability
                         if (optionalStock.isPresent()) {
                             return populateMedicalDTO(medicine, optionalStock.get());
-                        } else {
+                } else {
                             // Return medicine with default values indicating unavailability
-                            return populateUnavailableMedicalDTO(medicine);
-                        }
+                    return populateUnavailableMedicalDTO(medicine);
+                }
                     })
                     // Remove the filter that removes null values since we're not returning null anymore
                     .collect(Collectors.toList());
@@ -150,11 +152,11 @@ public class PreOrderServiceImpl implements IPreOrderService {
                 cart.setDeliveryTime(vendor.getDeliveryTime());
                 cart.setReviews(vendor.getReviews());
             }
+
             double totalCartValue = medicines.stream()
                     .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
                     .sum();
-
-            double discount   = medicines.stream()
+            double discount = medicines.stream()
                     .mapToDouble(medicine ->(medicine.getMrp() * medicine.getQty()) * medicine.getDiscount() / 100.0)
                     .sum();
 
@@ -323,6 +325,8 @@ public class PreOrderServiceImpl implements IPreOrderService {
                                 double price = stock.getMrp();
                                 medicine.setMrp(price);
                                 double discountPercentage = stock.getDiscount();
+                                medicine.setDiscount(discountPercentage);
+                                //medicine.setPrice(Constants.calculateUnitPrice(price, discountPercentage));
                                 double tempTotalCartValue =  price * qty;
                                 return  tempTotalCartValue;
                             }else {

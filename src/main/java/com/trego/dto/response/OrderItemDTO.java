@@ -8,10 +8,11 @@ import java.util.Map;
 
 @Data
 public class OrderItemDTO {
-
+   private  double totalAmount;
    private long itemId;
    private  int qty;
    private double mrp;
+   private double price;
    private Map<String, Object> medicine = new HashMap<>();
 
 }

@@ -11,22 +11,16 @@ import java.util.List;
 
 @Data
 public class OrderResponseDTO {
-
-    
-    private long userId;
-    private long  orderId;
+    private Long userId;
+    private Long orderId;
     private String razorpayOrderId;
     private double totalCartValue;
     private double amountToPay;
     private double discount;
-
     private String mobileNo;
     private AddressDTO address;
-
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createDate;
-    private  String paymentStatus;
+    private String paymentStatus;
     private List<OrderDTO> orders;
-
-
 }

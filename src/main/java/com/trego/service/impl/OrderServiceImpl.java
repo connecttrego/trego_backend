@@ -75,23 +75,23 @@ public class OrderServiceImpl implements IOrderService {
         PreOrder preOrder = preOrderRepository.findById(orderRequest.getPreOrderId()).get();
 
         Gson gson = new Gson();
-        PreOrderResponseDTO preOrderResponseDTO =  gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
+        PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
-        
+
         // If a specific vendor is selected, filter the carts to only include that vendor
         if (orderRequest.getSelectedVendorId() != null) {
             System.out.println("Filtering carts for selected vendor ID: " + orderRequest.getSelectedVendorId());
             List<CartResponseDTO> filteredCarts = preOrderResponseDTO.getCarts().stream()
-                .filter(cart -> cart.getVendorId().equals(orderRequest.getSelectedVendorId()))
-                .collect(Collectors.toList());
+                    .filter(cart -> cart.getVendorId().equals(orderRequest.getSelectedVendorId()))
+                    .collect(Collectors.toList());
             preOrderResponseDTO.setCarts(filteredCarts);
-            
+
             // Store the selected vendor ID in the preorder for later use during validation
             preOrder.setSelectedVendorId(orderRequest.getSelectedVendorId());
         }
 
         String razorpayOrderId = null;
-        if(StringUtils.isEmpty(preOrder.getRazorpayOrderId()) || !(preOrderResponseDTO.getAmountToPay()> 0 && Double.compare(preOrderResponseDTO.getAmountToPay(), preOrder.getTotalPayAmount()) == 0)){
+        if (StringUtils.isEmpty(preOrder.getRazorpayOrderId()) || !(preOrderResponseDTO.getAmountToPay() > 0 && Double.compare(preOrderResponseDTO.getAmountToPay(), preOrder.getTotalPayAmount()) == 0)) {
             razorpayOrderId = createRazorPayOrder(orderRequest, preOrderResponseDTO);
             preOrder.setRazorpayOrderId(razorpayOrderId);
             preOrder.setTotalPayAmount(preOrderResponseDTO.getAmountToPay());
@@ -99,7 +99,7 @@ public class OrderServiceImpl implements IOrderService {
 
             preOrder.setAddressId(orderRequest.getAddressId());
             preOrderRepository.save(preOrder);
-        }else{
+        } else {
             razorpayOrderId = preOrder.getRazorpayOrderId();
         }
 
@@ -109,57 +109,57 @@ public class OrderServiceImpl implements IOrderService {
 
         return orderResponseDTO;
     }
-    
+
     @Override
     public OrderResponseDTO placeOrderFromBucket(BucketOrderRequestDTO bucketOrderRequest) throws Exception {
-        System.out.println("Placing bucket order for user ID: " + bucketOrderRequest.getUserId() + 
-                          ", PreOrder ID: " + bucketOrderRequest.getPreOrderId() + 
-                          ", Bucket ID: " + bucketOrderRequest.getBucketId());
+        System.out.println("Placing bucket order for user ID: " + bucketOrderRequest.getUserId() +
+                ", PreOrder ID: " + bucketOrderRequest.getPreOrderId() +
+                ", Bucket ID: " + bucketOrderRequest.getBucketId());
         OrderResponseDTO orderResponseDTO = new OrderResponseDTO();
-        
+
         // Set user ID
         orderResponseDTO.setUserId(bucketOrderRequest.getUserId());
-        
+
         // Get the original preorder to recreate buckets
         PreOrder originalPreOrder = preOrderRepository.findById(bucketOrderRequest.getPreOrderId()).orElse(null);
         if (originalPreOrder == null) {
             System.out.println("Original preorder not found for ID: " + bucketOrderRequest.getPreOrderId());
             throw new Exception("Original preorder not found");
         }
-        
+
         try {
             // Recreate buckets from the original preorder
             VandorCartResponseDTO vendorCartData = preOrderService.vendorSpecificPrice(bucketOrderRequest.getPreOrderId());
-            
+
             // Check if carts is null and handle it
             if (vendorCartData.getCarts() == null) {
                 System.out.println("No cart data found in preorder");
                 throw new Exception("No cart data found in preorder");
             }
-            
+
             System.out.println("Number of carts in vendorCartData: " + vendorCartData.getCarts().size());
-            
+
             List<BucketDTO> buckets = bucketService.createOptimizedBucketsFromPreorder(vendorCartData);
             System.out.println("Created " + buckets.size() + " buckets");
-            
+
             // Find the selected bucket
             BucketDTO selectedBucket = buckets.stream()
-                .filter(bucket -> bucket.getId().equals(bucketOrderRequest.getBucketId()))
-                .findFirst()
-                .orElse(null);
-                
+                    .filter(bucket -> bucket.getId().equals(bucketOrderRequest.getBucketId()))
+                    .findFirst()
+                    .orElse(null);
+
             if (selectedBucket == null) {
                 System.out.println("Selected bucket not found for ID: " + bucketOrderRequest.getBucketId());
                 throw new Exception("Selected bucket not found");
             }
-            
+
             System.out.println("Selected bucket vendor ID: " + selectedBucket.getVendorId());
-            
+
             // Use the exact amount from the bucket to ensure consistency
             double bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
             double bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
             double originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
-            
+
             // Create a PreOrder entity for the bucket-based order
             PreOrder preOrder = new PreOrder();
             preOrder.setUserId(bucketOrderRequest.getUserId());
@@ -167,21 +167,21 @@ public class OrderServiceImpl implements IOrderService {
             preOrder.setPaymentStatus("unpaid");
             preOrder.setTotalPayAmount(bucketAmount); // Amount after discount
             preOrder.setCreatedBy("SYSTEM"); // Set the required createdBy field
-            
+
             // Create a payload with bucket information
             PreOrderResponseDTO preOrderResponseDTO = new PreOrderResponseDTO();
             preOrderResponseDTO.setUserId(bucketOrderRequest.getUserId());
             preOrderResponseDTO.setAmountToPay(bucketAmount); // Final amount to pay after discount
             preOrderResponseDTO.setTotalCartValue(originalTotal); // Original price before discount
             preOrderResponseDTO.setDiscount(bucketDiscount); // Total discount amount
-            
+
             // For bucket orders, we need to create a cart for the selected vendor only
             CartResponseDTO bucketCart = new CartResponseDTO();
             bucketCart.setVendorId(selectedBucket.getVendorId());
             bucketCart.setTotalCartValue(originalTotal);
             bucketCart.setAmountToPay(bucketAmount);
             bucketCart.setDiscount(bucketDiscount);
-            
+
             // Convert bucket items to medicine DTOs
             List<MedicineDTO> medicineDTOs = new ArrayList<>();
             if (selectedBucket.getAvailableItems() != null) {
@@ -194,39 +194,39 @@ public class OrderServiceImpl implements IOrderService {
                     medicineDTO.setDiscount(bucketItem.getDiscount());
                     medicineDTO.setQty(bucketItem.getRequestedQuantity());
                     // Calculate original price before discount
-                    double originalPrice = bucketItem.getDiscount() > 0 ? 
-                        bucketItem.getPrice() / (1 - bucketItem.getDiscount() / 100) : 
-                        bucketItem.getPrice();
+                    double originalPrice = bucketItem.getDiscount() > 0 ?
+                            bucketItem.getPrice() / (1 - bucketItem.getDiscount() / 100) :
+                            bucketItem.getPrice();
                     medicineDTO.setActualPrice(originalPrice); // Original price before discount
                     medicineDTOs.add(medicineDTO);
                 }
             }
             bucketCart.setMedicine(medicineDTOs);
-            
+
             preOrderResponseDTO.setCarts(Arrays.asList(bucketCart));
-            
-            System.out.println("Created bucket cart with vendor ID: " + bucketCart.getVendorId() + 
-                              " and " + medicineDTOs.size() + " medicines");
-            
+
+            System.out.println("Created bucket cart with vendor ID: " + bucketCart.getVendorId() +
+                    " and " + medicineDTOs.size() + " medicines");
+
             // Convert to JSON and set as payload BEFORE saving
             Gson gson = new Gson();
             String payload = gson.toJson(preOrderResponseDTO);
             preOrder.setPayload(payload);
-            
+
             // Save the preorder 
             PreOrder savedPreOrder = preOrderRepository.save(preOrder);
             System.out.println("Saved new PreOrder ID: " + savedPreOrder.getId());
-            
+
             // Add the order ID to the response DTO
             preOrderResponseDTO.setOrderId(savedPreOrder.getId());
-            
+
             // Generate RazorPay order using the exact same amount
             String razorpayOrderId = createRazorPayOrderForBucket(bucketOrderRequest, preOrderResponseDTO);
             savedPreOrder.setRazorpayOrderId(razorpayOrderId);
-            
+
             // Save the updated preorder
             preOrderRepository.save(savedPreOrder);
-            
+
             orderResponseDTO.setRazorpayOrderId(razorpayOrderId);
             orderResponseDTO.setAmountToPay(bucketAmount);
             orderResponseDTO.setOrderId(savedPreOrder.getId());
@@ -266,12 +266,10 @@ public class OrderServiceImpl implements IOrderService {
             if (preOrder.getSelectedVendorId() != null) {
                 System.out.println("Selected Vendor ID found: " + preOrder.getSelectedVendorId() + ". Processing as BUCKET ORDER.");
                 processBucketOrder(preOrder, preOrderResponseDTO);
-            }
-            else if (preOrderResponseDTO.getCarts() != null && preOrderResponseDTO.getCarts().size() > 1) {
+            } else if (preOrderResponseDTO.getCarts() != null && preOrderResponseDTO.getCarts().size() > 1) {
                 System.out.println("Detected MULTI-VENDOR cart (" + preOrderResponseDTO.getCarts().size() + " carts). Processing as REGULAR ORDER.");
                 processRegularOrder(preOrder, preOrderResponseDTO);
-            }
-            else {
+            } else {
                 System.out.println("Single vendor but no selectedVendorId found. Processing as BUCKET ORDER.");
                 processBucketOrder(preOrder, preOrderResponseDTO);
             }
@@ -391,28 +389,30 @@ public class OrderServiceImpl implements IOrderService {
 
             // Populate OrderItems list
             List<OrderItemDTO> orderItemsList = new ArrayList<>();
-            order.getOrderItems().forEach(orderItem -> {
+            double totalAmount = 0.0;
+
+            for (var orderItem : order.getOrderItems()) {
                 OrderItemDTO orderItemDTO = new OrderItemDTO();
                 orderItemDTO.setItemId(orderItem.getId());
                 orderItemDTO.setQty(orderItem.getQty());
                 orderItemDTO.setMrp(orderItem.getMrp());
-               /* MedicineDTO medicineDTO = new MedicineDTO();
-                medicineDTO.setName(orderItem.getMedicine().getName());*/
+                orderItemDTO.setPrice(orderItem.getSellingPrice());
+                orderItemDTO.setTotalAmount(orderItem.getAmount());
+                totalAmount += orderItem.getAmount();
 
                 Map<String, Object> medicineDetails = new HashMap<>();
                 medicineDetails.put("medicineId", orderItem.getMedicine().getId());
                 medicineDetails.put("medicineName", orderItem.getMedicine().getName());
                 medicineDetails.put("packing", orderItem.getMedicine().getPacking());
-                medicineDetails.put("medicineLogo", Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + orderItem.getMedicine().getPhoto1());
+                medicineDetails.put("medicineLogo",
+                        Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + orderItem.getMedicine().getPhoto1());
 
                 orderItemDTO.setMedicine(medicineDetails);
                 orderItemsList.add(orderItemDTO);
-            });
+            }
 
-            // Set the populated OrderItems list in OrderDTO
             orderDTO.setOrderItemsList(orderItemsList);
-
-            // Add the OrderDTO to the main list
+            orderDTO.setTotalAmount(totalAmount);
             orderDTOList.add(orderDTO);
         });
 
@@ -781,7 +781,7 @@ public class OrderServiceImpl implements IOrderService {
                     item.setMedicine(med);
                     item.setQty(medicine.getQty());
                     item.setMrp(medicine.getMrp());
-                    item.setSellingPrice(medicine.getMrp());
+                    item.setSellingPrice(Constants.calculateUnitPrice(medicine.getMrp(), medicine.getDiscount()));
                     item.setAmount(medicine.getMrp() * medicine.getQty());
                     item.setOrderStatus("pending");
                     item.setOrder(savedOrder);
@@ -840,7 +840,7 @@ public class OrderServiceImpl implements IOrderService {
                         item.setMedicine(med);
                         item.setQty(medicine.getQty());
                         item.setMrp(medicine.getMrp());
-                        item.setSellingPrice(medicine.getMrp());
+                        item.setSellingPrice(Constants.calculateUnitPrice(medicine.getMrp(), medicine.getDiscount()));
                         item.setAmount(medicine.getMrp() * medicine.getQty());
                         item.setOrderStatus("pending");
                         item.setOrder(savedOrder);

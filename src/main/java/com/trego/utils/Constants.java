@@ -14,4 +14,8 @@ public class Constants {
     public static  final String OFFLINE_BASE_URL = "";
 
     public static  final String ONLINE_BASE_URL = "";
+
+    public static double calculateUnitPrice(double mrp, double discount) {
+        return mrp - (mrp * discount / 100);
+    }
 }
