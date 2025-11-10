@@ -1,9 +1,12 @@
 package com.trego.service.impl;
 
+import com.google.gson.Gson;
 import com.trego.dao.entity.Medicine;
+import com.trego.dao.entity.PreOrder;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.entity.Vendor;
 import com.trego.dao.impl.MedicineRepository;
+import com.trego.dao.impl.PreOrderRepository;
 import com.trego.dao.impl.StockRepository;
 import com.trego.dao.impl.VendorRepository;
 import com.trego.dto.BucketDTO;
@@ -12,8 +15,9 @@ import com.trego.dto.BucketRequestDTO;
 import com.trego.dto.MedicineDTO;
 import com.trego.dto.SelectedSubstituteDTO;
 import com.trego.dto.response.CartResponseDTO;
-import com.trego.dto.response.VandorCartResponseDTO;
+import com.trego.dto.response.PreOrderResponseDTO;
 import com.trego.dto.UnavailableMedicineDTO;
+import com.trego.dto.response.VendorCartResponseDTO;
 import com.trego.dto.view.SubstituteDetailView;
 import com.trego.service.IBucketService;
 import com.trego.service.ISubstituteService;
@@ -29,6 +33,8 @@ public class BucketServiceImpl implements IBucketService {
 
     @Autowired
     private MedicineRepository medicineRepository;
+    @Autowired
+    private PreOrderRepository preOrderRepository;
 
     @Autowired
     private StockRepository stockRepository;
@@ -114,122 +120,46 @@ public class BucketServiceImpl implements IBucketService {
         return buckets;
     }
 
-    public List<BucketDTO> createOptimizedBucketsFromPreorder(VandorCartResponseDTO preorderData) {
-        // Extract medicine IDs and quantities from preorder data
+    @Override
+    public List<BucketDTO> createOptimizedBucketsFromPreorder(VendorCartResponseDTO preorderData) {
         Map<Long, Integer> medicineQuantities = new HashMap<>();
         List<Long> medicineIds = new ArrayList<>();
-        Set<Long> selectedVendorIds = new HashSet<>(); // Track vendors selected by user
+        Set<Long> selectedVendorIds = new HashSet<>();
 
         System.out.println("Processing preorder data with " + preorderData.getCarts().size() + " carts");
 
         for (CartResponseDTO cart : preorderData.getCarts()) {
-            System.out.println("Processing cart with vendor ID: " + cart.getVendorId() + " and " + cart.getMedicine().size() + " medicines");
-            // Track which vendors were selected by the user
             selectedVendorIds.add(cart.getVendorId());
-
             for (MedicineDTO medicine : cart.getMedicine()) {
-                Long medicineId = medicine.getId();
-                int quantity = medicine.getQty();
-
-                System.out.println("Medicine ID: " + medicineId + ", Quantity: " + quantity);
-
-                // If we already have this medicine, add the quantity
-                if (medicineQuantities.containsKey(medicineId)) {
-                    quantity += medicineQuantities.get(medicineId);
-                }
-
-                medicineQuantities.put(medicineId, quantity);
-                if (!medicineIds.contains(medicineId)) {
-                    medicineIds.add(medicineId);
-                }
+                medicineQuantities.merge(medicine.getId(), medicine.getQty(), Integer::sum);
+                if (!medicineIds.contains(medicine.getId())) medicineIds.add(medicine.getId());
             }
         }
 
-        System.out.println("Total unique medicines: " + medicineIds.size());
-        System.out.println("Medicine quantities: " + medicineQuantities);
-        System.out.println("User selected vendors: " + selectedVendorIds);
+        if (medicineIds.isEmpty()) return new ArrayList<>();
 
-        // Check if medicineIds is empty
-        if (medicineIds.isEmpty()) {
-            System.out.println("No medicines found in preorder");
-            return new ArrayList<>();
-        }
-
-        // Get all medicines
         List<Medicine> medicines = medicineRepository.findAllById(medicineIds);
-        System.out.println("Found " + medicines.size() + " medicines in database");
-
-        // Get all stocks for these medicines
         List<Stock> allStocks = stockRepository.findAll();
+
         List<Stock> relevantStocks = allStocks.stream()
-                .filter(stock -> medicineIds.contains(stock.getMedicine().getId()))
+                .filter(s -> medicineIds.contains(s.getMedicine().getId()))
                 .collect(Collectors.toList());
 
-        System.out.println("Found " + relevantStocks.size() + " relevant stocks");
-
-        // Filter out medicines that are not available from any vendor
-        Set<Long> availableMedicineIds = relevantStocks.stream()
-                .map(stock -> stock.getMedicine().getId())
-                .collect(Collectors.toSet());
-
-        // Identify unavailable medicines
-        Set<Long> unavailableMedicineIds = medicineIds.stream()
-                .filter(id -> !availableMedicineIds.contains(id))
-                .collect(Collectors.toSet());
-
-        // Log unavailable medicines
-        if (!unavailableMedicineIds.isEmpty()) {
-            System.out.println("Unavailable medicines: " + unavailableMedicineIds);
-            for (Long medicineId : unavailableMedicineIds) {
-                System.out.println("Medicine ID " + medicineId + " is not available from any vendor");
-            }
-        }
-
-        // Remove medicines that are not available from any vendor
-        medicineIds.removeIf(id -> !availableMedicineIds.contains(id));
-        medicineQuantities.entrySet().removeIf(entry -> !availableMedicineIds.contains(entry.getKey()));
-
-        // Update the medicines list to only include available medicines
-        medicines = medicines.stream()
-                .filter(medicine -> availableMedicineIds.contains(medicine.getId()))
-                .collect(Collectors.toList());
-
-        System.out.println("After filtering, " + medicineIds.size() + " medicines are available from at least one vendor");
-        System.out.println("Available medicine quantities: " + medicineQuantities);
-
-        // If no medicines are available, return empty list
-        if (medicineIds.isEmpty()) {
-            System.out.println("No medicines are available from any vendor");
-            return new ArrayList<>();
-        }
-
-        // Group stocks by vendor
         Map<Long, List<Stock>> stocksByVendor = relevantStocks.stream()
-                .collect(Collectors.groupingBy(stock -> stock.getVendor().getId()));
+                .collect(Collectors.groupingBy(s -> s.getVendor().getId()));
 
-        System.out.println("Stocks grouped by " + stocksByVendor.size() + " vendors");
-
-        // Create buckets only for vendors selected by the user
         List<BucketDTO> buckets = new ArrayList<>();
 
         for (Map.Entry<Long, List<Stock>> entry : stocksByVendor.entrySet()) {
             Long vendorId = entry.getKey();
-            List<Stock> vendorStocks = entry.getValue();
-
-            // Only create buckets for vendors selected by the user
             if (selectedVendorIds.contains(vendorId)) {
-                System.out.println("Creating bucket for user-selected vendor ID: " + vendorId);
-                // Create a bucket for this vendor with available medicines only
-                BucketDTO bucket = createBucketForVendorWithPartialAvailability(vendorId, vendorStocks, medicines, medicineQuantities, unavailableMedicineIds);
+                BucketDTO bucket = createBucketForVendorWithPartialAvailability(
+                        vendorId, entry.getValue(), medicines, medicineQuantities, new HashSet<>());
                 if (bucket != null && (!bucket.getAvailableItems().isEmpty() || !bucket.getUnavailableItems().isEmpty())) {
                     buckets.add(bucket);
                 }
-            } else {
-                System.out.println("Skipping vendor ID: " + vendorId + " (not selected by user)");
             }
         }
-
-        System.out.println("Created " + buckets.size() + " buckets");
 
         // Sort buckets by total price
         buckets.sort(Comparator
@@ -238,13 +168,51 @@ public class BucketServiceImpl implements IBucketService {
                 .thenComparingDouble(BucketDTO::getAmountToPay));              // 3. by amountToPay if tie
 
         System.out.println("Buckets sorted by available items count (desc) and amountToPay (asc)");
+// Persist the selected (cheapest) vendor directly to PreOrder table
+// NOTE: require a valid preOrderId (non-null and > 0)
+        if (!buckets.isEmpty() && preorderData.getPreOrderId() != null && preorderData.getPreOrderId() > 0) {
+            BucketDTO cheapestBucket = buckets.get(0);
 
+            // set in response DTO for immediate return (so client sees it)
+            preorderData.setSelectedVendorId(cheapestBucket.getVendorId());
 
+            try {
+                PreOrder preOrder = preOrderRepository.findById(preorderData.getPreOrderId()).orElse(null);
+                if (preOrder != null) {
+                    preOrder.setSelectedVendorId(cheapestBucket.getVendorId());
 
+                    // Optional: update payload JSON for UI consistency
+                    try {
+                        Gson gson = new Gson();
+                        PreOrderResponseDTO responsePayload = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
+                        if (responsePayload == null) responsePayload = new PreOrderResponseDTO();
+                        responsePayload.setSelectedVendorId(cheapestBucket.getVendorId());
+                        responsePayload.setVendorName(cheapestBucket.getVendorName());
+                        responsePayload.setVendorLogo(cheapestBucket.getLogo());
+                        responsePayload.setAmountToPay(cheapestBucket.getAmountToPay());
+                        preOrder.setPayload(gson.toJson(responsePayload));
+                    } catch (Exception ex) {
+                        System.out.println(" Could not update payload JSON: " + ex.getMessage());
+                    }
+
+                    preOrderRepository.save(preOrder);
+
+                    System.out.println(" PreOrder ID " + preOrder.getId()
+                            + " updated with selectedVendorId = " + cheapestBucket.getVendorId());
+                } else {
+                    System.out.println(" Could not find PreOrder with ID " + preorderData.getPreOrderId());
+                }
+            } catch (Exception e) {
+                System.out.println(" Error updating PreOrder with vendor ID: " + e.getMessage());
+            }
+        } else {
+            System.out.println("Skipping PreOrder DB update - missing valid preOrderId in vendorCartResponse");
+        }
 
 
         return buckets;
     }
+
 
     private BucketDTO createBucketForVendorWithPartialAvailability(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
         System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");

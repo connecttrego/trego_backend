@@ -3,25 +3,18 @@ package com.trego.service.impl;
 import com.google.gson.Gson;
 import com.trego.dao.entity.*;
 import com.trego.dao.impl.*;
-import com.trego.dto.CartDTO;
 import com.trego.dto.MedicineDTO;
 import com.trego.dto.PreOrderDTO;
-import com.trego.dto.VendorDTO;
 import com.trego.dto.response.CartResponseDTO;
 import com.trego.dto.response.PreOrderResponseDTO;
-import com.trego.dto.response.VandorCartResponseDTO;
+import com.trego.dto.response.VendorCartResponseDTO;
 import com.trego.service.IPreOrderService;
 import com.trego.utils.Constants;
-
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,7 +26,6 @@ public class PreOrderServiceImpl implements IPreOrderService {
     @Autowired
     private StockRepository stockRepository;
 
-
     @Autowired
     private VendorRepository vendorRepository;
 
@@ -44,42 +36,82 @@ public class PreOrderServiceImpl implements IPreOrderService {
     private MedicineRepository medicineRepository;
 
     @Override
+    @Transactional
     public PreOrderResponseDTO savePreOrder(PreOrderDTO preOrderRequest) {
 
+        Gson gson = new Gson();
 
+        // ✅ Step 1: Log incoming vendorId
+        System.out.println("🎯 Incoming selectedVendorId from frontend: " + preOrderRequest.getSelectedVendorId());
+
+        // ✅ Step 2: If vendorId missing, try reading from cart
+        if ((preOrderRequest.getSelectedVendorId() == null || preOrderRequest.getSelectedVendorId() <= 0)
+                && preOrderRequest.getCarts() != null && !preOrderRequest.getCarts().isEmpty()) {
+
+            Long vendorIdFromCart = preOrderRequest.getCarts().get(0).getVendorId();
+            preOrderRequest.setSelectedVendorId(vendorIdFromCart);
+            System.out.println("🟡 Auto-set vendor ID from cart payload: " + vendorIdFromCart);
+        }
+
+        // ✅ Step 3: Calculate totals before saving
         calculateTotalCartValue(preOrderRequest);
         calculateAmountToPay(preOrderRequest);
 
-        Gson gson = new Gson();
-        List<PreOrder> preOrders = preOrderRepository.findByUserIdAndPaymentStatus(preOrderRequest.getUserId(), "unpaid");
-        PreOrder preOrder = null;
-        
-        // If there are multiple pre-orders, use the first one or create a new one if none exist
-        if (preOrders != null && !preOrders.isEmpty()) {
-            preOrder = preOrders.get(0); // Use the first one
-        }
-        
+        // ✅ Step 4: Fetch existing unpaid PreOrder
+        List<PreOrder> preOrders =
+                preOrderRepository.findByUserIdAndPaymentStatus(preOrderRequest.getUserId(), "unpaid");
+        PreOrder preOrder = (preOrders != null && !preOrders.isEmpty()) ? preOrders.get(0) : null;
+
+        // ✅ Step 5: Create new PreOrder if not found
         if (preOrder == null) {
             preOrder = new PreOrder();
             preOrder.setPaymentStatus("unpaid");
             preOrder.setOrderStatus("new");
             preOrder.setUserId(preOrderRequest.getUserId());
             preOrder.setCreatedBy("SYSTEM");
-            preOrder.setPayload(gson.toJson(preOrderRequest));
             preOrder.setMobileNo(preOrderRequest.getMobileNo());
             preOrder.setAddressId(preOrderRequest.getAddressId());
-
-        } else {
-            preOrder.setPayload(gson.toJson(preOrderRequest));
-
+            System.out.println("🆕 Creating new PreOrder record for user: " + preOrderRequest.getUserId());
         }
-        preOrderRepository.save(preOrder);
 
+        // ✅ Step 6: Vendor selection logic (final priority)
+        Long finalVendorId = null;
+
+        if (preOrderRequest.getSelectedVendorId() != null && preOrderRequest.getSelectedVendorId() > 0) {
+            finalVendorId = preOrderRequest.getSelectedVendorId();
+            System.out.println("🟢 Vendor ID received from frontend/switch: " + finalVendorId);
+        } else if (preOrderRequest.getCarts() != null && !preOrderRequest.getCarts().isEmpty()) {
+            finalVendorId = preOrderRequest.getCarts().get(0).getVendorId();
+            System.out.println("🟡 Vendor ID picked from first cart: " + finalVendorId);
+        } else if (preOrder.getSelectedVendorId() != null && preOrder.getSelectedVendorId() > 0) {
+            finalVendorId = preOrder.getSelectedVendorId();
+            System.out.println("🔵 Vendor ID reused from previous PreOrder: " + finalVendorId);
+        } else {
+            System.out.println("⚠️ No vendor ID found at all! Saving as NULL");
+        }
+
+        // ✅ Step 7: Assign vendorId to DTO and Entity
+        preOrderRequest.setSelectedVendorId(finalVendorId);
+        preOrder.setSelectedVendorId(finalVendorId);
+
+        // ✅ Step 8: Save payload JSON
+        preOrder.setPayload(gson.toJson(preOrderRequest));
+
+        // ✅ Step 9: Save PreOrder in DB
+        preOrderRepository.save(preOrder);
+        System.out.println("✅ Saved PreOrder ID: " + preOrder.getId() + " | VendorID: " + finalVendorId);
+
+        // ✅ Step 10: Prepare response object
         PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
+
+        // ✅ Step 11: Populate cart details for frontend
         populateCartResponse(preOrderResponseDTO);
+
         return preOrderResponseDTO;
     }
+
+
 
     @Override
     public PreOrderResponseDTO getOrdersByUserId(Long userId) {
@@ -87,7 +119,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
         PreOrderResponseDTO preOrderResponseDTO = new PreOrderResponseDTO();
         List<PreOrder> preOrders = preOrderRepository.findByUserIdAndPaymentStatus(userId, "unpaid");
         if (preOrders != null && !preOrders.isEmpty()) {
-            PreOrder tempPreOrder = preOrders.get(0); // Use the first one
+            PreOrder tempPreOrder = preOrders.get(0);
             preOrderResponseDTO = gson.fromJson(tempPreOrder.getPayload(), PreOrderResponseDTO.class);
             preOrderResponseDTO.setOrderId(tempPreOrder.getId());
             populateCartResponse(preOrderResponseDTO);
@@ -96,16 +128,32 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     @Override
-    public VandorCartResponseDTO vendorSpecificPrice( long orderId) {
+    public VendorCartResponseDTO vendorSpecificPrice(long orderId) {
         PreOrder preOrder = preOrderRepository.findById(orderId).orElse(null);
-        VandorCartResponseDTO vandorCartResponseDTO = new VandorCartResponseDTO();
-        vandorCartResponseDTO.setUserId(preOrder.getUserId());
-        vandorCartResponseDTO.setOrderId(orderId);
+        VendorCartResponseDTO vendorCartResponseDTO = new VendorCartResponseDTO();
+
+        if (preOrder == null) {
+            // defensive: return empty dto (controller handles empty / bad request)
+            System.out.println("⚠️ vendorSpecificPrice: No PreOrder found for id=" + orderId);
+            return vendorCartResponseDTO;
+        }
+
+        vendorCartResponseDTO.setUserId(preOrder.getUserId());
+        vendorCartResponseDTO.setOrderId(orderId);
+
+        // ✅ NEW: set the preOrderId so downstream bucket logic can persist selected vendor
+        vendorCartResponseDTO.setPreOrderId(preOrder.getId());
+
+        // ✅ NEW: if PreOrder already has a selected vendor, pass it down
+        if (preOrder.getSelectedVendorId() != null && preOrder.getSelectedVendorId() > 0) {
+            vendorCartResponseDTO.setSelectedVendorId(preOrder.getSelectedVendorId());
+        }
+
         Gson gson = new Gson();
-        PreOrderResponseDTO preOrderResponseDTO =  gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
+        PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
 
-        // Get all unique medicine IDs from all carts
+        // Load medicines (unchanged)
         List<Medicine> allMedicines = medicineRepository.findAllById(
                 preOrderResponseDTO.getCarts().stream()
                         .flatMap(cart -> cart.getMedicine().stream())
@@ -114,48 +162,37 @@ public class PreOrderServiceImpl implements IPreOrderService {
                         .collect(Collectors.toList())
         );
 
-
+        // Build carts with vendor details (unchanged logic)
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
-            List<MedicineDTO> medicines = cart.getMedicine().stream()
-                    .map(medicine -> {
-                        // Use the new method that returns a List to handle multiple stocks
-                        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
-                        Optional<Stock> optionalStock = stocks.isEmpty() ? Optional.empty() : Optional.of(stocks.get(0));
-                        // Instead of returning null, return the medicine with indication of unavailability
-                        if (optionalStock.isPresent()) {
-                            return populateMedicalDTO(medicine, optionalStock.get());
-                        } else {
-                            // Return medicine with default values indicating unavailability
-                            return populateUnavailableMedicalDTO(medicine);
-                        }
-                    })
-                    // Remove the filter that removes null values since we're not returning null anymore
-                    .collect(Collectors.toList());
+            List<MedicineDTO> medicines = cart.getMedicine().stream().map(medicine -> {
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
+                if (!stocks.isEmpty()) {
+                    return populateMedicalDTO(medicine, stocks.get(0));
+                } else {
+                    return populateUnavailableMedicalDTO(medicine);
+                }
+            }).collect(Collectors.toList());
 
             cart.setMedicine(medicines);
             Vendor vendor = vendorRepository.findById(cart.getVendorId()).orElse(null);
             if (vendor != null) {
                 cart.setVendorId(vendor.getId());
                 cart.setName(vendor.getName());
-                if(vendor.getCategory().equalsIgnoreCase("retail")) {
-                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL+ vendor.getLogo());
-                }else{
-                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL+ vendor.getLogo());
-                }
+                cart.setLogo(Constants.LOGO_BASE_URL + (vendor.getCategory().equalsIgnoreCase("retail")
+                        ? Constants.OFFLINE_BASE_URL : Constants.ONLINE_BASE_URL) + vendor.getLogo());
                 cart.setGstNumber(vendor.getGistin());
                 cart.setLicence(vendor.getDruglicense());
-                // cart.setAddress(vendor.getAddress());
                 cart.setLat(vendor.getLat());
                 cart.setLng(vendor.getLng());
                 cart.setDeliveryTime(vendor.getDeliveryTime());
                 cart.setReviews(vendor.getReviews());
             }
-            double totalCartValue = medicines.stream()
-                    .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
-                    .sum();
 
-            double discount   = medicines.stream()
-                    .mapToDouble(medicine ->(medicine.getMrp() * medicine.getQty()) * medicine.getDiscount() / 100.0)
+            double totalCartValue = medicines.stream()
+                    .mapToDouble(med -> med.getMrp() * med.getQty())
+                    .sum();
+            double discount = medicines.stream()
+                    .mapToDouble(med -> (med.getMrp() * med.getQty()) * med.getDiscount() / 100.0)
                     .sum();
 
             cart.setTotalCartValue(totalCartValue);
@@ -163,77 +200,54 @@ public class PreOrderServiceImpl implements IPreOrderService {
             return cart;
         }).collect(Collectors.toList());
 
-        vandorCartResponseDTO.setCarts(cartDTOs);
-
-        return vandorCartResponseDTO;
+        vendorCartResponseDTO.setCarts(cartDTOs);
+        return vendorCartResponseDTO;
     }
+
 
     private void populateCartResponse(PreOrderResponseDTO preOrderResponseDTO) {
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
-
-            List<MedicineDTO> medicines = cart.getMedicine().stream()
-                    .map(medicine -> {
-                        // Use the new method that returns a List to handle multiple stocks
-                        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
-                        Optional<Stock> optionalStock = stocks.isEmpty() ? Optional.empty() : Optional.of(stocks.get(0));
-                        // Instead of returning null, return the medicine with indication of unavailability
-                        if (!stocks.isEmpty()) {
-                            Stock stock = stocks.get(0);
-                            return populateMedicalDTO(medicine, stock);
-                        } else {
-                            // Return medicine with default values indicating unavailability
-                            return populateUnavailableMedicalDTO(medicine);
-                        }
-                    })
-                    // Remove the filter that removes null values since we're not returning null anymore
-                    .collect(Collectors.toList());
-
+            List<MedicineDTO> medicines = cart.getMedicine().stream().map(medicine -> {
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
+                if (!stocks.isEmpty()) {
+                    return populateMedicalDTO(medicine, stocks.get(0));
+                } else {
+                    return populateUnavailableMedicalDTO(medicine);
+                }
+            }).collect(Collectors.toList());
 
             cart.setMedicine(medicines);
-
-
-          Vendor vendor = vendorRepository.findById(cart.getVendorId()).orElse(null);
-          if (vendor != null) {
-              cart.setVendorId(vendor.getId());
-              cart.setName(vendor.getName());
-              if(vendor.getCategory().equalsIgnoreCase("retail")) {
-                  cart.setLogo(vendor.getLogo());
-              }else{
-                  cart.setLogo(vendor.getLogo());
-              }
-              cart.setGstNumber(vendor.getGistin());
-              cart.setLicence(vendor.getDruglicense());
-             // cart.setAddress(vendor.getAddress());
-              cart.setLat(vendor.getLat());
-              cart.setLng(vendor.getLng());
-              cart.setDeliveryTime(vendor.getDeliveryTime());
-              cart.setReviews(vendor.getReviews());
-          }
-          return cart;
-      }).collect(Collectors.toList());
+            Vendor vendor = vendorRepository.findById(cart.getVendorId()).orElse(null);
+            if (vendor != null) {
+                cart.setVendorId(vendor.getId());
+                cart.setName(vendor.getName());
+                cart.setLogo(vendor.getLogo());
+                cart.setGstNumber(vendor.getGistin());
+                cart.setLicence(vendor.getDruglicense());
+                cart.setLat(vendor.getLat());
+                cart.setLng(vendor.getLng());
+                cart.setDeliveryTime(vendor.getDeliveryTime());
+                cart.setReviews(vendor.getReviews());
+            }
+            return cart;
+        }).collect(Collectors.toList());
 
         double totalCartValue = getTotalCartValue(cartDTOs);
-        double deliveryCharges = 0;
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
-        preOrderResponseDTO.setDeliveryCharges(deliveryCharges);
-        preOrderResponseDTO.setAmountToPay(totalCartValue - getDiscount(cartDTOs) + deliveryCharges);
+        preOrderResponseDTO.setAmountToPay(totalCartValue - getDiscount(cartDTOs));
         preOrderResponseDTO.setCarts(cartDTOs);
     }
 
     private MedicineDTO populateMedicalDTO(MedicineDTO medicineDTO, Stock stock) {
-
         Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
         medicineDTO.setId(tempMedicine.getId());
         medicineDTO.setMrp(stock.getMrp());
-        medicineDTO.setId(tempMedicine.getId());
         medicineDTO.setName(tempMedicine.getName());
         medicineDTO.setManufacturer(tempMedicine.getManufacturer());
         medicineDTO.setMedicineType(tempMedicine.getMedicineType());
         medicineDTO.setUseOf(tempMedicine.getUseOf());
         medicineDTO.setStrip(tempMedicine.getPacking());
         medicineDTO.setImage(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + tempMedicine.getPhoto1());
-        medicineDTO.setSaltComposition(tempMedicine.getSaltComposition());
-        medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + tempMedicine.getPhoto1());
         medicineDTO.setDiscount(stock.getDiscount());
         medicineDTO.setActualPrice(stock.getMrp());
         medicineDTO.setExpiryDate(stock.getExpiryDate());
@@ -241,25 +255,15 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     private MedicineDTO populateUnavailableMedicalDTO(MedicineDTO medicineDTO) {
-        // Create a copy of the medicine DTO with default values indicating unavailability
-        MedicineDTO unavailableMedicine = new MedicineDTO();
-        unavailableMedicine.setId(medicineDTO.getId());
-        unavailableMedicine.setName(medicineDTO.getName());
-        unavailableMedicine.setManufacturer(medicineDTO.getManufacturer());
-        unavailableMedicine.setSaltComposition(medicineDTO.getSaltComposition());
-        unavailableMedicine.setMedicineType(medicineDTO.getMedicineType());
-        unavailableMedicine.setUseOf(medicineDTO.getUseOf());
-        unavailableMedicine.setStrip(medicineDTO.getStrip());
-        unavailableMedicine.setPhoto1(medicineDTO.getPhoto1());
-
-        // Set default values indicating unavailability
-        unavailableMedicine.setMrp(0.0);
-        unavailableMedicine.setDiscount(0.0);
-        unavailableMedicine.setQty(0);
-        unavailableMedicine.setActualPrice(0.0);
-        unavailableMedicine.setExpiryDate("Not Available");
-
-        return unavailableMedicine;
+        MedicineDTO unavailable = new MedicineDTO();
+        unavailable.setId(medicineDTO.getId());
+        unavailable.setName(medicineDTO.getName());
+        unavailable.setMrp(0.0);
+        unavailable.setDiscount(0.0);
+        unavailable.setQty(0);
+        unavailable.setActualPrice(0.0);
+        unavailable.setExpiryDate("Not Available");
+        return unavailable;
     }
 
     private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
@@ -272,67 +276,43 @@ public class PreOrderServiceImpl implements IPreOrderService {
     private static double getDiscount(List<CartResponseDTO> cartDTOs) {
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .mapToDouble(medicine -> (medicine.getMrp() * medicine.getQty()) * medicine.getDiscount() / 100.0)
+                .mapToDouble(med -> (med.getMrp() * med.getQty()) * med.getDiscount() / 100.0)
                 .sum();
     }
 
-
     public PreOrderDTO calculateAmountToPay(PreOrderDTO preOrderResponseDTO) {
-        List<CartDTO> carts = preOrderResponseDTO.getCarts();
-        double amountToPay = carts.stream()
+        double amountToPay = preOrderResponseDTO.getCarts().stream()
                 .flatMap(cart -> cart.getMedicine().stream()
-                        .map(medicine -> {
-                            long vendorId = cart.getVendorId();
-                            long medicineId = medicine.getId();
-                            int qty = medicine.getQty();
-
-                            // Use the new method that returns a List to handle multiple stocks
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
-                            if(!stocks.isEmpty()){
+                        .map(med -> {
+                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(med.getId(), cart.getVendorId());
+                            if (!stocks.isEmpty()) {
                                 Stock stock = stocks.get(0);
                                 double price = stock.getMrp();
-                                double discountPercentage = stock.getDiscount();
-                                double totalCartValue=  price * qty;
-                                totalCartValue = totalCartValue - (totalCartValue * discountPercentage / 100.0);
-
-                                return totalCartValue;
+                                double discount = stock.getDiscount();
+                                double total = price * med.getQty();
+                                return total - (total * discount / 100.0);
                             } else {
                                 return 0.0;
                             }
                         }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
+                .mapToDouble(Double::doubleValue)
+                .sum();
         preOrderResponseDTO.setAmountToPay(amountToPay);
         return preOrderResponseDTO;
     }
 
     private void calculateTotalCartValue(PreOrderDTO preOrderResponseDTO) {
-
-        double totalCartValue = preOrderResponseDTO.getCarts().stream()
+        double total = preOrderResponseDTO.getCarts().stream()
                 .flatMap(cart -> cart.getMedicine().stream()
-                        .map(medicine -> {
-                            long vendorId = cart.getVendorId();
-                            long medicineId = medicine.getId();
-                            int qty = medicine.getQty();
-
-                            // Use the new method that returns a List to handle multiple stocks
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
-                            if(!stocks.isEmpty()){
-                                // Use the first stock if multiple exist
-                                Stock stock = stocks.get(0);
-                                double price = stock.getMrp();
-                                medicine.setMrp(price);
-                                double discountPercentage = stock.getDiscount();
-                                double tempTotalCartValue =  price * qty;
-                                return  tempTotalCartValue;
-                            }else {
-                                return  0.0;
-                            }
+                        .map(med -> {
+                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(med.getId(), cart.getVendorId());
+                            if (!stocks.isEmpty()) {
+                                double price = stocks.get(0).getMrp();
+                                return price * med.getQty();
+                            } else return 0.0;
                         }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
-        preOrderResponseDTO.setTotalCartValue(totalCartValue);
-
+                .mapToDouble(Double::doubleValue)
+                .sum();
+        preOrderResponseDTO.setTotalCartValue(total);
     }
-
 }

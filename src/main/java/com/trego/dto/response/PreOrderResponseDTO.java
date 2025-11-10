@@ -3,7 +3,6 @@ package com.trego.dto.response;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.trego.dto.CartDTO;
 import lombok.Data;
-
 import java.util.List;
 
 @Data
@@ -20,4 +19,8 @@ public class PreOrderResponseDTO {
 
     private List<CartResponseDTO> carts;
 
+    //  Added fields for selected vendor tracking
+    private Long selectedVendorId;
+    private String vendorName;
+    private String vendorLogo;
 }

@@ -45,9 +45,10 @@ public class PreOrder {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
-    
-    @Column(name = "selected_vendor_id", nullable = true)
+
+    @Column(name = "selected_vendor_id")
     private Long selectedVendorId;
+
 
     @PrePersist
     protected void onCreate() {

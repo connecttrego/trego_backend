@@ -109,57 +109,56 @@ public class OrderServiceImpl implements IOrderService {
 
         return orderResponseDTO;
     }
-    
+    // before  payment   switch to chiper clicke ke bad order id dusra generate nhi hona chahiye or pr id me hi playload update krna hai vedor id ,vendor playload load krna hai
     @Override
     public OrderResponseDTO placeOrderFromBucket(BucketOrderRequestDTO bucketOrderRequest) throws Exception {
-        System.out.println("Placing bucket order for user ID: " + bucketOrderRequest.getUserId() + 
-                          ", PreOrder ID: " + bucketOrderRequest.getPreOrderId() + 
-                          ", Bucket ID: " + bucketOrderRequest.getBucketId());
+        System.out.println("Placing bucket order for user ID: " + bucketOrderRequest.getUserId() +
+                ", PreOrder ID: " + bucketOrderRequest.getPreOrderId() +
+                ", Bucket ID: " + bucketOrderRequest.getBucketId());
         OrderResponseDTO orderResponseDTO = new OrderResponseDTO();
-        
+
         // Set user ID
         orderResponseDTO.setUserId(bucketOrderRequest.getUserId());
-        
-        // Get the original preorder to recreate buckets
+
+        // If an original preorder exists, keep a reference (not required but useful)
         PreOrder originalPreOrder = preOrderRepository.findById(bucketOrderRequest.getPreOrderId()).orElse(null);
         if (originalPreOrder == null) {
             System.out.println("Original preorder not found for ID: " + bucketOrderRequest.getPreOrderId());
-            throw new Exception("Original preorder not found");
+            // Not fatal — continue creating a new PreOrder for the bucket
         }
-        
+
         try {
-            // Recreate buckets from the original preorder
-            VandorCartResponseDTO vendorCartData = preOrderService.vendorSpecificPrice(bucketOrderRequest.getPreOrderId());
-            
-            // Check if carts is null and handle it
+            // Recreate buckets from the original preorder (this also sets preOrderId in VendorCartResponseDTO)
+            VendorCartResponseDTO vendorCartData = preOrderService.vendorSpecificPrice(bucketOrderRequest.getPreOrderId());
+
             if (vendorCartData.getCarts() == null) {
                 System.out.println("No cart data found in preorder");
                 throw new Exception("No cart data found in preorder");
             }
-            
+
             System.out.println("Number of carts in vendorCartData: " + vendorCartData.getCarts().size());
-            
+
             List<BucketDTO> buckets = bucketService.createOptimizedBucketsFromPreorder(vendorCartData);
             System.out.println("Created " + buckets.size() + " buckets");
-            
-            // Find the selected bucket
+
+            // Find the selected bucket (bucketId corresponds to vendorId in your implementation)
             BucketDTO selectedBucket = buckets.stream()
-                .filter(bucket -> bucket.getId().equals(bucketOrderRequest.getBucketId()))
-                .findFirst()
-                .orElse(null);
-                
+                    .filter(bucket -> bucket.getId().equals(bucketOrderRequest.getBucketId()))
+                    .findFirst()
+                    .orElse(null);
+
             if (selectedBucket == null) {
                 System.out.println("Selected bucket not found for ID: " + bucketOrderRequest.getBucketId());
                 throw new Exception("Selected bucket not found");
             }
-            
+
             System.out.println("Selected bucket vendor ID: " + selectedBucket.getVendorId());
-            
+
             // Use the exact amount from the bucket to ensure consistency
-            double bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
-            double bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
-            double originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
-            
+            double bucketAmount = selectedBucket.getAmountToPay();
+            double bucketDiscount = selectedBucket.getTotalDiscount();
+            double originalTotal = selectedBucket.getTotalPrice();
+
             // Create a PreOrder entity for the bucket-based order
             PreOrder preOrder = new PreOrder();
             preOrder.setUserId(bucketOrderRequest.getUserId());
@@ -167,21 +166,29 @@ public class OrderServiceImpl implements IOrderService {
             preOrder.setPaymentStatus("unpaid");
             preOrder.setTotalPayAmount(bucketAmount); // Amount after discount
             preOrder.setCreatedBy("SYSTEM"); // Set the required createdBy field
-            
-            // Create a payload with bucket information
+
+            // IMPORTANT FIX: Persist the selected vendor ID on the PreOrder entity
+            preOrder.setSelectedVendorId(selectedBucket.getVendorId());
+
+            // Create a payload with bucket information (and include selectedVendorId)
             PreOrderResponseDTO preOrderResponseDTO = new PreOrderResponseDTO();
             preOrderResponseDTO.setUserId(bucketOrderRequest.getUserId());
             preOrderResponseDTO.setAmountToPay(bucketAmount); // Final amount to pay after discount
             preOrderResponseDTO.setTotalCartValue(originalTotal); // Original price before discount
             preOrderResponseDTO.setDiscount(bucketDiscount); // Total discount amount
-            
-            // For bucket orders, we need to create a cart for the selected vendor only
+
+            // Also put vendor info into payload so UI can reflect selection immediately
+            preOrderResponseDTO.setSelectedVendorId(selectedBucket.getVendorId());
+            preOrderResponseDTO.setVendorName(selectedBucket.getVendorName());
+            preOrderResponseDTO.setVendorLogo(selectedBucket.getLogo());
+
+            // For bucket orders, create a cart for the selected vendor only
             CartResponseDTO bucketCart = new CartResponseDTO();
             bucketCart.setVendorId(selectedBucket.getVendorId());
             bucketCart.setTotalCartValue(originalTotal);
             bucketCart.setAmountToPay(bucketAmount);
             bucketCart.setDiscount(bucketDiscount);
-            
+
             // Convert bucket items to medicine DTOs
             List<MedicineDTO> medicineDTOs = new ArrayList<>();
             if (selectedBucket.getAvailableItems() != null) {
@@ -193,40 +200,40 @@ public class OrderServiceImpl implements IOrderService {
                     medicineDTO.setMrp(bucketItem.getPrice()); // Discounted price
                     medicineDTO.setDiscount(bucketItem.getDiscount());
                     medicineDTO.setQty(bucketItem.getRequestedQuantity());
-                    // Calculate original price before discount
-                    double originalPrice = bucketItem.getDiscount() > 0 ? 
-                        bucketItem.getPrice() / (1 - bucketItem.getDiscount() / 100) : 
-                        bucketItem.getPrice();
-                    medicineDTO.setActualPrice(originalPrice); // Original price before discount
+                    // Calculate original price before discount (best effort)
+                    double originalPrice = bucketItem.getDiscount() > 0 ?
+                            bucketItem.getPrice() / (1 - bucketItem.getDiscount() / 100) :
+                            bucketItem.getPrice();
+                    medicineDTO.setActualPrice(originalPrice);
                     medicineDTOs.add(medicineDTO);
                 }
             }
             bucketCart.setMedicine(medicineDTOs);
-            
             preOrderResponseDTO.setCarts(Arrays.asList(bucketCart));
-            
-            System.out.println("Created bucket cart with vendor ID: " + bucketCart.getVendorId() + 
-                              " and " + medicineDTOs.size() + " medicines");
-            
+
+            System.out.println("Created bucket cart with vendor ID: " + bucketCart.getVendorId() +
+                    " and " + medicineDTOs.size() + " medicines");
+
             // Convert to JSON and set as payload BEFORE saving
             Gson gson = new Gson();
             String payload = gson.toJson(preOrderResponseDTO);
             preOrder.setPayload(payload);
-            
-            // Save the preorder 
+
+            // Save the preorder (selectedVendorId is persisted now)
             PreOrder savedPreOrder = preOrderRepository.save(preOrder);
-            System.out.println("Saved new PreOrder ID: " + savedPreOrder.getId());
-            
+            System.out.println("Saved new PreOrder ID: " + savedPreOrder.getId() +
+                    " with selectedVendorId=" + savedPreOrder.getSelectedVendorId());
+
             // Add the order ID to the response DTO
             preOrderResponseDTO.setOrderId(savedPreOrder.getId());
-            
+
             // Generate RazorPay order using the exact same amount
             String razorpayOrderId = createRazorPayOrderForBucket(bucketOrderRequest, preOrderResponseDTO);
             savedPreOrder.setRazorpayOrderId(razorpayOrderId);
-            
-            // Save the updated preorder
+
+            // Save the updated preorder (Razorpay id)
             preOrderRepository.save(savedPreOrder);
-            
+
             orderResponseDTO.setRazorpayOrderId(razorpayOrderId);
             orderResponseDTO.setAmountToPay(bucketAmount);
             orderResponseDTO.setOrderId(savedPreOrder.getId());

@@ -3,7 +3,8 @@ package com.trego.api;
 import com.trego.dto.BucketDTO;
 import com.trego.dto.BucketRequestDTO;
 import com.trego.dto.SelectedSubstituteDTO;
-import com.trego.dto.response.VandorCartResponseDTO;
+import com.trego.dto.response.VendorCartResponseDTO;
+import com.trego.dto.response.VendorCartResponseDTO;
 import com.trego.dto.view.SubstituteDetailView;
 import com.trego.service.IBucketService;
 import com.trego.service.IPreOrderService;
@@ -47,7 +48,7 @@ public class BucketController {
     @GetMapping("/optimize/preorder/{preorderID}")
     public ResponseEntity<List<BucketDTO>> createOptimizedBucketsFromPreorder(@PathVariable Long preorderID) {
         try {
-            VandorCartResponseDTO vendorCartData = preOrderService.vendorSpecificPrice(preorderID);
+            VendorCartResponseDTO vendorCartData = preOrderService.vendorSpecificPrice(preorderID);
             List<BucketDTO> buckets = bucketService.createOptimizedBucketsFromPreorder(vendorCartData);
             return ResponseEntity.ok(buckets);
         } catch (Exception e) {
