@@ -253,7 +253,8 @@ public class OrderServiceImpl implements IOrderService {
             preOrder.setPaymentStatus("paid");
 
             Gson gson = new Gson();
-            PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
+            String payload = preOrder.getSelectedVendorId() != null ? preOrder.getVendorPayload() :preOrder.getPayload();
+            PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(payload, PreOrderResponseDTO.class);
             preOrderResponseDTO.setOrderId(preOrder.getId());
 
             System.out.println("Preserving original cart data during validation");
