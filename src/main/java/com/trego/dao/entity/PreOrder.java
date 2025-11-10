@@ -25,7 +25,10 @@ public class PreOrder {
     private String vendorPayload;
 
     @Column(nullable = true, name = "razorpay_order_id")
-    private String razorpayOrderId;
+	private String razorpayOrderId;
+    
+    @Column(nullable = true, name = "order_type")
+    private Integer orderType;
 
     @Column(nullable = true, name = "total_pay_amount")
     private double totalPayAmount;

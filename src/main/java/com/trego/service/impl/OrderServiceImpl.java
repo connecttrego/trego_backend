@@ -94,9 +94,10 @@ public class OrderServiceImpl implements IOrderService {
         if (StringUtils.isEmpty(preOrder.getRazorpayOrderId()) || !(preOrderResponseDTO.getAmountToPay() > 0 && Double.compare(preOrderResponseDTO.getAmountToPay(), preOrder.getTotalPayAmount()) == 0)) {
             razorpayOrderId = createRazorPayOrder(orderRequest, preOrderResponseDTO);
             preOrder.setRazorpayOrderId(razorpayOrderId);
+            
             preOrder.setTotalPayAmount(preOrderResponseDTO.getAmountToPay());
             preOrder.setPaymentStatus("unpaid");
-
+            preOrder.setOrderType(0);
             preOrder.setAddressId(orderRequest.getAddressId());
             preOrderRepository.save(preOrder);
         } else {
@@ -213,6 +214,7 @@ public class OrderServiceImpl implements IOrderService {
             Gson gson = new Gson();
             String payload = gson.toJson(preOrderResponseDTO);
             preOrder.setVendorPayload(payload);
+            preOrder.setOrderType(1);
 
             // Save the preorder 
             //preOrderRepository.save(preOrder);
@@ -249,11 +251,11 @@ public class OrderServiceImpl implements IOrderService {
 
         if (isValidate) {
             PreOrder preOrder = preOrderRepository.findById(orderValidateRequestDTO.getOrderId()).get();
-            System.out.println("Found PreOrder ID: " + preOrder.getId() + " with payment status: " + preOrder.getPaymentStatus());
+            System.out.println("Found PreOrder ID: " + preOrder.getId() + " with payment status: " + preOrder.getPaymentStatus()+ "  OrderType is "+(preOrder.getOrderType() == 1));
             preOrder.setPaymentStatus("paid");
 
             Gson gson = new Gson();
-            String payload = preOrder.getSelectedVendorId() != null ? preOrder.getVendorPayload() :preOrder.getPayload();
+            String payload = preOrder.getOrderType() == 1 ? preOrder.getVendorPayload() : preOrder.getPayload();
             PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(payload, PreOrderResponseDTO.class);
             preOrderResponseDTO.setOrderId(preOrder.getId());
 
@@ -265,7 +267,7 @@ public class OrderServiceImpl implements IOrderService {
             }
 
 
-            if (preOrder.getSelectedVendorId() != null) {
+            if (preOrder.getOrderType() == 1 ) {
                 System.out.println("Selected Vendor ID found: " + preOrder.getSelectedVendorId() + ". Processing as BUCKET ORDER.");
                 processBucketOrder(preOrder, preOrderResponseDTO);
             } else if (preOrderResponseDTO.getCarts() != null && preOrderResponseDTO.getCarts().size() > 1) {
@@ -273,7 +275,7 @@ public class OrderServiceImpl implements IOrderService {
                 processRegularOrder(preOrder, preOrderResponseDTO);
             } else {
                 System.out.println("Single vendor but no selectedVendorId found. Processing as BUCKET ORDER.");
-                processBucketOrder(preOrder, preOrderResponseDTO);
+                processRegularOrder(preOrder, preOrderResponseDTO);
             }
 
 
