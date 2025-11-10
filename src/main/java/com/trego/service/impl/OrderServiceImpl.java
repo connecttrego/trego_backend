@@ -160,14 +160,15 @@ public class OrderServiceImpl implements IOrderService {
             double bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
             double originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
 
-            // Create a PreOrder entity for the bucket-based order
-            PreOrder preOrder = new PreOrder();
-            preOrder.setUserId(bucketOrderRequest.getUserId());
+            // Create a PreOrder entity for the bucket-based orde
+            PreOrder preOrder = originalPreOrder;
             preOrder.setAddressId(bucketOrderRequest.getAddressId());
             preOrder.setPaymentStatus("unpaid");
-            preOrder.setTotalPayAmount(bucketAmount); // Amount after discount
-            preOrder.setCreatedBy("SYSTEM"); // Set the required createdBy field
-
+            preOrder.setTotalPayAmount(bucketAmount);
+            preOrder.setModifiedBy("SYSTEM"); // optional if you track modification
+            preOrder.setSelectedVendorId(selectedBucket.getVendorId());
+            
+            
             // Create a payload with bucket information
             PreOrderResponseDTO preOrderResponseDTO = new PreOrderResponseDTO();
             preOrderResponseDTO.setUserId(bucketOrderRequest.getUserId());
@@ -214,22 +215,22 @@ public class OrderServiceImpl implements IOrderService {
             preOrder.setPayload(payload);
 
             // Save the preorder 
-            PreOrder savedPreOrder = preOrderRepository.save(preOrder);
-            System.out.println("Saved new PreOrder ID: " + savedPreOrder.getId());
+            //preOrderRepository.save(preOrder);
+            System.out.println("Updated existing PreOrder ID: " + preOrder.getId());
 
             // Add the order ID to the response DTO
-            preOrderResponseDTO.setOrderId(savedPreOrder.getId());
+            preOrderResponseDTO.setOrderId(preOrder.getId());
 
             // Generate RazorPay order using the exact same amount
             String razorpayOrderId = createRazorPayOrderForBucket(bucketOrderRequest, preOrderResponseDTO);
-            savedPreOrder.setRazorpayOrderId(razorpayOrderId);
+            preOrder.setRazorpayOrderId(razorpayOrderId);
 
             // Save the updated preorder
-            preOrderRepository.save(savedPreOrder);
+            preOrderRepository.save(preOrder);
 
             orderResponseDTO.setRazorpayOrderId(razorpayOrderId);
             orderResponseDTO.setAmountToPay(bucketAmount);
-            orderResponseDTO.setOrderId(savedPreOrder.getId());
+            orderResponseDTO.setOrderId(preOrder.getId());
         } catch (Exception e) {
             // Log the exception for debugging
             System.err.println("Error in placeOrderFromBucket: " + e.getMessage());
