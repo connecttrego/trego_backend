@@ -805,6 +805,31 @@ public class OrderServiceImpl implements IOrderService {
     // Process regular orders (multiple vendors)
     private void processRegularOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO) {
         System.out.println("Processing regular order for PreOrder ID: " + preOrder.getId());
+
+        // ✅ Step added: Calculate cart-wise total and amountToPay before saving orders
+        for (CartResponseDTO cart : preOrderResponseDTO.getCarts()) {
+            double totalCartValue = 0.0;
+            double totalDiscount = 0.0;
+
+            if (cart.getMedicine() != null) {
+                for (var med : cart.getMedicine()) {
+                    double price = med.getMrp();
+                    int qty = med.getQty();
+                    double discount = med.getDiscount();
+
+                    totalCartValue += price * qty;
+                    totalDiscount += (price * qty * discount / 100.0);
+                }
+            }
+
+            double amountToPay = totalCartValue - totalDiscount;
+            cart.setTotalCartValue(totalCartValue);
+            cart.setDiscount(totalDiscount);
+            cart.setAmountToPay(amountToPay);
+
+
+        }
+
         if (preOrderResponseDTO.getCarts() != null) {
             System.out.println("Number of carts in regular order: " + preOrderResponseDTO.getCarts().size());
         }
