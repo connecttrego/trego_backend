@@ -17,5 +17,7 @@ public class Banner {
     private String logo;
     private  String bannerUrl;
     private String position;
+    private Long medicineId;
+    private Long vendorId;
     private String createdBy;
 }

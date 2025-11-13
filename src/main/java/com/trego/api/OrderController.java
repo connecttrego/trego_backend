@@ -1,5 +1,6 @@
 package com.trego.api;
 
+import com.trego.dto.BucketOrderRequestDTO;
 import com.trego.dto.CancelOrderRequestDTO;
 import com.trego.dto.OrderRequestDTO;
 import com.trego.dto.OrderValidateRequestDTO;
@@ -25,6 +26,12 @@ public class OrderController {
     @PostMapping
     public OrderResponseDTO placeOrder(@RequestBody OrderRequestDTO orderRequest) throws Exception {
         return orderService.placeOrder(orderRequest);
+    }
+
+    // New endpoint for placing order from a selected bucket
+    @PostMapping("/fromBucket")
+    public OrderResponseDTO placeOrderFromBucket(@RequestBody BucketOrderRequestDTO bucketOrderRequest) throws Exception {
+        return orderService.placeOrderFromBucket(bucketOrderRequest);
     }
 
     @PostMapping("/validateOrder")

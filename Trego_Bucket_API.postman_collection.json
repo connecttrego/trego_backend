@@ -1,0 +1,136 @@
+{
+	"info": {
+		"_postman_id": "bucket-api-test-collection",
+		"name": "Trego Bucket API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Get All Medicines",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/medicines",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"medicines"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Medicine by ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/medicines/1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"medicines",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Optimized Buckets",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"medicineQuantities\": {\n    \"1\": 2,\n    \"2\": 1,\n    \"3\": 3\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/buckets/optimize",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"buckets",
+						"optimize"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Optimized Buckets from Preorder",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/buckets/optimize/preorder/11",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"buckets",
+						"optimize",
+						"preorder",
+						"11"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get All Vendors",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/vendors",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"vendors"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080"
+		}
+	]
+}

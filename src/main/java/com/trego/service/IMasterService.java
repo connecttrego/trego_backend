@@ -8,4 +8,9 @@ import java.util.List;
 public interface IMasterService {
 
   public List<CategoryDTO> loadCategoriesByType(String type);
+  
+  // Default method to load all categories
+  public default List<CategoryDTO> loadAllCategories() {
+      return loadCategoriesByType("");
+  }
 }

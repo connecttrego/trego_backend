@@ -47,4 +47,5 @@ public class MedicineDTO {
     private String image;
     private String strip;
     private Double offeredPrice;
+    private Long salesCount; // Added field for sales count
 }

@@ -32,7 +32,8 @@ public class AddressServiceImpl implements IAddressService {
         address.setLng(addressDTO.getLng());
         address.setMobileNo(addressDTO.getMobileNo());
         address.setName(addressDTO.getName());
-        address.setAddressType(addressDTO.getAddressType());
+        // Convert int to AddressType enum
+        address.setAddressType(AddressType.fromCode(addressDTO.getAddressType()));
         User user  = new User();
         user.setId(addressDTO.getUserId());
         address.setUser(user);
@@ -65,7 +66,7 @@ public class AddressServiceImpl implements IAddressService {
                         address.getLandmark(),
                         address.getPincode(),
                         address.getLat(),
-                        address.getLng(), address.getUser().getId() , address.getMobileNo() , address.getName(), address.getAddressType()))
+                        address.getLng(), address.getUser().getId() , address.getMobileNo() , address.getName(), address.getAddressType().getCode()))
                 .collect(Collectors.toList());
 
     }

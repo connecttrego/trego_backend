@@ -18,5 +18,5 @@ public class MedicineWithStockAndVendorDTO {
 
     private String photo1;
     private List<Stock> stocks;
-    //private Vendor vendor;
+    private List<SubstituteDetailDTO> substitutes;
 }

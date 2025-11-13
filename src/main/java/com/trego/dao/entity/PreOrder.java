@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -19,9 +20,15 @@ public class PreOrder {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String payload;
+    
+    @Column(nullable = true, columnDefinition = "TEXT")
+    private String vendorPayload;
 
     @Column(nullable = true, name = "razorpay_order_id")
-    private String razorpayOrderId;
+	private String razorpayOrderId;
+    
+    @Column(nullable = true, name = "order_type")
+    private Integer orderType;
 
     @Column(nullable = true, name = "total_pay_amount")
     private double totalPayAmount;
@@ -41,17 +48,32 @@ public class PreOrder {
 
     @Column(name = "created_by", nullable = false)
     private String createdBy;
+    
+    @Column(name = "modified_by", nullable = true)
+    private String modifiedBy;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+    
+    @Column(name = "modified_at", nullable = true)
+    private LocalDateTime modifiedAt;
+    
+    @Column(name = "selected_vendor_id", nullable = true)
+    private Long selectedVendorId;
 
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+        this.modifiedAt = LocalDateTime.now();
+    }
+    
+    @PreUpdate
+    protected void onUpdate() {
+        this.modifiedAt = LocalDateTime.now(); // Update automatically before every save
     }
 
-    @OneToMany(mappedBy = "preOrder")
-    private List<Order> orders;  // Related to Stock
+    @OneToMany(mappedBy = "preOrder", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Order> orders = new ArrayList<>();
 
     // Getters and Setters
 }
