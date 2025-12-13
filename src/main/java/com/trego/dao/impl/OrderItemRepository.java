@@ -39,4 +39,5 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             """)
     List<Object[]> findVendorMedicineSalesByCategory(@Param("category") String category);
 
+    List<OrderItem> findByOrderId(Long orderId);
 }

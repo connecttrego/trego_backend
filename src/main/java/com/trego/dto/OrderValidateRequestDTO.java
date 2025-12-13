@@ -11,4 +11,7 @@ public class OrderValidateRequestDTO {
     private String razorpayPaymentId;
     private String razorpaysignature;
     private String razorpayAmount;
+
+    private String prescriptionUrl;
+
 }

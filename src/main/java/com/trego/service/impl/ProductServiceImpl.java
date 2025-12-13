@@ -61,9 +61,12 @@ public class ProductServiceImpl implements IProductService {
         ProductDTO dto = new ProductDTO();
         dto.setId(product.getId());
         dto.setName(product.getName());
+        dto.setDescription(product.getDescription());
         dto.setPrice(product.getPrice());
         dto.setTax(product.getTax());
         dto.setTotalPrice(product.getTotalPrice());
+        dto.setImage(product.getImage());
+        dto.setStock(product.getStock());
         return dto;
     }
 }

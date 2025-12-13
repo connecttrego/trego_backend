@@ -17,6 +17,9 @@ public class Medicine {
     private String name;
     private String manufacturer;
     private String saltComposition;
+    @Column(name = "subcategory_id")
+    private Long subcategoryId;
+
 
     private String medicineType;
     @Column(columnDefinition = "LONGTEXT")

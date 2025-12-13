@@ -72,7 +72,7 @@ public class PreOrder {
         this.modifiedAt = LocalDateTime.now(); // Update automatically before every save
     }
 
-    @OneToMany(mappedBy = "preOrder", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "preOrder", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<Order> orders = new ArrayList<>();
 
     // Getters and Setters

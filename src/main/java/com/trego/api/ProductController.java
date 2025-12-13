@@ -22,7 +22,7 @@ public class ProductController {
      * @return List of products
      */
     @GetMapping("/{subcategoryId}/products")
-    public ResponseEntity<?> getProductsBySubcategory(
+    public ResponseEntity<Page<ProductDTO>> getProductsBySubcategory(
             @PathVariable Long subcategoryId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {

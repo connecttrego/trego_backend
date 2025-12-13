@@ -12,6 +12,8 @@ import com.trego.service.IOrderService;
 import com.trego.service.IPreOrderService;
 import com.trego.utils.Constants;
 
+import jakarta.transaction.Transactional;
+import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -33,6 +35,16 @@ import com.google.gson.JsonObject;
 
 @Service
 public class OrderServiceImpl implements IOrderService {
+
+
+
+    @Autowired
+    private PrescriptionRepository prescriptionRepository;
+
+    @Autowired
+    private AttachmentRepository attachmentRepository;
+
+
 
     @Autowired
     private OrderRepository orderRepository;
@@ -243,50 +255,284 @@ public class OrderServiceImpl implements IOrderService {
         return orderResponseDTO;
     }
 
+
+
+
+
+
     @Override
+    @Transactional
     public OrderValidateResponseDTO validateOrder(OrderValidateRequestDTO orderValidateRequestDTO) throws Exception {
         System.out.println("Validating order with Order ID: " + orderValidateRequestDTO.getOrderId());
         OrderValidateResponseDTO validateResponseDTO = new OrderValidateResponseDTO();
         boolean isValidate = verifyRazorPayOrder(orderValidateRequestDTO);
 
-        if (isValidate) {
-            PreOrder preOrder = preOrderRepository.findById(orderValidateRequestDTO.getOrderId()).get();
-            System.out.println("Found PreOrder ID: " + preOrder.getId() + " with payment status: " + preOrder.getPaymentStatus()+ "  OrderType is "+(preOrder.getOrderType() == 1));
-            preOrder.setPaymentStatus("paid");
-
-            Gson gson = new Gson();
-            String payload = preOrder.getOrderType() == 1 ? preOrder.getVendorPayload() : preOrder.getPayload();
-            PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(payload, PreOrderResponseDTO.class);
-            preOrderResponseDTO.setOrderId(preOrder.getId());
-
-            System.out.println("Preserving original cart data during validation");
-
-            // Ensure address ID preserved
-            if (preOrderResponseDTO.getAddressId() == 0) {
-                preOrderResponseDTO.setAddressId(preOrder.getAddressId());
-            }
-
-
-            if (preOrder.getOrderType() == 1 ) {
-                System.out.println("Selected Vendor ID found: " + preOrder.getSelectedVendorId() + ". Processing as BUCKET ORDER.");
-                processBucketOrder(preOrder, preOrderResponseDTO);
-            } else if (preOrderResponseDTO.getCarts() != null && preOrderResponseDTO.getCarts().size() > 1) {
-                System.out.println("Detected MULTI-VENDOR cart (" + preOrderResponseDTO.getCarts().size() + " carts). Processing as REGULAR ORDER.");
-                processRegularOrder(preOrder, preOrderResponseDTO);
-            } else {
-                System.out.println("Single vendor but no selectedVendorId found. Processing as BUCKET ORDER.");
-                processRegularOrder(preOrder, preOrderResponseDTO);
-            }
-
-
-            preOrderRepository.save(preOrder);
+        if (!isValidate) {
+            validateResponseDTO.setValidate(false);
+            validateResponseDTO.setRazorpayOrderId(orderValidateRequestDTO.getRazorpayOrderId());
+            validateResponseDTO.setRazorpayPaymentId(orderValidateRequestDTO.getRazorpayPaymentId());
+            return validateResponseDTO;
         }
 
-        validateResponseDTO.setValidate(isValidate);
+        // validated by payment gateway
+        PreOrder preOrder = preOrderRepository.findById(orderValidateRequestDTO.getOrderId()).orElse(null);
+        if (preOrder == null) {
+            throw new Exception("PreOrder not found: " + orderValidateRequestDTO.getOrderId());
+        }
+
+        System.out.println("Found PreOrder ID: " + preOrder.getId() + " with payment status: " + preOrder.getPaymentStatus()+ "  OrderType is "+(preOrder.getOrderType() == 1));
+        preOrder.setPaymentStatus("paid");
+
+        Gson gson = new Gson();
+        String payload = preOrder.getOrderType() == 1 ? preOrder.getVendorPayload() : preOrder.getPayload();
+        PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(payload, PreOrderResponseDTO.class);
+        preOrderResponseDTO.setOrderId(preOrder.getId());
+
+        // Ensure address ID preserved
+        if (preOrderResponseDTO.getAddressId() == 0) {
+            preOrderResponseDTO.setAddressId(preOrder.getAddressId());
+        }
+
+
+        if (preOrder.getOrderType() == 1) {
+                System.out.println("Selected Vendor ID found: " + preOrder.getSelectedVendorId() + ". Processing as BUCKET ORDER.");
+            processBucketOrder(preOrder, preOrderResponseDTO);
+        } else if (preOrderResponseDTO.getCarts() != null && preOrderResponseDTO.getCarts().size() > 1) {
+                System.out.println("Detected MULTI-VENDOR cart (" + preOrderResponseDTO.getCarts().size() + " carts). Processing as REGULAR ORDER.");
+            processRegularOrder(preOrder, preOrderResponseDTO);
+        } else {
+                System.out.println("Single vendor but no selectedVendorId found. Processing as BUCKET ORDER.");
+            processRegularOrder(preOrder, preOrderResponseDTO);
+        }
+
+        // IMPORTANT: flush order items so subsequent reads (findById) will see saved items
+        // orderItemRepository is JpaRepository and has flush() through JpaRepository
+        try {
+            orderItemRepository.flush();
+        } catch (Exception e) {
+            // flush may not be necessary in some setups, but best-effort
+            System.out.println("Warning: flush failed: " + e.getMessage());
+        }
+
+        // If front-end passed a prescriptionUrl directly (maybe mobile attached file url), prefer that:
+        if (orderValidateRequestDTO.getPrescriptionUrl() != null && !orderValidateRequestDTO.getPrescriptionUrl().isBlank()) {
+            System.out.println("Prescription URL provided in request -> saving.");
+            saveRxPrescriptionData(preOrder, orderValidateRequestDTO.getPrescriptionUrl());
+        } else {
+            // Try find uploaded attachment(s) and save records
+            // Some clients upload attachment with orderId = preOrderId (as you said). We'll try multiple lookups.
+            List<Attachment> attachmentsByOrder = new ArrayList<>();
+
+            // 1) attachments with order_id = each saved order id (preferred)
+            if (preOrder.getOrders() != null) {
+                for (Order ord : preOrder.getOrders()) {
+                    if (ord.getId() != null) {
+                        List<Attachment> byOrd = attachmentRepository.findByOrderId(ord.getId());
+                        if (byOrd != null && !byOrd.isEmpty()) {
+                            attachmentsByOrder.addAll(byOrd);
+                        }
+                    }
+                }
+            }
+
+            // 2) if nothing, try attachments where order_id == preOrder.id (frontend may have set that)
+            if (attachmentsByOrder.isEmpty()) {
+                List<Attachment> byPreOrderId = attachmentRepository.findByOrderId(preOrder.getId());
+                if (byPreOrderId != null && !byPreOrderId.isEmpty()) {
+                    attachmentsByOrder.addAll(byPreOrderId);
+                }
+            }
+
+            // 3) fallback: attachments uploaded by user (filter description or recency)
+            if (attachmentsByOrder.isEmpty()) {
+                List<Attachment> byUser = attachmentRepository.findByUserId(preOrder.getUserId());
+                if (byUser != null && !byUser.isEmpty()) {
+                    // pick attachments whose description contains PRESCRIPTION or most recent ones
+                    List<Attachment> filtered = byUser.stream()
+                            .filter(a -> a.getDescription() != null && a.getDescription().toLowerCase().contains("prescription"))
+                            .collect(Collectors.toList());
+                    if (!filtered.isEmpty()) attachmentsByOrder.addAll(filtered);
+                    else {
+                        // no explicit description — pick latest 1-2
+                        byUser.sort((a,b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+                        if (!byUser.isEmpty()) attachmentsByOrder.add(byUser.get(0));
+                    }
+                }
+            }
+
+            // If we found attachments, attach them to orders
+            if (attachmentsByOrder.isEmpty()) {
+                System.out.println("❌ No attachments found to save as prescription for PreOrder: " + preOrder.getId());
+            } else {
+                System.out.println("Found attachments: " + attachmentsByOrder.size());
+                // Prefer mapping: for each final Order, find attachments with orderId matching order.id OR preOrderId in order field
+                // We'll call helper that uses order->items to fill medicine_ids
+                saveRxPrescriptionDataUsingAttachments(preOrder, attachmentsByOrder);
+            }
+        }
+
+        // Save preOrder final state
+        preOrderRepository.save(preOrder);
+
+        validateResponseDTO.setValidate(true);
         validateResponseDTO.setRazorpayOrderId(orderValidateRequestDTO.getRazorpayOrderId());
         validateResponseDTO.setRazorpayPaymentId(orderValidateRequestDTO.getRazorpayPaymentId());
         return validateResponseDTO;
     }
+
+
+
+
+    private void saveRxPrescriptionData(PreOrder preOrder, String prescriptionUrl) {
+
+        try {
+
+            if (prescriptionUrl == null || prescriptionUrl.isBlank()) {
+                return;
+            }
+
+            // FINAL ORDERS (already created)
+            List<Order> finalOrders = preOrder.getOrders();
+
+            if (finalOrders == null || finalOrders.isEmpty()) {
+                System.out.println("❌ No final orders found to save prescription.");
+                return;
+            }
+
+            for (Order order : finalOrders) {
+
+                // ⭐⭐ MOST IMPORTANT FIX ⭐⭐
+                // Reload order from DB to ensure orderItems are fetched
+                Order dbOrder = orderRepository.findById(order.getId()).orElse(null);
+
+                if (dbOrder == null) {
+                    continue;
+                }
+
+                List<OrderItem> items = dbOrder.getOrderItems();
+
+                if (items == null || items.isEmpty()) {
+                    System.out.println("❌ OrderItems EMPTY for OrderId: " + order.getId());
+                    continue;
+                }
+
+                // Collect Medicine IDs
+                List<Long> medIds = items.stream()
+                        .map(i -> i.getMedicine().getId())
+                        .toList();
+
+                PrescriptionRecord record = new PrescriptionRecord();
+                record.setUserId(preOrder.getUserId());
+                record.setOrderId(order.getId());
+
+
+
+                record.setPrescriptionUrl(prescriptionUrl);
+                record.setMedicineIds(medIds.toString());
+
+                prescriptionRepository.save(record);
+
+                System.out.println("Prescription saved with medicines: " + medIds);
+
+            }
+
+        } catch (Exception e) {
+            System.out.println("❌ Error saving prescription: " + e.getMessage());
+        }
+    }
+
+
+    private void saveRxPrescriptionDataUsingAttachments(PreOrder preOrder, List<Attachment> attachments) {
+        try {
+            if (attachments == null || attachments.isEmpty()) return;
+
+            // For each final order, try to find attachments that belong to that order (orderId matches),
+            // otherwise use preOrder-level attachments.
+            List<Order> finalOrders = preOrder.getOrders();
+            if (finalOrders == null || finalOrders.isEmpty()) {
+                System.out.println("No final orders to attach prescriptions");
+                return;
+            }
+
+            for (Order order : finalOrders) {
+                Long orderId = order.getId();
+
+                // pick attachments that match this order first, else those matching preOrder id, else user-level ones
+                List<Attachment> chosen = attachments.stream()
+                        .filter(a -> a.getOrderId() != null && a.getOrderId().equals(orderId))
+                        .collect(Collectors.toList());
+
+                if (chosen.isEmpty()) {
+                    chosen = attachments.stream()
+                            .filter(a -> a.getOrderId() != null && a.getOrderId().equals(preOrder.getId()))
+                            .collect(Collectors.toList());
+                }
+
+                if (chosen.isEmpty()) {
+                    // finally pick attachments uploaded by same user (already possibly provided)
+                    chosen = attachments.stream()
+                            .filter(a -> a.getUserId() != null && a.getUserId().equals(preOrder.getUserId()))
+                            .collect(Collectors.toList());
+                }
+
+                if (chosen.isEmpty()) {
+                    System.out.println("No attachment selected for order " + orderId);
+                    continue;
+                }
+
+                // pick latest attachment from chosen
+                chosen.sort((a,b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+                Attachment pick = chosen.get(0);
+                String prescriptionUrl = pick.getFileUrl();
+
+                // RELOAD DB ORDER to ensure orderItems exist (and use orderItemRepository as fallback)
+                Order dbOrder = orderRepository.findById(orderId).orElse(null);
+                List<OrderItem> items = null;
+                if (dbOrder != null) {
+                    items = dbOrder.getOrderItems();
+                }
+                if (items == null || items.isEmpty()) {
+                    // fallback to repo finder
+                    items = orderItemRepository.findByOrderId(orderId);
+                }
+
+                if (items == null || items.isEmpty()) {
+                    System.out.println("❌ No order items for order " + orderId + ", cannot save medicine IDs");
+                    // still save record with URL and preOrder/order mapping so audit exists
+                    PrescriptionRecord rec = new PrescriptionRecord();
+                    rec.setUserId(preOrder.getUserId());
+                    rec.setOrderId(orderId);
+
+                    rec.setPrescriptionUrl(prescriptionUrl);
+                    rec.setMedicineIds("[]");
+                    prescriptionRepository.save(rec);
+                    continue;
+                }
+
+                List<Long> medIds = items.stream()
+                        .map(i -> i.getMedicine().getId())
+                        .collect(Collectors.toList());
+
+                PrescriptionRecord record = new PrescriptionRecord();
+                record.setUserId(preOrder.getUserId());
+                record.setOrderId(orderId);
+
+                record.setPrescriptionUrl(prescriptionUrl);
+                record.setMedicineIds(medIds.toString());
+
+                prescriptionRepository.save(record);
+
+            }
+
+        } catch (Exception e) {
+            System.out.println("Error saving prescriptions: " + e.getMessage());
+        }
+    }
+
+
+
+
+
 
 
     @Override

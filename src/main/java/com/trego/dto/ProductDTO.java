@@ -10,4 +10,7 @@ public class ProductDTO {
     private BigDecimal price;
     private BigDecimal tax;
     private BigDecimal totalPrice;
+    private String description;
+    private String image;
+    private Integer stock;
 }

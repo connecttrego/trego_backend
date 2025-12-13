@@ -100,6 +100,17 @@ public class MedicineServiceImpl implements IMedicineService {
 
     }
 
+
+    @Override
+    public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Long subcategoryId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Medicine> medicines = medicineRepository.findBySubcategoryId(subcategoryId, pageable);
+
+        return convertResponse(medicines);
+    }
+
+
     private Page<MedicineWithStockAndVendorDTO> convertResponse(Page<Medicine> medicines) {
         List<Medicine> tempMedicines = medicines.getContent();
         Page<MedicineWithStockAndVendorDTO> medicineDTOs = medicines.map(medicine -> {

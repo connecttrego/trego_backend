@@ -66,4 +66,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
     List<SubstituteDetailView> findSubstituteByMedicineId(@Param("medicineId") long medicineId);
 //AND m.manufacturer IN ('Abbott', 'Lupin Ltd', 'Dr. Reddy’s Labs')
 
+    Page<Medicine> findBySubcategoryId(Long subcategoryId, Pageable pageable);
+
+
 }
