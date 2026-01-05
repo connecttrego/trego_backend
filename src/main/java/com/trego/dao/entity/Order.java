@@ -86,6 +86,11 @@ public class Order {
     @JoinColumn(name = "pre_order_id")
     private PreOrder preOrder;
 
+    @Column(name = "prescription_url")
+    private String prescriptionUrl;
+
+
+
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();

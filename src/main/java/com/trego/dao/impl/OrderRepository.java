@@ -20,5 +20,19 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT oi FROM OrderItem oi WHERE oi.order.id = :orderId")
     List<OrderItem> findByOrderId(@Param("orderId") Long orderId);
 
+    @Modifying
+    @Transactional
+    @Query(
+            value = "UPDATE orders SET prescription_url = :url WHERE id = :orderId",
+            nativeQuery = true
+    )
+    int updatePrescriptionUrl(
+            @Param("orderId") Long orderId,
+            @Param("url") String url
+    );
+
+
+
+
 
 }

@@ -25,6 +25,10 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
             "WHERE m.name LIKE %:name% AND v.id = :vendorId")
     Page<Medicine> findByNameWithVendorId(String name, long vendorId, Pageable pageable);
 
+    @Query("SELECT m.prescriptionRequired FROM medicines m WHERE m.id = :id")
+    String findPrescriptionRequiredById(@Param("id") Long id);
+
+
     @Query(value = """
         select
             m.id as id,

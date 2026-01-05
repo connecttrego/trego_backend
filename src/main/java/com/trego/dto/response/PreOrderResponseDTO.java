@@ -2,6 +2,7 @@ package com.trego.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.trego.dto.CartDTO;
+import com.trego.dto.MedicineDTO;
 import lombok.Data;
 
 import java.util.List;
@@ -19,5 +20,6 @@ public class PreOrderResponseDTO {
     private double deliveryCharges;
 
     private List<CartResponseDTO> carts;
+
 
 }

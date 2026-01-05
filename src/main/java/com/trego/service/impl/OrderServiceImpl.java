@@ -46,13 +46,14 @@ public class OrderServiceImpl implements IOrderService {
 
 
 
+
     @Autowired
     private OrderRepository orderRepository;
 
     @Autowired
     private OrderItemRepository orderItemRepository;
 
-    @Autowired
+       @Autowired
     private PreOrderRepository preOrderRepository;
 
     @Autowired
@@ -66,9 +67,11 @@ public class OrderServiceImpl implements IOrderService {
     @Autowired
     private VendorRepository vendorRepository;
 
-
     @Autowired
     private MedicineRepository medicineRepository;
+
+
+
 
     @Autowired
     private AddressRepository addressRepository;
@@ -284,8 +287,36 @@ public class OrderServiceImpl implements IOrderService {
         preOrder.setPaymentStatus("paid");
 
         Gson gson = new Gson();
-        String payload = preOrder.getOrderType() == 1 ? preOrder.getVendorPayload() : preOrder.getPayload();
+        String payload = preOrder.getOrderType() == 1
+                ? preOrder.getVendorPayload()
+                : preOrder.getPayload();
+
         PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(payload, PreOrderResponseDTO.class);
+
+
+
+
+        // STEP-1️⃣ Decide prescription URL ONCE
+        String prescriptionUrl = orderValidateRequestDTO.getPrescriptionUrl();
+
+        if (prescriptionUrl == null || prescriptionUrl.isBlank()) {
+            List<Attachment> attachments =
+                    attachmentRepository.findByUserIdAndOrderIdIsNull(preOrder.getUserId());
+
+            if (!attachments.isEmpty()) {
+                attachments.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+                prescriptionUrl = attachments.get(0).getFileUrl();
+            }
+        }
+
+        System.out.println("FINAL prescriptionUrl = " + prescriptionUrl);
+
+
+
+
+
+
+
         preOrderResponseDTO.setOrderId(preOrder.getId());
 
         // Ensure address ID preserved
@@ -296,13 +327,13 @@ public class OrderServiceImpl implements IOrderService {
 
         if (preOrder.getOrderType() == 1) {
                 System.out.println("Selected Vendor ID found: " + preOrder.getSelectedVendorId() + ". Processing as BUCKET ORDER.");
-            processBucketOrder(preOrder, preOrderResponseDTO);
+            processBucketOrder(preOrder, preOrderResponseDTO,prescriptionUrl);
         } else if (preOrderResponseDTO.getCarts() != null && preOrderResponseDTO.getCarts().size() > 1) {
                 System.out.println("Detected MULTI-VENDOR cart (" + preOrderResponseDTO.getCarts().size() + " carts). Processing as REGULAR ORDER.");
-            processRegularOrder(preOrder, preOrderResponseDTO);
+            processRegularOrder(preOrder, preOrderResponseDTO,prescriptionUrl);
         } else {
                 System.out.println("Single vendor but no selectedVendorId found. Processing as BUCKET ORDER.");
-            processRegularOrder(preOrder, preOrderResponseDTO);
+            processRegularOrder(preOrder, preOrderResponseDTO,prescriptionUrl);
         }
 
         // IMPORTANT: flush order items so subsequent reads (findById) will see saved items
@@ -358,17 +389,33 @@ public class OrderServiceImpl implements IOrderService {
                         if (!byUser.isEmpty()) attachmentsByOrder.add(byUser.get(0));
                     }
                 }
-            }
+        }
 
             // If we found attachments, attach them to orders
-            if (attachmentsByOrder.isEmpty()) {
-                System.out.println("❌ No attachments found to save as prescription for PreOrder: " + preOrder.getId());
-            } else {
-                System.out.println("Found attachments: " + attachmentsByOrder.size());
-                // Prefer mapping: for each final Order, find attachments with orderId matching order.id OR preOrderId in order field
-                // We'll call helper that uses order->items to fill medicine_ids
-                saveRxPrescriptionDataUsingAttachments(preOrder, attachmentsByOrder);
+            if (!attachmentsByOrder.isEmpty()) {
+
+                Attachment latest = attachmentsByOrder.get(0);
+                String finalUrl = latest.getFileUrl();
+
+                System.out.println("✅ Updating prescriptionUrl = " + finalUrl);
+
+                for (Order ord : preOrder.getOrders()) {
+
+                    boolean rxRequired = isRxRequiredFromDB(
+                            preOrderResponseDTO.getCarts().stream()
+                                    .filter(c -> c.getVendorId().equals(ord.getVendor().getId()))
+                                    .findFirst()
+                                    .map(CartResponseDTO::getMedicine)
+                                    .orElse(List.of())
+                    );
+
+                    if (rxRequired) {
+                        orderRepository.updatePrescriptionUrl(ord.getId(), finalUrl);
+                        System.out.println("✅ RX URL SAVED for orderId=" + ord.getId());
+                    }
+                }
             }
+
         }
 
         // Save preOrder final state
@@ -378,7 +425,16 @@ public class OrderServiceImpl implements IOrderService {
         validateResponseDTO.setRazorpayOrderId(orderValidateRequestDTO.getRazorpayOrderId());
         validateResponseDTO.setRazorpayPaymentId(orderValidateRequestDTO.getRazorpayPaymentId());
         return validateResponseDTO;
+
+
+
     }
+
+
+
+
+
+
 
 
 
@@ -996,7 +1052,7 @@ public class OrderServiceImpl implements IOrderService {
     }
 
     // Process bucket orders (single vendor)
-    private void processBucketOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO) {
+    private void processBucketOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO,String prescriptionUrl) {
         System.out.println("Processing bucket order for PreOrder ID: " + preOrder.getId());
         if (preOrderResponseDTO.getCarts() != null && !preOrderResponseDTO.getCarts().isEmpty()) {
             System.out.println("Number of carts in bucket order: " + preOrderResponseDTO.getCarts().size());
@@ -1010,46 +1066,66 @@ public class OrderServiceImpl implements IOrderService {
             Order order = populateOrder(preOrderResponseDTO);
             order.setTotalAmount(selectedCart.getAmountToPay());
             order.setDiscount(selectedCart.getDiscount());
-            Vendor vendor = new Vendor();
+        Vendor vendor = new Vendor();
             vendor.setId(selectedCart.getVendorId());
-            order.setVendor(vendor);
-            order.setPreOrder(preOrder);
+        order.setVendor(vendor);
+        order.setPreOrder(preOrder);
+
+            for (MedicineDTO m : selectedCart.getMedicine()) {
+                System.out.println(
+                        "RX CHECK -> medId=" + m.getId() +
+                                ", prescriptionRequired=" + m.getPrescriptionRequired()
+                );
+            }
+
+
+            boolean rxRequired = isRxRequiredFromDB(selectedCart.getMedicine());
+
+            System.out.println(
+                    "RX CHECK | BUCKET | rxRequired=" + rxRequired
+                            + " | prescriptionUrl=" + prescriptionUrl
+            );
+
+
+
+
+
 
             Order savedOrder = orderRepository.save(order);
             System.out.println("Saved order ID: " + savedOrder.getId() + " for vendor ID: " + selectedCart.getVendorId());
             selectedCart.setOrderId(savedOrder.getId());
 
-            preOrder.getOrders().add(savedOrder);
+        preOrder.getOrders().add(savedOrder);
 
             List<OrderItem> orderItems = new ArrayList<>();
             if (selectedCart.getMedicine() != null) {
                 System.out.println("Number of medicines in cart: " + selectedCart.getMedicine().size());
                 for (MedicineDTO medicine : selectedCart.getMedicine()) {
-                    OrderItem item = new OrderItem();
-                    Medicine med = new Medicine();
+            OrderItem item = new OrderItem();
+            Medicine med = new Medicine();
                     med.setId(medicine.getId());
-                    item.setMedicine(med);
+            item.setMedicine(med);
                     item.setQty(medicine.getQty());
                     item.setMrp(medicine.getMrp());
                     item.setSellingPrice(Constants.calculateUnitPrice(medicine.getMrp(), medicine.getDiscount()));
                     item.setAmount(medicine.getMrp() * medicine.getQty());
-                    item.setOrderStatus("pending");
-                    item.setOrder(savedOrder);
+            item.setOrderStatus("pending");
+            item.setOrder(savedOrder);
                     orderItems.add(item);
                 }
             }
             orderItemRepository.saveAll(orderItems);
             System.out.println("Saved " + orderItems.size() + " order items for order ID: " + savedOrder.getId());
 
-            preOrderRepository.save(preOrder);
+        preOrderRepository.save(preOrder);
         } else {
             System.out.println("No carts found in bucket order");
-        }
+    }
     }
 
 
     // Process regular orders (multiple vendors)
-    private void processRegularOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO) {
+    private void processRegularOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO,String prescriptionUrl) {
         System.out.println("Processing regular order for PreOrder ID: " + preOrder.getId());
 
         // ✅ Step added: Calculate cart-wise total and amountToPay before saving orders
@@ -1099,6 +1175,32 @@ public class OrderServiceImpl implements IOrderService {
             order.setVendor(vendor);
             order.setPreOrder(preOrder);
 
+            for (MedicineDTO m : cart.getMedicine()) {
+                System.out.println(
+                        "RX CHECK -> medId=" + m.getId() +
+                                ", prescriptionRequired=" + m.getPrescriptionRequired()
+                );
+            }
+
+
+            boolean rxRequired = isRxRequiredFromDB(cart.getMedicine());
+
+            System.out.println(
+                    "RX CHECK | order vendorId=" + cart.getVendorId()
+                            + " | rxRequired=" + rxRequired
+                            + " | prescriptionUrl=" + prescriptionUrl
+            );
+
+
+
+
+
+
+
+
+
+
+
             // Save order
             Order savedOrder = orderRepository.save(order);
             System.out.println("Saved order ID: " + savedOrder.getId() + " for vendor ID: " + cart.getVendorId());
@@ -1109,17 +1211,17 @@ public class OrderServiceImpl implements IOrderService {
 
             List<OrderItem> orderItems = cart.getMedicine().stream()
                     .map(medicine -> {
-                        OrderItem item = new OrderItem();
-                        Medicine med = new Medicine();
+                OrderItem item = new OrderItem();
+                Medicine med = new Medicine();
                         med.setId(medicine.getId());
-                        item.setMedicine(med);
+                item.setMedicine(med);
                         item.setQty(medicine.getQty());
                         item.setMrp(medicine.getMrp());
                         item.setSellingPrice(Constants.calculateUnitPrice(medicine.getMrp(), medicine.getDiscount()));
                         item.setAmount(medicine.getMrp() * medicine.getQty());
-                        item.setOrderStatus("pending");
-                        item.setOrder(savedOrder);
-                        return item;
+                item.setOrderStatus("pending");
+                item.setOrder(savedOrder);
+                return item;
                     })
                     .collect(Collectors.toList());
 
@@ -1128,8 +1230,48 @@ public class OrderServiceImpl implements IOrderService {
             System.out.println("Saved " + orderItems.size() + " order items for order ID: " + savedOrder.getId());
         });
 
+
+
         // Persist the updated PreOrder (with orders added)
         preOrderRepository.save(preOrder);
+
+
     }
+
+    private boolean isRxRequiredFromDB(List<MedicineDTO> cartMeds) {
+
+        for (MedicineDTO m : cartMeds) {
+
+            Medicine med = medicineRepository.findById(m.getId()).orElse(null);
+
+            System.out.println(
+                    "RX CHECK DB -> medId=" + m.getId() +
+                            " | DB prescriptionRequired=" +
+                            (med != null ? med.getPrescriptionRequired() : "NULL")
+            );
+
+            if (med != null &&
+                    "Prescription Required".equalsIgnoreCase(med.getPrescriptionRequired())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 }

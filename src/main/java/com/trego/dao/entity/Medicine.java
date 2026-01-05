@@ -34,6 +34,7 @@ public class Medicine {
     private String ifMiss;
     private String packing;
     private String packagingType;
+    @Column(name = "prescription_required")
     private String prescriptionRequired;
     private String storage;
     private String useOf;
