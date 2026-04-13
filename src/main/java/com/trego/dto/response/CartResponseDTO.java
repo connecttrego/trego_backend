@@ -16,7 +16,7 @@ public class CartResponseDTO {
     private Long vendorId;
     private BigDecimal totalCartValue;
     private BigDecimal amountToPay;
-    private double discount;
+    private BigDecimal discount;
     private  long orderId;
     private String name;
     private String licence;

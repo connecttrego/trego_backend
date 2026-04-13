@@ -3,16 +3,17 @@ package com.trego.dto.response;
 import com.trego.dto.MedicineDTO;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
 @Data
 public class OrderItemDTO {
-   private  double totalAmount;
+   private  BigDecimal totalAmount;
    private long itemId;
    private  int qty;
-   private double mrp;
-   private double price;
+   private BigDecimal mrp;
+   private BigDecimal price;
    private Map<String, Object> medicine = new HashMap<>();
 
 }

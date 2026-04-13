@@ -30,13 +30,13 @@ public class OrderItem {
     private Integer qty;
 
     @Column(nullable = true)
-    private double mrp;
+    private BigDecimal mrp;
 
     @Column(nullable = true)
-    private double sellingPrice;
+    private BigDecimal sellingPrice;
 
     @Column(nullable = true)
-    private double amount;
+    private BigDecimal amount;
 
     @Column(nullable = true)
     private String thumbnail;

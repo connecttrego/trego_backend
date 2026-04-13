@@ -2,6 +2,7 @@ package com.trego.dao.entity;
 
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import org.checkerframework.checker.units.qual.C;
 
@@ -41,19 +42,20 @@ public class Stock {
     private long id;
     private BigDecimal mrp;
     private BigDecimal discount;
+    @Column(name = "quantity")
     private int qty;
 
     @Column(name = "expiry_date")
-    private String expiryDate;
+    private LocalDate expiryDate;
 
     @ManyToOne
     @JoinColumn(name = "medicine_id")
     @JsonIgnore
     private Medicine medicine;
 
-
-    @ManyToOne
-    @JoinColumn(name = "vendor_id")
-    private Vendor vendor;
+    //TODO: Add vendor details in prices table and link it with vendor table
+    // @ManyToOne
+    // @JoinColumn(name = "vendor_id")
+    private Vendor vendor = null;
 
 }

@@ -1,5 +1,8 @@
 package com.trego.utils;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 public class Constants {
     public static  final String LOGO_BASE_URL = "";
 
@@ -15,7 +18,15 @@ public class Constants {
 
     public static  final String ONLINE_BASE_URL = "";
 
-    public static double calculateUnitPrice(double mrp, double discount) {
-        return mrp - (mrp * discount / 100);
-    }
+    public static BigDecimal calculateUnitPrice(BigDecimal mrp, BigDecimal discount) {
+
+    if (mrp == null) return BigDecimal.ZERO;
+    if (discount == null || discount.compareTo(BigDecimal.ZERO) <= 0) return mrp;
+
+    BigDecimal discountAmount = mrp
+            .multiply(discount)
+            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+    return mrp.subtract(discountAmount);
+}
 }

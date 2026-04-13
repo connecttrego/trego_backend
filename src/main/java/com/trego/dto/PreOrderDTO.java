@@ -13,7 +13,7 @@ public class PreOrderDTO {
     private long addressId;
     private String mobileNo;
     private BigDecimal totalCartValue;
-    private double amountToPay;
+    private BigDecimal amountToPay;
     private double discount;
     private List<CartDTO> carts;
 

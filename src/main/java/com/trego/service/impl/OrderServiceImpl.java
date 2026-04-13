@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -35,15 +36,11 @@ import com.google.gson.JsonObject;
 @Service
 public class OrderServiceImpl implements IOrderService {
 
-
-
     @Autowired
     private PrescriptionRepository prescriptionRepository;
 
     @Autowired
     private AttachmentRepository attachmentRepository;
-
-
 
     @Autowired
     private OrderRepository orderRepository;
@@ -57,14 +54,11 @@ public class OrderServiceImpl implements IOrderService {
     @Autowired
     private UserRepository userRepository;
 
-
     @Autowired
     private StockRepository stockRepository;
 
-
     @Autowired
     private VendorRepository vendorRepository;
-
 
     @Autowired
     private MedicineRepository medicineRepository;
@@ -89,7 +83,8 @@ public class OrderServiceImpl implements IOrderService {
         PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
 
-        // If a specific vendor is selected, filter the carts to only include that vendor
+        // If a specific vendor is selected, filter the carts to only include that
+        // vendor
         if (orderRequest.getSelectedVendorId() != null) {
             System.out.println("Filtering carts for selected vendor ID: " + orderRequest.getSelectedVendorId());
             List<CartResponseDTO> filteredCarts = preOrderResponseDTO.getCarts().stream()
@@ -102,19 +97,26 @@ public class OrderServiceImpl implements IOrderService {
         }
 
         String razorpayOrderId = null;
-        if (StringUtils.isEmpty(preOrder.getRazorpayOrderId()) || !(preOrderResponseDTO.getAmountToPay() > 0 && Double.compare(preOrderResponseDTO.getAmountToPay(), preOrder.getTotalPayAmount()) == 0)) {
+        if (StringUtils.isEmpty(preOrder.getRazorpayOrderId())
+                || preOrderResponseDTO.getAmountToPay() == null
+                || preOrder.getTotalPayAmount() == null
+                || preOrderResponseDTO.getAmountToPay().compareTo(BigDecimal.ZERO) <= 0
+                || preOrderResponseDTO.getAmountToPay()
+                        .compareTo(preOrder.getTotalPayAmount()) != 0) {
+
             razorpayOrderId = createRazorPayOrder(orderRequest, preOrderResponseDTO);
             preOrder.setRazorpayOrderId(razorpayOrderId);
-            
+
             preOrder.setTotalPayAmount(preOrderResponseDTO.getAmountToPay());
             preOrder.setPaymentStatus("unpaid");
             preOrder.setOrderType(0);
             preOrder.setAddressId(orderRequest.getAddressId());
+
             preOrderRepository.save(preOrder);
+
         } else {
             razorpayOrderId = preOrder.getRazorpayOrderId();
         }
-
 
         orderResponseDTO.setRazorpayOrderId(razorpayOrderId);
         orderResponseDTO.setAmountToPay(preOrderResponseDTO.getAmountToPay());
@@ -141,7 +143,8 @@ public class OrderServiceImpl implements IOrderService {
 
         try {
             // Recreate buckets from the original preorder
-            VandorCartResponseDTO vendorCartData = preOrderService.vendorSpecificPrice(bucketOrderRequest.getPreOrderId());
+            VandorCartResponseDTO vendorCartData = preOrderService
+                    .vendorSpecificPrice(bucketOrderRequest.getPreOrderId());
 
             // Check if carts is null and handle it
             if (vendorCartData.getCarts() == null) {
@@ -168,9 +171,9 @@ public class OrderServiceImpl implements IOrderService {
             System.out.println("Selected bucket vendor ID: " + selectedBucket.getVendorId());
 
             // Use the exact amount from the bucket to ensure consistency
-            double bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
-            double bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
-            double originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
+            BigDecimal bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
+            BigDecimal bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
+            BigDecimal originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
 
             // Create a PreOrder entity for the bucket-based orde
             PreOrder preOrder = originalPreOrder;
@@ -179,8 +182,7 @@ public class OrderServiceImpl implements IOrderService {
             preOrder.setTotalPayAmount(bucketAmount);
             preOrder.setModifiedBy("SYSTEM"); // optional if you track modification
             preOrder.setSelectedVendorId(selectedBucket.getVendorId());
-            
-            
+
             // Create a payload with bucket information
             PreOrderResponseDTO preOrderResponseDTO = new PreOrderResponseDTO();
             preOrderResponseDTO.setUserId(bucketOrderRequest.getUserId());
@@ -191,8 +193,8 @@ public class OrderServiceImpl implements IOrderService {
             // For bucket orders, we need to create a cart for the selected vendor only
             CartResponseDTO bucketCart = new CartResponseDTO();
             bucketCart.setVendorId(selectedBucket.getVendorId());
-            bucketCart.setTotalCartValue(new BigDecimal(originalTotal));
-            bucketCart.setAmountToPay(new BigDecimal(bucketAmount));
+            bucketCart.setTotalCartValue((originalTotal));
+            bucketCart.setAmountToPay((bucketAmount));
             bucketCart.setDiscount(bucketDiscount);
 
             // Convert bucket items to medicine DTOs
@@ -207,10 +209,26 @@ public class OrderServiceImpl implements IOrderService {
                     medicineDTO.setDiscount(bucketItem.getDiscount());
                     medicineDTO.setQty(bucketItem.getRequestedQuantity());
                     // Calculate original price before discount
-                    double originalPrice = bucketItem.getDiscount() > 0 ?
-                            bucketItem.getPrice() / (1 - bucketItem.getDiscount() / 100) :
-                            bucketItem.getPrice();
-                    medicineDTO.setActualPrice(new BigDecimal(originalPrice)); // Original price before discount
+                    BigDecimal price = new BigDecimal(bucketItem.getPrice());
+                    BigDecimal discount = bucketItem.getDiscount();
+
+                    BigDecimal originalPrice;
+
+                    if (discount != null && discount.compareTo(BigDecimal.ZERO) > 0) {
+
+                        BigDecimal discountFactor = BigDecimal.ONE.subtract(
+                                discount.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
+
+                        if (discountFactor.compareTo(BigDecimal.ZERO) == 0) {
+                            originalPrice = price; // fallback safety
+                        } else {
+                            originalPrice = price.divide(discountFactor, 2, RoundingMode.HALF_UP);
+                        }
+
+                    } else {
+                        originalPrice = price;
+                    }
+                    medicineDTO.setActualPrice(originalPrice); // Original price before discount
                     medicineDTOs.add(medicineDTO);
                 }
             }
@@ -227,8 +245,8 @@ public class OrderServiceImpl implements IOrderService {
             preOrder.setVendorPayload(payload);
             preOrder.setOrderType(1);
 
-            // Save the preorder 
-            //preOrderRepository.save(preOrder);
+            // Save the preorder
+            // preOrderRepository.save(preOrder);
             System.out.println("Updated existing PreOrder ID: " + preOrder.getId());
 
             // Add the order ID to the response DTO
@@ -254,11 +272,6 @@ public class OrderServiceImpl implements IOrderService {
         return orderResponseDTO;
     }
 
-
-
-
-
-
     @Override
     @Transactional
     public OrderValidateResponseDTO validateOrder(OrderValidateRequestDTO orderValidateRequestDTO) throws Exception {
@@ -279,7 +292,8 @@ public class OrderServiceImpl implements IOrderService {
             throw new Exception("PreOrder not found: " + orderValidateRequestDTO.getOrderId());
         }
 
-        System.out.println("Found PreOrder ID: " + preOrder.getId() + " with payment status: " + preOrder.getPaymentStatus()+ "  OrderType is "+(preOrder.getOrderType() == 1));
+        System.out.println("Found PreOrder ID: " + preOrder.getId() + " with payment status: "
+                + preOrder.getPaymentStatus() + "  OrderType is " + (preOrder.getOrderType() == 1));
         preOrder.setPaymentStatus("paid");
 
         Gson gson = new Gson();
@@ -292,19 +306,21 @@ public class OrderServiceImpl implements IOrderService {
             preOrderResponseDTO.setAddressId(preOrder.getAddressId());
         }
 
-
         if (preOrder.getOrderType() == 1) {
-                System.out.println("Selected Vendor ID found: " + preOrder.getSelectedVendorId() + ". Processing as BUCKET ORDER.");
+            System.out.println(
+                    "Selected Vendor ID found: " + preOrder.getSelectedVendorId() + ". Processing as BUCKET ORDER.");
             processBucketOrder(preOrder, preOrderResponseDTO);
         } else if (preOrderResponseDTO.getCarts() != null && preOrderResponseDTO.getCarts().size() > 1) {
-                System.out.println("Detected MULTI-VENDOR cart (" + preOrderResponseDTO.getCarts().size() + " carts). Processing as REGULAR ORDER.");
+            System.out.println("Detected MULTI-VENDOR cart (" + preOrderResponseDTO.getCarts().size()
+                    + " carts). Processing as REGULAR ORDER.");
             processRegularOrder(preOrder, preOrderResponseDTO);
         } else {
-                System.out.println("Single vendor but no selectedVendorId found. Processing as BUCKET ORDER.");
+            System.out.println("Single vendor but no selectedVendorId found. Processing as BUCKET ORDER.");
             processRegularOrder(preOrder, preOrderResponseDTO);
         }
 
-        // IMPORTANT: flush order items so subsequent reads (findById) will see saved items
+        // IMPORTANT: flush order items so subsequent reads (findById) will see saved
+        // items
         // orderItemRepository is JpaRepository and has flush() through JpaRepository
         try {
             orderItemRepository.flush();
@@ -313,13 +329,16 @@ public class OrderServiceImpl implements IOrderService {
             System.out.println("Warning: flush failed: " + e.getMessage());
         }
 
-        // If front-end passed a prescriptionUrl directly (maybe mobile attached file url), prefer that:
-        if (orderValidateRequestDTO.getPrescriptionUrl() != null && !orderValidateRequestDTO.getPrescriptionUrl().isBlank()) {
+        // If front-end passed a prescriptionUrl directly (maybe mobile attached file
+        // url), prefer that:
+        if (orderValidateRequestDTO.getPrescriptionUrl() != null
+                && !orderValidateRequestDTO.getPrescriptionUrl().isBlank()) {
             System.out.println("Prescription URL provided in request -> saving.");
             saveRxPrescriptionData(preOrder, orderValidateRequestDTO.getPrescriptionUrl());
         } else {
             // Try find uploaded attachment(s) and save records
-            // Some clients upload attachment with orderId = preOrderId (as you said). We'll try multiple lookups.
+            // Some clients upload attachment with orderId = preOrderId (as you said). We'll
+            // try multiple lookups.
             List<Attachment> attachmentsByOrder = new ArrayList<>();
 
             // 1) attachments with order_id = each saved order id (preferred)
@@ -334,7 +353,8 @@ public class OrderServiceImpl implements IOrderService {
                 }
             }
 
-            // 2) if nothing, try attachments where order_id == preOrder.id (frontend may have set that)
+            // 2) if nothing, try attachments where order_id == preOrder.id (frontend may
+            // have set that)
             if (attachmentsByOrder.isEmpty()) {
                 List<Attachment> byPreOrderId = attachmentRepository.findByOrderId(preOrder.getId());
                 if (byPreOrderId != null && !byPreOrderId.isEmpty()) {
@@ -348,13 +368,16 @@ public class OrderServiceImpl implements IOrderService {
                 if (byUser != null && !byUser.isEmpty()) {
                     // pick attachments whose description contains PRESCRIPTION or most recent ones
                     List<Attachment> filtered = byUser.stream()
-                            .filter(a -> a.getDescription() != null && a.getDescription().toLowerCase().contains("prescription"))
+                            .filter(a -> a.getDescription() != null
+                                    && a.getDescription().toLowerCase().contains("prescription"))
                             .collect(Collectors.toList());
-                    if (!filtered.isEmpty()) attachmentsByOrder.addAll(filtered);
+                    if (!filtered.isEmpty())
+                        attachmentsByOrder.addAll(filtered);
                     else {
                         // no explicit description — pick latest 1-2
-                        byUser.sort((a,b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
-                        if (!byUser.isEmpty()) attachmentsByOrder.add(byUser.get(0));
+                        byUser.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+                        if (!byUser.isEmpty())
+                            attachmentsByOrder.add(byUser.get(0));
                     }
                 }
             }
@@ -364,7 +387,8 @@ public class OrderServiceImpl implements IOrderService {
                 System.out.println("❌ No attachments found to save as prescription for PreOrder: " + preOrder.getId());
             } else {
                 System.out.println("Found attachments: " + attachmentsByOrder.size());
-                // Prefer mapping: for each final Order, find attachments with orderId matching order.id OR preOrderId in order field
+                // Prefer mapping: for each final Order, find attachments with orderId matching
+                // order.id OR preOrderId in order field
                 // We'll call helper that uses order->items to fill medicine_ids
                 saveRxPrescriptionDataUsingAttachments(preOrder, attachmentsByOrder);
             }
@@ -378,9 +402,6 @@ public class OrderServiceImpl implements IOrderService {
         validateResponseDTO.setRazorpayPaymentId(orderValidateRequestDTO.getRazorpayPaymentId());
         return validateResponseDTO;
     }
-
-
-
 
     private void saveRxPrescriptionData(PreOrder preOrder, String prescriptionUrl) {
 
@@ -424,8 +445,6 @@ public class OrderServiceImpl implements IOrderService {
                 record.setUserId(preOrder.getUserId());
                 record.setOrderId(order.getId());
 
-
-
                 record.setPrescriptionUrl(prescriptionUrl);
                 record.setMedicineIds(medIds.toString());
 
@@ -440,12 +459,13 @@ public class OrderServiceImpl implements IOrderService {
         }
     }
 
-
     private void saveRxPrescriptionDataUsingAttachments(PreOrder preOrder, List<Attachment> attachments) {
         try {
-            if (attachments == null || attachments.isEmpty()) return;
+            if (attachments == null || attachments.isEmpty())
+                return;
 
-            // For each final order, try to find attachments that belong to that order (orderId matches),
+            // For each final order, try to find attachments that belong to that order
+            // (orderId matches),
             // otherwise use preOrder-level attachments.
             List<Order> finalOrders = preOrder.getOrders();
             if (finalOrders == null || finalOrders.isEmpty()) {
@@ -456,7 +476,8 @@ public class OrderServiceImpl implements IOrderService {
             for (Order order : finalOrders) {
                 Long orderId = order.getId();
 
-                // pick attachments that match this order first, else those matching preOrder id, else user-level ones
+                // pick attachments that match this order first, else those matching preOrder
+                // id, else user-level ones
                 List<Attachment> chosen = attachments.stream()
                         .filter(a -> a.getOrderId() != null && a.getOrderId().equals(orderId))
                         .collect(Collectors.toList());
@@ -480,11 +501,12 @@ public class OrderServiceImpl implements IOrderService {
                 }
 
                 // pick latest attachment from chosen
-                chosen.sort((a,b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+                chosen.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
                 Attachment pick = chosen.get(0);
                 String prescriptionUrl = pick.getFileUrl();
 
-                // RELOAD DB ORDER to ensure orderItems exist (and use orderItemRepository as fallback)
+                // RELOAD DB ORDER to ensure orderItems exist (and use orderItemRepository as
+                // fallback)
                 Order dbOrder = orderRepository.findById(orderId).orElse(null);
                 List<OrderItem> items = null;
                 if (dbOrder != null) {
@@ -528,12 +550,6 @@ public class OrderServiceImpl implements IOrderService {
         }
     }
 
-
-
-
-
-
-
     @Override
     public Page<OrderResponseDTO> fetchAllOrders(Long userId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -559,10 +575,10 @@ public class OrderServiceImpl implements IOrderService {
                         address.getLandmark(),
                         address.getPincode(),
                         address.getLat(),
-                        address.getLng(), address.getUser().getId(), address.getMobileNo(), address.getName(), address.getAddressTypeValue());
+                        address.getLng(), address.getUser().getId(), address.getMobileNo(), address.getName(),
+                        address.getAddressTypeValue());
                 responseDTO.setAddress(addressDTO);
             }
-
 
             responseDTO.setAmountToPay(preOrder.getTotalPayAmount());
             responseDTO.setTotalCartValue(preOrderResponseDTO.getTotalCartValue());
@@ -600,17 +616,20 @@ public class OrderServiceImpl implements IOrderService {
 
         }
         if (!subOrderIds.isEmpty()) {
-            orderRepository.updateOrderStatusAndReason(subOrderIds, "cancelled", request.getReason(), request.getReasonId());
+            orderRepository.updateOrderStatusAndReason(subOrderIds, "cancelled", request.getReason(),
+                    request.getReasonId());
         }
         return new CancelOrderResponseDTO("Orders and sub-orders cancelled successfully", orderIds, subOrderIds);
     }
 
     private List<OrderDTO> populateOrders(PreOrder preOrder) {
-        System.out.println("Populating orders for PreOrder ID: " + preOrder.getId() + " with " + preOrder.getOrders().size() + " orders");
+        System.out.println("Populating orders for PreOrder ID: " + preOrder.getId() + " with "
+                + preOrder.getOrders().size() + " orders");
         List<OrderDTO> orderDTOList = new ArrayList<>();
-// Iterate over orders in PreOrder
+        // Iterate over orders in PreOrder
         preOrder.getOrders().forEach(order -> {
-            System.out.println("Processing order ID: " + order.getId() + " for vendor ID: " + order.getVendor().getId());
+            System.out
+                    .println("Processing order ID: " + order.getId() + " for vendor ID: " + order.getVendor().getId());
             OrderDTO orderDTO = new OrderDTO();
 
             // Populate fields of OrderDTO based on Order entity
@@ -638,7 +657,7 @@ public class OrderServiceImpl implements IOrderService {
 
             // Populate OrderItems list
             List<OrderItemDTO> orderItemsList = new ArrayList<>();
-            double totalAmount = 0.0;
+            BigDecimal totalAmount = new BigDecimal(0);
 
             for (var orderItem : order.getOrderItems()) {
                 OrderItemDTO orderItemDTO = new OrderItemDTO();
@@ -647,7 +666,7 @@ public class OrderServiceImpl implements IOrderService {
                 orderItemDTO.setMrp(orderItem.getMrp());
                 orderItemDTO.setPrice(orderItem.getSellingPrice());
                 orderItemDTO.setTotalAmount(orderItem.getAmount());
-                totalAmount += orderItem.getAmount();
+                totalAmount = totalAmount.add(orderItem.getAmount());
 
                 Map<String, Object> medicineDetails = new HashMap<>();
                 medicineDetails.put("medicineId", orderItem.getMedicine().getId());
@@ -667,7 +686,6 @@ public class OrderServiceImpl implements IOrderService {
 
         return orderDTOList;
     }
-
 
     public boolean verifyRazorPayOrder(OrderValidateRequestDTO orderValidateRequestDTO) throws Exception {
         String keyId = "rzp_test_oZBGm1luIG1Rpl"; // Replace with actual key
@@ -724,13 +742,12 @@ public class OrderServiceImpl implements IOrderService {
         } catch (Exception e) {
             System.err.println("Error while parsing JSON or validating 'id': " + e.getMessage());
 
-
         }
         return isValidate;
     }
 
-
-    public String createRazorPayOrder(OrderRequestDTO orderRequest, PreOrderResponseDTO preOrderResponseDTO) throws Exception {
+    public String createRazorPayOrder(OrderRequestDTO orderRequest, PreOrderResponseDTO preOrderResponseDTO)
+            throws Exception {
         String keyId = "rzp_test_oZBGm1luIG1Rpl"; // Replace with actual key
         String keySecret = "S0Pxnueo7AdCYS2HFIa7LXK6"; // Replace with actual key
         String credentials = keyId + ":" + keySecret;
@@ -740,10 +757,9 @@ public class OrderServiceImpl implements IOrderService {
         // Create a JSON object
         JsonObject jsonObject = new JsonObject();
         // Add fields to the JSON object
-        BigDecimal amount = new BigDecimal(preOrderResponseDTO.getAmountToPay())
+        BigDecimal amount = preOrderResponseDTO.getAmountToPay()
                 .setScale(2, BigDecimal.ROUND_HALF_UP);
         int convertedAmount = amount.multiply(BigDecimal.valueOf(100)).intValue();
-
 
         jsonObject.addProperty("amount", convertedAmount);
         jsonObject.addProperty("currency", "INR");
@@ -790,7 +806,8 @@ public class OrderServiceImpl implements IOrderService {
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
             List<MedicineDTO> medicines = cart.getMedicine().stream()
                     .map(medicine -> {
-                        List<Stock> stockList = stockRepository.findByMedicineIdAndVendorId(medicine.getId(), cart.getVendorId());
+                        List<Stock> stockList = stockRepository.findByMedicineIdAndVendorId(medicine.getId(),
+                                cart.getVendorId());
 
                         return stockList.stream()
                                 .findFirst() // pick first if multiple records exist
@@ -803,9 +820,9 @@ public class OrderServiceImpl implements IOrderService {
             return cart;
         }).collect(Collectors.toList());
 
-        double totalCartValue = getTotalCartValue(cartDTOs);
+        BigDecimal totalCartValue = getTotalCartValue(cartDTOs);
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
-        preOrderResponseDTO.setAmountToPay(totalCartValue - getDiscount(cartDTOs));
+        preOrderResponseDTO.setAmountToPay(totalCartValue.subtract(getDiscount(cartDTOs)));
         preOrderResponseDTO.setCarts(cartDTOs);
     }
 
@@ -830,58 +847,79 @@ public class OrderServiceImpl implements IOrderService {
         return medicineDTO;
     }
 
-    private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
+    private static BigDecimal getTotalCartValue(List<CartResponseDTO> cartDTOs) {
+
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
-                .sum();
+                .map(medicine -> medicine.getMrp()
+                        .multiply(BigDecimal.valueOf(medicine.getQty())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private static double getDiscount(List<CartResponseDTO> cartDTOs) {
+    private static BigDecimal getDiscount(List<CartResponseDTO> cartDTOs) {
+
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .mapToDouble(medicine -> (medicine.getMrp() * medicine.getQty()) * medicine.getDiscount() / 100.0)
-                .sum();
-    }
+                .map(medicine -> {
 
+                    BigDecimal mrp = medicine.getMrp();
+                    BigDecimal qty = BigDecimal.valueOf(medicine.getQty());
+                    BigDecimal discount = medicine.getDiscount();
+
+                    BigDecimal totalPrice = mrp.multiply(qty);
+
+                    return totalPrice
+                            .multiply(discount)
+                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
 
     public PreOrderDTO calculateAmountToPay(PreOrderDTO preOrderResponseDTO) {
+
         List<CartDTO> carts = preOrderResponseDTO.getCarts();
-        double amountToPay = carts.stream()
+
+        BigDecimal amountToPay = carts.stream()
                 .flatMap(cart -> cart.getMedicine().stream()
                         .map(medicine -> {
+
                             long vendorId = cart.getVendorId();
                             long medicineId = medicine.getId();
-                            int qty = medicine.getQty();
+                            BigDecimal qty = BigDecimal.valueOf(medicine.getQty());
 
                             List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
 
                             if (!stocks.isEmpty()) {
-                                // You can decide how to handle multiple results
-                                // Option 1: Take the first one
+
                                 Stock stock = stocks.get(0);
 
-                                double price = stock.getMrp();
-                                double discountPercentage = stock.getDiscount();
-                                double totalCartValue = price * qty;
-                                totalCartValue = totalCartValue - (totalCartValue * discountPercentage / 100.0);
+                                BigDecimal price = stock.getMrp();
+                                BigDecimal discountPercentage = stock.getDiscount();
 
-                                return totalCartValue;
-                            } else {
-                                return 0.0;
+                                BigDecimal totalCartValue = price.multiply(qty);
+
+                                BigDecimal discountAmount = totalCartValue
+                                        .multiply(discountPercentage)
+                                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+                                return totalCartValue.subtract(discountAmount);
                             }
+
+                            return BigDecimal.ZERO;
                         }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         preOrderResponseDTO.setAmountToPay(amountToPay);
+
         return preOrderResponseDTO;
     }
 
     private void calculateTotalCartValue(PreOrderDTO preOrderResponseDTO) {
 
-        double totalCartValue = preOrderResponseDTO.getCarts().stream()
+        BigDecimal totalCartValue = preOrderResponseDTO.getCarts().stream()
                 .flatMap(cart -> cart.getMedicine().stream()
                         .map(medicine -> {
+
                             long vendorId = cart.getVendorId();
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
@@ -889,26 +927,23 @@ public class OrderServiceImpl implements IOrderService {
                             List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
 
                             if (!stocks.isEmpty()) {
+
                                 Stock stock = stocks.get(0);
 
-                                double price = stock.getMrp();
+                                BigDecimal price = stock.getMrp();
                                 medicine.setMrp(price);
-                                double discountPercentage = stock.getDiscount();
-                                double tempTotalCartValue = price * qty;
-                                return tempTotalCartValue;
-                            } else {
-                                return 0.0;
+
+                                return price.multiply(BigDecimal.valueOf(qty));
                             }
 
+                            return BigDecimal.ZERO;
                         }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
-        preOrderResponseDTO.setTotalCartValue(totalCartValue);
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        preOrderResponseDTO.setTotalCartValue(totalCartValue);
     }
 
     private Order populateOrder(PreOrderResponseDTO orderRequest) {
-
 
         Address address = addressRepository.findById(orderRequest.getAddressId()).get();
         Order order = new Order();
@@ -930,7 +965,8 @@ public class OrderServiceImpl implements IOrderService {
         return order;
     }
 
-    public String createRazorPayOrderForBucket(BucketOrderRequestDTO bucketOrderRequest, PreOrderResponseDTO preOrderResponseDTO) throws Exception {
+    public String createRazorPayOrderForBucket(BucketOrderRequestDTO bucketOrderRequest,
+            PreOrderResponseDTO preOrderResponseDTO) throws Exception {
         String keyId = "rzp_test_oZBGm1luIG1Rpl"; // Replace with actual key
         String keySecret = "S0Pxnueo7AdCYS2HFIa7LXK6"; // Replace with actual key
         String credentials = keyId + ":" + keySecret;
@@ -940,10 +976,9 @@ public class OrderServiceImpl implements IOrderService {
         // Create a JSON object
         JsonObject jsonObject = new JsonObject();
         // Add fields to the JSON object
-        BigDecimal amount = new BigDecimal(preOrderResponseDTO.getAmountToPay())
+        BigDecimal amount = preOrderResponseDTO.getAmountToPay()
                 .setScale(2, BigDecimal.ROUND_HALF_UP);
         int convertedAmount = amount.multiply(BigDecimal.valueOf(100)).intValue();
-
 
         jsonObject.addProperty("amount", convertedAmount);
         jsonObject.addProperty("currency", "INR");
@@ -990,7 +1025,8 @@ public class OrderServiceImpl implements IOrderService {
     public boolean isBucketOrder(PreOrder preOrder) {
         // Bucket orders are created by "SYSTEM" and have a single cart
         boolean isBucket = "SYSTEM".equals(preOrder.getCreatedBy());
-        System.out.println("Checking if PreOrder ID: " + preOrder.getId() + " is bucket order. CreatedBy: " + preOrder.getCreatedBy() + ", IsBucket: " + isBucket);
+        System.out.println("Checking if PreOrder ID: " + preOrder.getId() + " is bucket order. CreatedBy: "
+                + preOrder.getCreatedBy() + ", IsBucket: " + isBucket);
         return isBucket;
     }
 
@@ -1015,7 +1051,8 @@ public class OrderServiceImpl implements IOrderService {
             order.setPreOrder(preOrder);
 
             Order savedOrder = orderRepository.save(order);
-            System.out.println("Saved order ID: " + savedOrder.getId() + " for vendor ID: " + selectedCart.getVendorId());
+            System.out
+                    .println("Saved order ID: " + savedOrder.getId() + " for vendor ID: " + selectedCart.getVendorId());
             selectedCart.setOrderId(savedOrder.getId());
 
             preOrder.getOrders().add(savedOrder);
@@ -1031,7 +1068,9 @@ public class OrderServiceImpl implements IOrderService {
                     item.setQty(medicine.getQty());
                     item.setMrp(medicine.getMrp());
                     item.setSellingPrice(Constants.calculateUnitPrice(medicine.getMrp(), medicine.getDiscount()));
-                    item.setAmount(medicine.getMrp() * medicine.getQty());
+                    item.setAmount(
+                            medicine.getMrp()
+                                    .multiply(BigDecimal.valueOf(medicine.getQty())));
                     item.setOrderStatus("pending");
                     item.setOrder(savedOrder);
                     orderItems.add(item);
@@ -1046,32 +1085,37 @@ public class OrderServiceImpl implements IOrderService {
         }
     }
 
-
     // Process regular orders (multiple vendors)
     private void processRegularOrder(PreOrder preOrder, PreOrderResponseDTO preOrderResponseDTO) {
         System.out.println("Processing regular order for PreOrder ID: " + preOrder.getId());
 
         // ✅ Step added: Calculate cart-wise total and amountToPay before saving orders
         for (CartResponseDTO cart : preOrderResponseDTO.getCarts()) {
-            double totalCartValue = 0.0;
-            double totalDiscount = 0.0;
+            BigDecimal totalCartValue = BigDecimal.ZERO;
+            BigDecimal totalDiscount = BigDecimal.ZERO;
 
             if (cart.getMedicine() != null) {
                 for (var med : cart.getMedicine()) {
-                    double price = med.getMrp();
-                    int qty = med.getQty();
-                    double discount = med.getDiscount();
 
-                    totalCartValue += price * qty;
-                    totalDiscount += (price * qty * discount / 100.0);
+                    BigDecimal price = med.getMrp();
+                    BigDecimal qty = BigDecimal.valueOf(med.getQty());
+                    BigDecimal discount = med.getDiscount();
+
+                    BigDecimal itemTotal = price.multiply(qty);
+
+                    BigDecimal itemDiscount = itemTotal
+                            .multiply(discount)
+                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+                    totalCartValue = totalCartValue.add(itemTotal);
+                    totalDiscount = totalDiscount.add(itemDiscount);
                 }
             }
 
-            double amountToPay = totalCartValue - totalDiscount;
+            BigDecimal amountToPay = totalCartValue.subtract(totalDiscount);
             cart.setTotalCartValue(totalCartValue);
             cart.setDiscount(totalDiscount);
             cart.setAmountToPay(amountToPay);
-
 
         }
 
@@ -1115,7 +1159,7 @@ public class OrderServiceImpl implements IOrderService {
                         item.setQty(medicine.getQty());
                         item.setMrp(medicine.getMrp());
                         item.setSellingPrice(Constants.calculateUnitPrice(medicine.getMrp(), medicine.getDiscount()));
-                        item.setAmount(medicine.getMrp() * medicine.getQty());
+                        item.setAmount(medicine.getMrp().multiply(BigDecimal.valueOf(medicine.getQty())));
                         item.setOrderStatus("pending");
                         item.setOrder(savedOrder);
                         return item;

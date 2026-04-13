@@ -3,6 +3,7 @@ package com.trego.dao.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,7 +32,7 @@ public class PreOrder {
     private Integer orderType;
 
     @Column(nullable = true, name = "total_pay_amount")
-    private double totalPayAmount;
+    private BigDecimal totalPayAmount;
 
     @Column(name = "payment_status", nullable = true)
     private String paymentStatus;

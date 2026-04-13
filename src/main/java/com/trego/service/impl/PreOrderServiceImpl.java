@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -225,11 +226,11 @@ public class PreOrderServiceImpl implements IPreOrderService {
             return cart;
         }).collect(Collectors.toList());
 
-        double totalCartValue = getTotalCartValue(cartDTOs);
-        double deliveryCharges = 0;
+        BigDecimal totalCartValue = getTotalCartValue(cartDTOs);
+        BigDecimal deliveryCharges = BigDecimal.ZERO;
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
         preOrderResponseDTO.setDeliveryCharges(deliveryCharges);
-        preOrderResponseDTO.setAmountToPay(totalCartValue - getDiscount(cartDTOs) + deliveryCharges);
+        preOrderResponseDTO.setAmountToPay(totalCartValue.subtract(getDiscount(cartDTOs)).add(deliveryCharges));
         preOrderResponseDTO.setCarts(cartDTOs);
     }
 
@@ -271,55 +272,73 @@ public class PreOrderServiceImpl implements IPreOrderService {
         unavailableMedicine.setDiscount(new BigDecimal(0));
         unavailableMedicine.setQty(0);
         unavailableMedicine.setActualPrice(new BigDecimal(0));
-        unavailableMedicine.setExpiryDate("Not Available");
+        unavailableMedicine.setExpiryDate(null);
 
         return unavailableMedicine;
     }
 
-    private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
+    private static BigDecimal getTotalCartValue(List<CartResponseDTO> cartDTOs) {
+
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .mapToDouble(medicine -> medicine.getMrp().multiply(new BigDecimal(medicine.getQty())).doubleValue())
-                .sum();
+                .map(medicine -> medicine.getMrp()
+                        .multiply(BigDecimal.valueOf(medicine.getQty())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private static double getDiscount(List<CartResponseDTO> cartDTOs) {
+    private static BigDecimal getDiscount(List<CartResponseDTO> cartDTOs) {
+
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .mapToDouble(medicine -> medicine.getMrp().multiply(new BigDecimal(medicine.getQty()))
-                        .multiply(medicine.getDiscount()).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP)
-                        .doubleValue())
-                .sum();
+                .map(medicine -> {
+
+                    BigDecimal totalPrice = medicine.getMrp()
+                            .multiply(BigDecimal.valueOf(medicine.getQty()));
+
+                    return totalPrice
+                            .multiply(medicine.getDiscount())
+                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public PreOrderDTO calculateAmountToPay(PreOrderDTO preOrderResponseDTO) {
+
         List<CartDTO> carts = preOrderResponseDTO.getCarts();
-        double amountToPay = carts.stream()
+
+        BigDecimal amountToPay = carts.stream()
                 .flatMap(cart -> cart.getMedicine().stream()
                         .map(medicine -> {
+
                             long vendorId = cart.getVendorId();
                             long medicineId = medicine.getId();
-                            int qty = medicine.getQty();
+                            BigDecimal qty = BigDecimal.valueOf(medicine.getQty());
 
-                            // Use the new method that returns a List to handle multiple stocks
                             List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId,
                                     vendorId);
+
                             if (!stocks.isEmpty()) {
+
                                 Stock stock = stocks.get(0);
+
                                 BigDecimal price = stock.getMrp();
                                 BigDecimal discountPercentage = stock.getDiscount();
-                                BigDecimal totalCartValue = price.multiply(new BigDecimal(qty));
-                                totalCartValue = totalCartValue.subtract(totalCartValue.multiply(discountPercentage)
-                                        .divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP));
 
-                                return totalCartValue.doubleValue();
-                            } else {
-                                return 0.0;
+                                BigDecimal totalCartValue = price.multiply(qty);
+
+                                BigDecimal discountAmount = totalCartValue
+                                        .multiply(discountPercentage)
+                                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+                                return totalCartValue.subtract(discountAmount);
                             }
+
+                            return BigDecimal.ZERO;
                         }))
-                .mapToDouble(Double::doubleValue) // Map to double for summing
-                .sum(); // Calculate total value
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         preOrderResponseDTO.setAmountToPay(amountToPay);
+
         return preOrderResponseDTO;
     }
 

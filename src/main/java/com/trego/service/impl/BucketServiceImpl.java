@@ -111,7 +111,7 @@ public class BucketServiceImpl implements IBucketService {
             }
         }
         // Sort buckets by total price
-        buckets.sort(Comparator.comparingDouble(BucketDTO::getAmountToPay));
+        buckets.sort(Comparator.comparing(BucketDTO::getAmountToPay));
         return buckets;
     }
 
@@ -236,7 +236,7 @@ public class BucketServiceImpl implements IBucketService {
         buckets.sort(Comparator
                 .comparingInt((BucketDTO b) -> b.getAvailableItems().size())   // 1. by item count
                 .reversed()                                                    // 2. max first
-                .thenComparingDouble(BucketDTO::getAmountToPay));              // 3. by amountToPay if tie
+                .thenComparing(BucketDTO::getAmountToPay));              // 3. by amountToPay if tie
 
         System.out.println("Buckets sorted by available items count (desc) and amountToPay (asc)");
 
@@ -267,9 +267,9 @@ public class BucketServiceImpl implements IBucketService {
         List<BucketItemDTO> availableItems = new ArrayList<>();
         List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
         String deliveryTime = "1 hrs extra";
-        double totalPrice = 0.0;
-        double deliveryCharges = 0.0;
-        double totalDiscount = 0.0; // Track total discount
+        BigDecimal totalPrice = BigDecimal.ZERO;
+        BigDecimal deliveryCharges = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO; // Track total discount
 
         // Process available medicines
         for (Medicine medicine : medicines) {
@@ -307,10 +307,10 @@ public class BucketServiceImpl implements IBucketService {
                     item.setTotalPrice(itemTotalPrice);
 
                     availableItems.add(item);
-                    totalPrice += itemTotalPrice;
+                    totalPrice = totalPrice.add(new BigDecimal(itemTotalPrice));
                     // Calculate discount amount for this item and add to total discount
-                    double itemDiscountAmount =itemTotalPrice - itemDiscountedPrice;
-                    totalDiscount += itemDiscountAmount;
+                    BigDecimal itemDiscountAmount = new BigDecimal(itemTotalPrice).subtract(new BigDecimal(itemDiscountedPrice));
+                    totalDiscount = totalDiscount.add(itemDiscountAmount);
 
                     System.out.println("Added item to bucket - total price so far: " + totalPrice + ", total discount so far: " + totalDiscount);
                 } else {
@@ -382,7 +382,7 @@ public class BucketServiceImpl implements IBucketService {
         bucket.setDeliveryTime(deliveryTime);
         bucket.setTotalDiscount(totalDiscount); // Set the total discount
         bucket.setDeliveryCharges(deliveryCharges);
-        double amountToPay = totalPrice - totalDiscount + deliveryCharges;
+        BigDecimal amountToPay = totalPrice.subtract(totalDiscount).add(deliveryCharges);
         bucket.setAmountToPay(amountToPay);
         System.out.println("Returning vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
         return bucket;
@@ -410,9 +410,9 @@ public class BucketServiceImpl implements IBucketService {
         List<UnavailableMedicineDTO> unavailableItems = new ArrayList<>();
         List<SelectedSubstituteDTO> selectedSubstitutes = new ArrayList<>(); // Track selected substitutes
         String deliveryTime = "1 hrs extra";
-        double totalPrice = 0.0;
-        double deliveryCharges = 0.0;
-        double totalDiscount = 0.0; // Track total discount
+        BigDecimal totalPrice = BigDecimal.ZERO;
+        BigDecimal deliveryCharges = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO; // Track total discount
 
         // Process available medicines
         for (Medicine medicine : medicines) {
@@ -461,10 +461,10 @@ public class BucketServiceImpl implements IBucketService {
                     item.setTotalPrice(itemTotalPrice);
 
                     availableItems.add(item);
-                    totalPrice += itemTotalPrice;
+                    totalPrice = totalPrice.add(new BigDecimal(itemTotalPrice));
                     // Calculate discount amount for this item and add to total discount
-                    double itemDiscountAmount = (stock.getMrp().multiply(stock.getDiscount()).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP)).doubleValue() * requestedQuantity;
-                    totalDiscount += itemDiscountAmount;
+                    BigDecimal itemDiscountAmount = stock.getMrp().multiply(stock.getDiscount()).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP).multiply(new BigDecimal(requestedQuantity));
+                    totalDiscount = totalDiscount.add(itemDiscountAmount);
 
                     System.out.println("Added item to bucket - total price so far: " + totalPrice + ", total discount so far: " + totalDiscount);
                 } else {
@@ -554,7 +554,7 @@ public class BucketServiceImpl implements IBucketService {
         bucket.setDeliveryTime(deliveryTime);
         bucket.setTotalDiscount(totalDiscount); // Set the total discount
         bucket.setDeliveryCharges(deliveryCharges);
-        double amountToPay = totalPrice - totalDiscount + deliveryCharges;
+        BigDecimal amountToPay = totalPrice.subtract(totalDiscount).add(deliveryCharges);
         bucket.setAmountToPay(amountToPay);
         System.out.println("Returning vendor bucket with total price: " + totalPrice + ", total discount: " + totalDiscount);
         return bucket;
@@ -591,10 +591,10 @@ public class BucketServiceImpl implements IBucketService {
         bucket.getSelectedSubstitutes().add(selectedSubstitute);
         
         // Update bucket totals
-        bucket.setTotalPrice(bucket.getTotalPrice() + totalPrice);
-        double discountAmount = (substitute.getBestPrice().doubleValue() * substitute.getDiscount().doubleValue() / 100) * quantity;
-        bucket.setTotalDiscount(bucket.getTotalDiscount() + discountAmount);
-        bucket.setAmountToPay(bucket.getTotalPrice() - bucket.getTotalDiscount() + bucket.getDeliveryCharges());
+        bucket.setTotalPrice(bucket.getTotalPrice().add(new BigDecimal(totalPrice)));
+        BigDecimal discountAmount = substitute.getBestPrice().multiply(substitute.getDiscount()).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP).multiply(new BigDecimal(quantity));
+        bucket.setTotalDiscount(bucket.getTotalDiscount().add(discountAmount));
+        bucket.setAmountToPay(bucket.getTotalPrice().subtract(bucket.getTotalDiscount()).add(bucket.getDeliveryCharges()));
         
         System.out.println("Updated bucket - total price: " + bucket.getTotalPrice() + 
                           ", total discount: " + bucket.getTotalDiscount() + 
@@ -625,10 +625,10 @@ public class BucketServiceImpl implements IBucketService {
             bucket.getSelectedSubstitutes().remove(substituteToRemove);
             
             // Update bucket totals
-            bucket.setTotalPrice(bucket.getTotalPrice() - substituteToRemove.getTotalPrice());
-            double discountAmount = (substituteToRemove.getUnitPrice() * substituteToRemove.getDiscount() / 100) * substituteToRemove.getQuantity();
-            bucket.setTotalDiscount(bucket.getTotalDiscount() - discountAmount);
-            bucket.setAmountToPay(bucket.getTotalPrice() - bucket.getTotalDiscount() + bucket.getDeliveryCharges());
+            bucket.setTotalPrice(bucket.getTotalPrice().subtract(new BigDecimal(substituteToRemove.getTotalPrice())));
+            BigDecimal discountAmount = new BigDecimal(substituteToRemove.getUnitPrice() * substituteToRemove.getDiscount() / 100).multiply(new BigDecimal(substituteToRemove.getQuantity()));
+            bucket.setTotalDiscount(bucket.getTotalDiscount().subtract(discountAmount));
+            bucket.setAmountToPay(bucket.getTotalPrice().subtract(bucket.getTotalDiscount()).add(bucket.getDeliveryCharges()));
             
             System.out.println("Updated bucket - total price: " + bucket.getTotalPrice() + 
                               ", total discount: " + bucket.getTotalDiscount() + 

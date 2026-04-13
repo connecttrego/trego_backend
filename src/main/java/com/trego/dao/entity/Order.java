@@ -27,10 +27,10 @@ public class Order {
     private Vendor vendor;
 
     @Column(nullable = false)
-    private double totalAmount;
+    private BigDecimal totalAmount;
 
     @Column(nullable = false)
-    private double discount;
+    private BigDecimal discount;
 
     @Column(nullable = false)
     private String address;

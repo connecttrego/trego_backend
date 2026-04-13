@@ -6,6 +6,9 @@ import com.trego.dto.response.PreOrderResponseDTO;
 import com.trego.dto.response.VandorCartResponseDTO;
 import com.trego.exception.InvalidAmountException;
 import com.trego.service.IPreOrderService;
+
+import java.math.BigDecimal;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +24,10 @@ public class PreOrderController {
     @PostMapping
     public PreOrderResponseDTO createPreOrder(@RequestBody PreOrderDTO preOrder) {
 
-        PreOrderResponseDTO  preOrderResponseDTO = preOrderService.savePreOrder(preOrder);
-        if(preOrderResponseDTO.getAmountToPay() == 0.0){
+        PreOrderResponseDTO preOrderResponseDTO = preOrderService.savePreOrder(preOrder);
+        if (preOrderResponseDTO.getAmountToPay() == null ||
+                preOrderResponseDTO.getAmountToPay().compareTo(BigDecimal.ZERO) <= 0) {
+
             throw new InvalidAmountException("Amount to pay must be greater than zero.");
         }
         return preOrderResponseDTO;
@@ -35,7 +40,7 @@ public class PreOrderController {
 
     @GetMapping("/vendorspecificcarts/order/{orderId}")
     public VandorCartResponseDTO vendorSpecificPrice(@PathVariable long orderId) {
-        return preOrderService.vendorSpecificPrice( orderId);
+        return preOrderService.vendorSpecificPrice(orderId);
     }
 
 }

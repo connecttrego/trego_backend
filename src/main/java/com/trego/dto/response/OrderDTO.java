@@ -5,6 +5,7 @@ import com.trego.dao.entity.Vendor;
 import com.trego.dto.VendorDTO;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -13,8 +14,8 @@ public class OrderDTO {
 
 
     private long  orderId;
-    private double totalAmount;
-    private double discount;
+    private BigDecimal totalAmount;
+    private BigDecimal discount;
     private String orderStatus;
     private String paymentStatus;
     private String address;
