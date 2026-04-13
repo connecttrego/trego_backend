@@ -28,7 +28,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import com.google.gson.JsonObject;
@@ -192,8 +191,8 @@ public class OrderServiceImpl implements IOrderService {
             // For bucket orders, we need to create a cart for the selected vendor only
             CartResponseDTO bucketCart = new CartResponseDTO();
             bucketCart.setVendorId(selectedBucket.getVendorId());
-            bucketCart.setTotalCartValue(originalTotal);
-            bucketCart.setAmountToPay(bucketAmount);
+            bucketCart.setTotalCartValue(new BigDecimal(originalTotal));
+            bucketCart.setAmountToPay(new BigDecimal(bucketAmount));
             bucketCart.setDiscount(bucketDiscount);
 
             // Convert bucket items to medicine DTOs

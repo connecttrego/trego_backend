@@ -7,14 +7,15 @@ import com.trego.dto.MedicinePreOrderDTO;
 import com.trego.dto.VendorDTO;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CartResponseDTO {
     private Long vendorId;
-    private double totalCartValue;
-    private double amountToPay;
+    private BigDecimal totalCartValue;
+    private BigDecimal amountToPay;
     private double discount;
     private  long orderId;
     private String name;

@@ -14,6 +14,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -73,14 +75,14 @@ public class MainServiceImpl implements IMainService {
         // Convert Banner entities to BannerDTOs and append base path
         mainDTO.setMiddleBanners(middleBannerDTOs);
 
-
         mainDTO.setOffLineTopVendor(getTopOfflineVendors("retail"));
         mainDTO.setOnLineTopVendor(getTopOfflineVendors("online"));
 
-        //mainDTO.setOffLineTopVendor(getTopVendors("retail"));
-        //mainDTO.setOnLineTopVendor(getTopVendors("online"));
+        // mainDTO.setOffLineTopVendor(getTopVendors("retail"));
+        // mainDTO.setOnLineTopVendor(getTopVendors("online"));
 
-        mainDTO.setSubCategories(masterService.loadCategoriesByType("")); // Load all categories instead of just medicine categories
+        mainDTO.setSubCategories(masterService.loadCategoriesByType("")); // Load all categories instead of just
+                                                                          // medicine categories
         return mainDTO;
     }
 
@@ -111,17 +113,27 @@ public class MainServiceImpl implements IMainService {
                 medDTO.setMedicineType(med.getMedicineType());
                 medDTO.setUseOf(med.getUseOf());
                 medDTO.setPhoto1(med.getPhoto1());
-                //medDTO.setSalesCount(salesCount.intValue());
+                // medDTO.setSalesCount(salesCount.intValue());
 
-                System.out.println("vendorId "+vendorId+"  medicineId "+medicineId);
-                // Get stock info - Use the new method that returns a List to handle multiple stocks
+                System.out.println("vendorId " + vendorId + "  medicineId " + medicineId);
+                // Get stock info - Use the new method that returns a List to handle multiple
+                // stocks
                 List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
                 if (!stocks.isEmpty()) {
                     Stock stock = stocks.get(0);
+
+                    BigDecimal mrp = stock.getMrp();
+                    BigDecimal discount = stock.getDiscount();
+
+                    BigDecimal discountAmount = mrp
+                            .multiply(discount)
+                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+                    medDTO.setOfferedPrice(mrp.subtract(discountAmount));
+
                     medDTO.setMrp(stock.getMrp());
                     medDTO.setDiscount(stock.getDiscount());
                     medDTO.setQty(stock.getQty());
-                    medDTO.setOfferedPrice(stock.getMrp() - (stock.getMrp() * stock.getDiscount() / 100));
                 }
 
                 vendor.getMedicines().add(medDTO);
@@ -131,8 +143,6 @@ public class MainServiceImpl implements IMainService {
         // pick top 5 vendors
         return vendorMap.values().stream().limit(5).toList();
     }
-
-
 
     private List<VendorDTO> getTopVendors(String type) {
         // Get all vendors
@@ -164,7 +174,7 @@ public class MainServiceImpl implements IMainService {
             // Add to both lists if less than 5 vendors in each list
             if (topOfflineVendors.size() < 5) {
                 topOfflineVendors.add(vendorDTO);
-                //topOnlineVendors.add(vendorDTO);
+                // topOnlineVendors.add(vendorDTO);
             }
         }
         return topOfflineVendors;
@@ -189,7 +199,8 @@ public class MainServiceImpl implements IMainService {
         int count = 0;
         List<MedicineDTO> medicineDTOList = new ArrayList<>();
 
-        // Sort stocks based on sales count (highest first), then by stock ID as fallback
+        // Sort stocks based on sales count (highest first), then by stock ID as
+        // fallback
         stocks.sort((s1, s2) -> {
             Long medicineId1 = s1.getMedicine().getId();
             Long medicineId2 = s2.getMedicine().getId();

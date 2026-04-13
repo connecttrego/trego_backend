@@ -21,6 +21,7 @@ import com.trego.service.ISubstituteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -301,7 +302,7 @@ public class BucketServiceImpl implements IBucketService {
                     item.setDiscount(stock.getDiscount());
                     item.setAvailableQuantity(stock.getQty());
                     item.setRequestedQuantity(requestedQuantity);
-                    double itemTotalPrice = calculateTotalPrice(stock.getMrp(), 0, requestedQuantity);
+                    double itemTotalPrice = calculateTotalPrice(stock.getMrp(), new BigDecimal(0), requestedQuantity);
                     double itemDiscountedPrice = calculateTotalPrice(stock.getMrp(), stock.getDiscount(), requestedQuantity);
                     item.setTotalPrice(itemTotalPrice);
 
@@ -462,7 +463,7 @@ public class BucketServiceImpl implements IBucketService {
                     availableItems.add(item);
                     totalPrice += itemTotalPrice;
                     // Calculate discount amount for this item and add to total discount
-                    double itemDiscountAmount = (stock.getMrp() * stock.getDiscount() / 100) * requestedQuantity;
+                    double itemDiscountAmount = (stock.getMrp().multiply(stock.getDiscount()).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP)).doubleValue() * requestedQuantity;
                     totalDiscount += itemDiscountAmount;
 
                     System.out.println("Added item to bucket - total price so far: " + totalPrice + ", total discount so far: " + totalDiscount);
@@ -581,7 +582,7 @@ public class BucketServiceImpl implements IBucketService {
         selectedSubstitute.setDiscount(substitute.getDiscount().doubleValue());
         
         // Calculate total price for this substitute
-        double totalPrice = calculateTotalPrice(substitute.getBestPrice().doubleValue(), substitute.getDiscount().doubleValue(), quantity);
+        double totalPrice = calculateTotalPrice(substitute.getBestPrice(), substitute.getDiscount(), quantity);
         selectedSubstitute.setTotalPrice(totalPrice);
         selectedSubstitute.setMedicineImage(substitute.getPhoto1());
         selectedSubstitute.setMedicineStrip(substitute.getPacking());
@@ -1020,14 +1021,15 @@ public class BucketServiceImpl implements IBucketService {
 //        return null;
 //    }
 
-    private double calculateUnitPrice(double mrp, double discount) {
-        return mrp - (mrp * discount / 100);
+    private double calculateUnitPrice(BigDecimal mrp, BigDecimal discount) {
+        return mrp.subtract(mrp.multiply(discount).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP)).doubleValue();
     }
 
-    private double calculateTotalPrice(double mrp, double discount, int quantity) {
+    private double calculateTotalPrice(BigDecimal mrp, BigDecimal discount, int quantity) {
         double unitPrice = calculateUnitPrice(mrp, discount);
         return unitPrice * quantity;
     }
+    
 
     @Override
     public List<BucketDTO> getAllBuckets() {

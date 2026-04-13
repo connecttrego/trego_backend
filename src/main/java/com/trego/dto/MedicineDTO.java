@@ -3,6 +3,7 @@ package com.trego.dto;
 import com.trego.dao.entity.Stock;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -39,13 +40,13 @@ public class MedicineDTO {
 
     private List<Stock> offLineStocks;
     private List<Stock> onLineStocks;
-    private double mrp;
-    private double discount;
+    private BigDecimal mrp;
+    private BigDecimal discount;
     private int qty;
     private String expiryDate;
-    private Double actualPrice;
+    private BigDecimal actualPrice;
     private String image;
     private String strip;
-    private Double offeredPrice;
+    private BigDecimal offeredPrice;
     private Long salesCount; // Added field for sales count
 }
