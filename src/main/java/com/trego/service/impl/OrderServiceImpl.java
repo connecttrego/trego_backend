@@ -203,14 +203,14 @@ public class OrderServiceImpl implements IOrderService {
                     medicineDTO.setId(bucketItem.getMedicineId());
                     medicineDTO.setName(bucketItem.getMedicineName());
                     medicineDTO.setStrip(bucketItem.getMedicineStrip());
-                    medicineDTO.setMrp(bucketItem.getPrice()); // Discounted price
+                    medicineDTO.setMrp(new BigDecimal(bucketItem.getPrice())); // Discounted price
                     medicineDTO.setDiscount(bucketItem.getDiscount());
                     medicineDTO.setQty(bucketItem.getRequestedQuantity());
                     // Calculate original price before discount
                     double originalPrice = bucketItem.getDiscount() > 0 ?
                             bucketItem.getPrice() / (1 - bucketItem.getDiscount() / 100) :
                             bucketItem.getPrice();
-                    medicineDTO.setActualPrice(originalPrice); // Original price before discount
+                    medicineDTO.setActualPrice(new BigDecimal(originalPrice)); // Original price before discount
                     medicineDTOs.add(medicineDTO);
                 }
             }
