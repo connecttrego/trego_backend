@@ -11,7 +11,7 @@ import java.util.List;
 
 
 @Data
-@Entity(name = "users")
+@Entity(name = "app_users")
 public class User {
 
     @Id
@@ -42,6 +42,16 @@ public class User {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 
     // One-to-many relationship with Address (can be changed to One-to-One if needed)
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
