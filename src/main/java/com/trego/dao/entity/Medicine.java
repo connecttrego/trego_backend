@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.List;
+
 @Data
 @Entity(name = "vendor_medicine")
 public class Medicine {
@@ -12,10 +13,11 @@ public class Medicine {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "medicine_id")
+    @Column(name = "vendor_medicine_id")
     private long id;
     private String name;
     @Column(columnDefinition = "LONGTEXT")
+
     private String manufacturer;
     private String saltComposition;
     @Column(name = "subcategory_id")
@@ -41,6 +43,7 @@ public class Medicine {
     private String alcoholInteraction;
     private String pregnancyInteraction;
     private String lactationInteraction;
+
     private String drivingInteraction;
     private String kidneyInteraction;
     private String liverInteraction;

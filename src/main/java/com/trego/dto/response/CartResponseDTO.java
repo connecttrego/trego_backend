@@ -22,9 +22,9 @@ public class CartResponseDTO {
     private String gstNumber;
    // private String address;
     private String logo;
-    private String lat;
-    private String lng;
-    private String deliveryTime;
+    private BigDecimal lat;
+    private BigDecimal lng;
+    private Integer deliveryTime;
     private String reviews;
     private String rating;
 

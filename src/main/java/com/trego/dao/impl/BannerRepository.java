@@ -12,6 +12,6 @@ public interface BannerRepository extends JpaRepository<Banner, Long> {
 
     List<Banner> findByPosition(String position);
 
-    List<Banner> findByPositionAndVendorId(String position, Long vendorId);
+    List<Banner> findByPositionAndVendorId(String position, Integer vendorId);
 
 }

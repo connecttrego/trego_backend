@@ -142,11 +142,11 @@ public class PreOrderServiceImpl implements IPreOrderService {
             if (vendor != null) {
                 cart.setVendorId(vendor.getId());
                 cart.setName(vendor.getName());
-                if (vendor.getCategory().equalsIgnoreCase("retail")) {
-                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL + vendor.getLogo());
-                } else {
-                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL + vendor.getLogo());
-                }
+//                if (vendor.getCategory().equalsIgnoreCase("retail")) {
+//                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL + vendor.getLogo());
+//                } else {
+//                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL + vendor.getLogo());
+//                }
                 cart.setGstNumber(vendor.getGistin());
                 cart.setLicence(vendor.getDruglicense());
                 // cart.setAddress(vendor.getAddress());
@@ -210,11 +210,11 @@ public class PreOrderServiceImpl implements IPreOrderService {
             if (vendor != null) {
                 cart.setVendorId(vendor.getId());
                 cart.setName(vendor.getName());
-                if (vendor.getCategory().equalsIgnoreCase("retail")) {
-                    cart.setLogo(vendor.getLogo());
-                } else {
-                    cart.setLogo(vendor.getLogo());
-                }
+//                if (vendor.getCategory().equalsIgnoreCase("retail")) {
+//                    cart.setLogo(vendor.getLogo());
+//                } else {
+//                    cart.setLogo(vendor.getLogo());
+//                }
                 cart.setGstNumber(vendor.getGistin());
                 cart.setLicence(vendor.getDruglicense());
                 // cart.setAddress(vendor.getAddress());

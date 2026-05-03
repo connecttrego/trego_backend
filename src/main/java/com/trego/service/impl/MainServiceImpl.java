@@ -75,8 +75,8 @@ public class MainServiceImpl implements IMainService {
         // Convert Banner entities to BannerDTOs and append base path
         mainDTO.setMiddleBanners(middleBannerDTOs);
 
-        mainDTO.setOffLineTopVendor(getTopOfflineVendors("retail"));
-        mainDTO.setOnLineTopVendor(getTopOfflineVendors("online"));
+        //mainDTO.setOffLineTopVendor(getTopOfflineVendors("retail"));
+        //mainDTO.setOnLineTopVendor(getTopOfflineVendors("online"));
 
         // mainDTO.setOffLineTopVendor(getTopVendors("retail"));
         // mainDTO.setOnLineTopVendor(getTopVendors("online"));
@@ -86,63 +86,63 @@ public class MainServiceImpl implements IMainService {
         return mainDTO;
     }
 
-    public List<VendorDTO> getTopOfflineVendors(String type) {
-        List<Object[]> salesData = orderItemRepository.findVendorMedicineSalesByCategory(type);
-
-        Map<Integer, VendorDTO> vendorMap = new LinkedHashMap<>();
-
-        for (Object[] row : salesData) {
-            Integer vendorId = (Integer) row[0];
-            Long medicineId = (Long) row[1];
-            Long salesCount = ((Number) row[2]).longValue();
-
-            VendorDTO vendor = vendorMap.computeIfAbsent(vendorId, id -> {
-                Vendor v = vendorRepository.findById(id).orElseThrow();
-                VendorDTO dto = populateVendorDTO(v);
-                dto.setMedicines(new ArrayList<>());
-                return dto;
-            });
-
-            if (vendor.getMedicines().size() < 5) {
-                Medicine med = medicineRepository.findById(medicineId).orElseThrow();
-                MedicineDTO medDTO = new MedicineDTO();
-                medDTO.setId(med.getId());
-                medDTO.setName(med.getName());
-                medDTO.setManufacturer(med.getManufacturer());
-                medDTO.setSaltComposition(med.getSaltComposition());
-                medDTO.setMedicineType(med.getMedicineType());
-                medDTO.setUseOf(med.getUseOf());
-                medDTO.setPhoto1(med.getPhoto1());
-                // medDTO.setSalesCount(salesCount.intValue());
-
-                System.out.println("vendorId " + vendorId + "  medicineId " + medicineId);
-                // Get stock info - Use the new method that returns a List to handle multiple
-                // stocks
-                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
-                if (!stocks.isEmpty()) {
-                    Stock stock = stocks.get(0);
-
-                    BigDecimal mrp = stock.getMrp();
-                    BigDecimal discount = stock.getDiscount();
-
-                    BigDecimal discountAmount = mrp
-                            .multiply(discount)
-                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-                    medDTO.setOfferedPrice(mrp.subtract(discountAmount));
-
-                    medDTO.setMrp(stock.getMrp());
-                    medDTO.setDiscount(stock.getDiscount());
-                    medDTO.setQty(stock.getQty());
-                }
-
-                vendor.getMedicines().add(medDTO);
-            }
-        }
-
-        // pick top 5 vendors
-        return vendorMap.values().stream().limit(5).toList();
-    }
+//    public List<VendorDTO> getTopOfflineVendors(String type) {
+//        List<Object[]> salesData = orderItemRepository.findVendorMedicineSalesByCategory(type);
+//
+//        Map<Integer, VendorDTO> vendorMap = new LinkedHashMap<>();
+//
+//        for (Object[] row : salesData) {
+//            Integer vendorId = (Integer) row[0];
+//            Long medicineId = (Long) row[1];
+//            Long salesCount = ((Number) row[2]).longValue();
+//
+//            VendorDTO vendor = vendorMap.computeIfAbsent(vendorId, id -> {
+//                Vendor v = vendorRepository.findById(id).orElseThrow();
+//                VendorDTO dto = populateVendorDTO(v);
+//                dto.setMedicines(new ArrayList<>());
+//                return dto;
+//            });
+//
+//            if (vendor.getMedicines().size() < 5) {
+//                Medicine med = medicineRepository.findById(medicineId).orElseThrow();
+//                MedicineDTO medDTO = new MedicineDTO();
+//                medDTO.setId(med.getId());
+//                medDTO.setName(med.getName());
+//                medDTO.setManufacturer(med.getManufacturer());
+//                medDTO.setSaltComposition(med.getSaltComposition());
+//                medDTO.setMedicineType(med.getMedicineType());
+//                medDTO.setUseOf(med.getUseOf());
+//                medDTO.setPhoto1(med.getPhoto1());
+//                // medDTO.setSalesCount(salesCount.intValue());
+//
+//                System.out.println("vendorId " + vendorId + "  medicineId " + medicineId);
+//                // Get stock info - Use the new method that returns a List to handle multiple
+//                // stocks
+//                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+//                if (!stocks.isEmpty()) {
+//                    Stock stock = stocks.get(0);
+//
+//                    BigDecimal mrp = stock.getMrp();
+//                    BigDecimal discount = stock.getDiscount();
+//
+//                    BigDecimal discountAmount = mrp
+//                            .multiply(discount)
+//                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+//
+//                    medDTO.setOfferedPrice(mrp.subtract(discountAmount));
+//
+//                    medDTO.setMrp(stock.getMrp());
+//                    medDTO.setDiscount(stock.getDiscount());
+//                    medDTO.setQty(stock.getQty());
+//                }
+//
+//                vendor.getMedicines().add(medDTO);
+//            }
+//        }
+//
+//        // pick top 5 vendors
+//        return vendorMap.values().stream().limit(5).toList();
+//    }
 
     private List<VendorDTO> getTopVendors(String type) {
         // Get all vendors

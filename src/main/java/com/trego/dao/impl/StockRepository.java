@@ -18,8 +18,8 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
 
     List<Stock> findByMedicineId(long id);
 
-    List<Stock> findByVendorId(long id);
-    Page<Stock> findByVendorId(Long vendorId, Pageable pageable);
+    List<Stock> findByVendorId(Integer id);
+    Page<Stock> findByVendorId(Integer vendorId, Pageable pageable);
     List<Stock> findByMedicineIdAndVendorId(long medicineId, Integer vendorId);
 
     // Custom query to handle cases where there might be multiple stocks for the same medicine/vendor combination

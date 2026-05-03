@@ -3,6 +3,7 @@ package com.trego.dto;
 import jakarta.persistence.Id;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import java.math.BigDecimal;
 
 @Data
 public class AddressDTO {
@@ -14,12 +15,12 @@ public class AddressDTO {
     private String mobileNo;
     private String name;
     private int addressType;
-    private Double lat;
-    private Double lng;
+    private BigDecimal lat;
+    private BigDecimal lng;
     private long userId;
 
 
-    public AddressDTO(Long id, String address, String city, String landmark, String pincode, Double lat, Double lng, long userId, String mobileNo, String name, int addressType) {
+    public AddressDTO(Long id, String address, String city, String landmark, String pincode, BigDecimal lat, BigDecimal lng, long userId, String mobileNo, String name, int addressType) {
         this.id = id;
         this.address = address;
         this.city = city;

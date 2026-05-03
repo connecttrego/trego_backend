@@ -28,16 +28,16 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             """)
     List<Object[]> findVendorMedicineSales();
 
-    @Query("""
-                SELECT oi.order.vendor.id as vendorId, oi.medicine.id as medicineId, 
-                       COUNT(oi.id) as salesCount, MAX(oi.mrp) as mrp, MAX(oi.qty) as qty
-                FROM OrderItem oi
-                JOIN oi.order.vendor v
-                WHERE v.category = :category
-                GROUP BY oi.order.vendor.id, oi.medicine.id
-                ORDER BY salesCount DESC
-            """)
-    List<Object[]> findVendorMedicineSalesByCategory(@Param("category") String category);
+//    @Query("""
+//                SELECT oi.order.vendor.id as vendorId, oi.medicine.id as medicineId,
+//                       COUNT(oi.id) as salesCount, MAX(oi.mrp) as mrp, MAX(oi.qty) as qty
+//                FROM OrderItem oi
+//                JOIN oi.order.vendor v
+//                WHERE v.category = :category
+//                GROUP BY oi.order.vendor.id, oi.medicine.id
+//                ORDER BY salesCount DESC
+//            """)
+//    List<Object[]> findVendorMedicineSalesByCategory(@Param("category") String category);
 
     List<OrderItem> findByOrderId(Long orderId);
 }

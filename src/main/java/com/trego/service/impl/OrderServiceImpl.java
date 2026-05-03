@@ -647,11 +647,11 @@ public class OrderServiceImpl implements IOrderService {
             vendorDTO.setId(order.getVendor().getId());
             vendorDTO.setName(order.getVendor().getName());
 
-            if (order.getVendor().getCategory().equalsIgnoreCase("retail")) {
-                vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL + order.getVendor().getLogo());
-            } else {
-                vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL + order.getVendor().getLogo());
-            }
+//            if (order.getVendor().getCategory().equalsIgnoreCase("retail")) {
+//                vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL + order.getVendor().getLogo());
+//            } else {
+//                vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL + order.getVendor().getLogo());
+//            }
 
             orderDTO.setVendor(vendorDTO);
 
