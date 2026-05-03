@@ -39,7 +39,7 @@ public class Stock {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "price_id")
-    private long id;
+    private Integer id;
     private BigDecimal mrp;
     private BigDecimal discount;
     @Column(name = "quantity")

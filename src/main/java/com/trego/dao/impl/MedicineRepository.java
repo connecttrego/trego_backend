@@ -19,7 +19,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
 
 
     // JPQL query to fetch medicines along with stocks and vendor details
-    @Query("SELECT m FROM medicines m " +
+    @Query("SELECT m FROM vendor_medicine m " +
             "JOIN FETCH m.stocks s " +
             "JOIN FETCH s.vendor v " +
             "WHERE m.name LIKE %:name% AND v.id = :vendorId")
@@ -66,7 +66,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
     List<SubstituteDetailView> findSubstituteByMedicineId(@Param("medicineId") long medicineId);
 //AND m.manufacturer IN ('Abbott', 'Lupin Ltd', 'Dr. Reddy’s Labs')
 
-    Page<Medicine> findBySubcategoryId(Long subcategoryId, Pageable pageable);
+//    Page<Medicine> findBySubcategoryId(Long subcategoryId, Pageable pageable);
 
 
 }
