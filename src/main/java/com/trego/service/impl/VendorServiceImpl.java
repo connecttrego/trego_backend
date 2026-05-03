@@ -67,7 +67,7 @@ public class VendorServiceImpl implements IVendorService {
     }
 
     @Override
-    public VendorDTO getVendorByIdOrMedicine(Long id,  String searchText, int page, int size) {
+    public VendorDTO getVendorByIdOrMedicine(Integer id,  String searchText, int page, int size) {
         VendorDTO vendorDTO = new VendorDTO();
         Vendor vendor = vendorRepository.findById(id).orElse(null);
         if(page == 0) {

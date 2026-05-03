@@ -7,6 +7,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+//SELECT *
+//FROM trego_db_2.vendor_medicine_table AS vm
+//LEFT JOIN vendor_signup AS vs
+//ON vs.id = vm.vender_id
+//WHERE vm.name LIKE '%para%';
 @Data
 public class MedicineDTO {
 

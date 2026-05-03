@@ -89,10 +89,10 @@ public class MainServiceImpl implements IMainService {
     public List<VendorDTO> getTopOfflineVendors(String type) {
         List<Object[]> salesData = orderItemRepository.findVendorMedicineSalesByCategory(type);
 
-        Map<Long, VendorDTO> vendorMap = new LinkedHashMap<>();
+        Map<Integer, VendorDTO> vendorMap = new LinkedHashMap<>();
 
         for (Object[] row : salesData) {
-            Long vendorId = (Long) row[0];
+            Integer vendorId = (Integer) row[0];
             Long medicineId = (Long) row[1];
             Long salesCount = ((Number) row[2]).longValue();
 

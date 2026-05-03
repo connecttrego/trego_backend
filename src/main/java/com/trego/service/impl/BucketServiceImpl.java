@@ -93,15 +93,15 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         // Group stocks by vendor
-        Map<Long, List<Stock>> stocksByVendor = relevantStocks.stream()
+        Map<Integer, List<Stock>> stocksByVendor = relevantStocks.stream()
                 .collect(Collectors.groupingBy(stock -> stock.getVendor().getId()));
 
         // For direct medicine requests, we'll create buckets for all vendors that have the medicines
         // (different from preorder where we only consider user-selected vendors)
         List<BucketDTO> buckets = new ArrayList<>();
 
-        for (Map.Entry<Long, List<Stock>> entry : stocksByVendor.entrySet()) {
-            Long vendorId = entry.getKey();
+        for (Map.Entry<Integer, List<Stock>> entry : stocksByVendor.entrySet()) {
+            Integer vendorId = entry.getKey();
             List<Stock> vendorStocks = entry.getValue();
 
             // Create a bucket for this vendor with available medicines only
@@ -119,7 +119,7 @@ public class BucketServiceImpl implements IBucketService {
         // Extract medicine IDs and quantities from preorder data
         Map<Long, Integer> medicineQuantities = new HashMap<>();
         List<Long> medicineIds = new ArrayList<>();
-        Set<Long> selectedVendorIds = new HashSet<>(); // Track vendors selected by user
+        Set<Integer> selectedVendorIds = new HashSet<>(); // Track vendors selected by user
 
         System.out.println("Processing preorder data with " + preorderData.getCarts().size() + " carts");
 
@@ -205,7 +205,7 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         // Group stocks by vendor
-        Map<Long, List<Stock>> stocksByVendor = relevantStocks.stream()
+        Map<Integer, List<Stock>> stocksByVendor = relevantStocks.stream()
                 .collect(Collectors.groupingBy(stock -> stock.getVendor().getId()));
 
         System.out.println("Stocks grouped by " + stocksByVendor.size() + " vendors");
@@ -213,8 +213,8 @@ public class BucketServiceImpl implements IBucketService {
         // Create buckets only for vendors selected by the user
         List<BucketDTO> buckets = new ArrayList<>();
 
-        for (Map.Entry<Long, List<Stock>> entry : stocksByVendor.entrySet()) {
-            Long vendorId = entry.getKey();
+        for (Map.Entry<Integer, List<Stock>> entry : stocksByVendor.entrySet()) {
+            Integer vendorId = entry.getKey();
             List<Stock> vendorStocks = entry.getValue();
 
             // Only create buckets for vendors selected by the user
@@ -247,7 +247,7 @@ public class BucketServiceImpl implements IBucketService {
         return buckets;
     }
 
-    private BucketDTO createBucketForVendorWithPartialAvailability(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
+    private BucketDTO createBucketForVendorWithPartialAvailability(Integer vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
         System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");
 
         // Check if medicines list is empty
@@ -388,7 +388,7 @@ public class BucketServiceImpl implements IBucketService {
         return bucket;
     }
 
-    private BucketDTO createBucketForVendorWithSpecificQuantities(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
+    private BucketDTO createBucketForVendorWithSpecificQuantities(Integer vendorId, List<Stock> vendorStocks, List<Medicine> medicines, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
         System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");
 
         // Check if medicines list is empty

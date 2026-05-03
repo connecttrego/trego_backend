@@ -20,7 +20,7 @@ public class OrderItem {
     private Order order;
 
     @ManyToOne
-    @JoinColumn(name = "medicine_id", nullable = false)
+    @JoinColumn(name = "vendor_medicine_id", nullable = false)
     private Medicine medicine;
 
 /*    @Column(nullable = true)

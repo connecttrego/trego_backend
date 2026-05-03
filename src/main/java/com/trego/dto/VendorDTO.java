@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 public class VendorDTO {
 
-    private Long id;
+    private Integer id;
     private String name;
     private String licence;
     private String gstNumber;

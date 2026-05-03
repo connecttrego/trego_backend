@@ -9,7 +9,7 @@ import java.util.List;
 @Data
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public class BucketDTO {
-    private Long id;
+    private Integer id;
     private String name;
     private List<BucketItemDTO> availableItems; // Available medicines
     private List<UnavailableMedicineDTO> unavailableItems; // Unavailable medicines with substitutes
@@ -18,7 +18,7 @@ public class BucketDTO {
     private BigDecimal deliveryCharges;
     private BigDecimal amountToPay;
     private BigDecimal totalDiscount; // Total discount across all items in the bucket
-    private Long vendorId; // If all items are from the same vendor
+    private Integer vendorId; // If all items are from the same vendor
     private String vendorName; // If all items are from the same vendor
     private String logo;
     private String deliveryTime;

@@ -12,5 +12,5 @@ public class OrderRequestDTO {
     private long userId;
     private long addressId;
     private long preOrderId;
-    private Long selectedVendorId; // Added to support vendor selection for regular orders
+    private Integer selectedVendorId; // Added to support vendor selection for regular orders
 }

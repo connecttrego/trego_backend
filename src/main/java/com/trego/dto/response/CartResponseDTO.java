@@ -1,7 +1,6 @@
 package com.trego.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.trego.dao.entity.Vendor;
 import com.trego.dto.MedicineDTO;
 import com.trego.dto.MedicinePreOrderDTO;
 import com.trego.dto.VendorDTO;
@@ -13,7 +12,7 @@ import java.util.List;
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CartResponseDTO {
-    private Long vendorId;
+    private Integer vendorId;
     private BigDecimal totalCartValue;
     private BigDecimal amountToPay;
     private BigDecimal discount;

@@ -7,6 +7,6 @@ import java.util.List;
 
 @Data
 public class CartDTO {
-    private Long vendorId;
+    private Integer vendorId;
     private List<MedicineDTO> medicine;
 }

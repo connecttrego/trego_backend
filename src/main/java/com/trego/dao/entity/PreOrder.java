@@ -60,7 +60,7 @@ public class PreOrder {
     private LocalDateTime modifiedAt;
     
     @Column(name = "selected_vendor_id", nullable = true)
-    private Long selectedVendorId;
+    private Integer selectedVendorId;
 
     @PrePersist
     protected void onCreate() {

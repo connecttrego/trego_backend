@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface VendorRepository extends JpaRepository<Vendor, Long> {
+public interface VendorRepository extends JpaRepository<Vendor, Integer> {
       List<Vendor> findByCategory(String type);
     // Custom queries can be defined here, if necessary
 }

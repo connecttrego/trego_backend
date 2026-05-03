@@ -883,7 +883,7 @@ public class OrderServiceImpl implements IOrderService {
                 .flatMap(cart -> cart.getMedicine().stream()
                         .map(medicine -> {
 
-                            long vendorId = cart.getVendorId();
+                            Integer vendorId = cart.getVendorId();
                             long medicineId = medicine.getId();
                             BigDecimal qty = BigDecimal.valueOf(medicine.getQty());
 
@@ -920,7 +920,7 @@ public class OrderServiceImpl implements IOrderService {
                 .flatMap(cart -> cart.getMedicine().stream()
                         .map(medicine -> {
 
-                            long vendorId = cart.getVendorId();
+                            Integer vendorId = cart.getVendorId();
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 

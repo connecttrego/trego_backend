@@ -9,31 +9,31 @@ import org.checkerframework.checker.units.qual.C;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
-
-
-//CREATE TABLE `prices` (
-//   `price_id` bigint(20) NOT NULL AUTO_INCREMENT,
-//   `medicine_id` bigint(20) NOT NULL,
-//   `batch_id` bigint(20) NOT NULL,
-//   `mrp` decimal(10,2) NOT NULL,
-//   `discount` decimal(10,2) DEFAULT 0.00,
-//   `selling_price` decimal(10,2) NOT NULL,
-//   `offer_percent` decimal(5,2) DEFAULT NULL,
-//   `bought` tinyint(1) DEFAULT 0,
-//   `cost_price` decimal(10,2) DEFAULT NULL,
-//   `created_at` timestamp NULL DEFAULT current_timestamp(),
-//   `expiry_date` date DEFAULT NULL,
-//   `quantity` int(11) DEFAULT NULL,
-//   PRIMARY KEY (`price_id`),
-//   KEY `fk_price_medicine` (`medicine_id`),
-//   KEY `fk_price_batch` (`batch_id`),
-//   CONSTRAINT `fk_price_batch` FOREIGN KEY (`batch_id`) REFERENCES `batches` (`batch_id`) ON DELETE CASCADE,
-//   CONSTRAINT `fk_price_medicine` FOREIGN KEY (`medicine_id`) REFERENCES `medicines` (`medicine_id`) ON DELETE CASCADE
-// ) ENGINE=InnoDB AUTO_INCREMENT=60 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+//
+//CREATE TABLE `vendor_medicine_price` (
+//        `price_id` int(11) NOT NULL AUTO_INCREMENT,
+//  `mrp` decimal(10,2) NOT NULL,
+//  `discount` decimal(10,2) DEFAULT 0.00,
+//        `selling_price` decimal(10,2) NOT NULL,
+//  `offer_percent` decimal(5,2) DEFAULT NULL,
+//  `bought` tinyint(1) DEFAULT 0,
+//        `cost_price` decimal(10,2) DEFAULT NULL,
+//  `created_at` timestamp NULL DEFAULT current_timestamp(),
+//  `expiry_date` date DEFAULT NULL,
+//        `quantity` int(11) DEFAULT NULL,
+//  `manufacturer_date` timestamp NULL DEFAULT NULL,
+//  `vendor_id` int(11) NOT NULL,
+//  `vendor_medicine_id` bigint(20) DEFAULT NULL,
+//PRIMARY KEY (`price_id`),
+//KEY `fk_vendor_price_id` (`vendor_id`),
+//KEY `fk_vendor_medicine` (`vendor_medicine_id`),
+//CONSTRAINT `fk_vendor_medicine` FOREIGN KEY (`vendor_medicine_id`) REFERENCES `vendor_medicine` (`vendor_medicine_id`),
+//CONSTRAINT `fk_vendor_price_id` FOREIGN KEY (`vendor_id`) REFERENCES `vendor_signup` (`vendor_id`)
+//        ) ENGINE=InnoDB AUTO_INCREMENT=56 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 @Data
-@Entity(name = "prices")
+@Entity(name = "vendor_medicine_price")
 public class Stock {
 
     @Id
@@ -49,13 +49,12 @@ public class Stock {
     private LocalDate expiryDate;
 
     @ManyToOne
-    @JoinColumn(name = "medicine_id")
+    @JoinColumn(name = "vendor_medicine_id")
     @JsonIgnore
     private Medicine medicine;
 
-    //TODO: Add vendor details in prices table and link it with vendor table
-    // @ManyToOne
-    // @JoinColumn(name = "vendor_id")
+    @ManyToOne
+    @JoinColumn(name = "vendor_id")
     private Vendor vendor = null;
 
 }
