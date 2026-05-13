@@ -237,17 +237,28 @@ public class PreOrderServiceImpl implements IPreOrderService {
     private MedicineDTO populateMedicalDTO(MedicineDTO medicineDTO, Stock stock) {
 
         Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
+        if (tempMedicine == null) return medicineDTO;
+        
         medicineDTO.setId(tempMedicine.getId());
         medicineDTO.setMrp(stock.getMrp());
-        medicineDTO.setId(tempMedicine.getId());
         medicineDTO.setName(tempMedicine.getName());
-        medicineDTO.setManufacturer(tempMedicine.getManufacturer());
+        medicineDTO.setManufacturer(tempMedicine.getManufacture()); // Fixed rename
         medicineDTO.setMedicineType(tempMedicine.getMedicineType());
-        medicineDTO.setUseOf(tempMedicine.getUseOf());
-        medicineDTO.setStrip(tempMedicine.getPacking());
-        medicineDTO.setImage(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + tempMedicine.getPhoto1());
+        
+        MedicineInformation medicineInformation = tempMedicine.getMedicineInformation();
+        if (medicineInformation != null) {
+            medicineDTO.setUseOf(medicineInformation.getUseOf());
+            medicineDTO.setStrip(medicineInformation.getPacking());
+            medicineDTO.setImage(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
+            medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
+        } else {
+            medicineDTO.setUseOf("");
+            medicineDTO.setStrip("");
+            medicineDTO.setImage("");
+            medicineDTO.setPhoto1("");
+        }
+        
         medicineDTO.setSaltComposition(tempMedicine.getSaltComposition());
-        medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + tempMedicine.getPhoto1());
         medicineDTO.setDiscount(stock.getDiscount());
         medicineDTO.setActualPrice(stock.getMrp());
         medicineDTO.setExpiryDate(stock.getExpiryDate());

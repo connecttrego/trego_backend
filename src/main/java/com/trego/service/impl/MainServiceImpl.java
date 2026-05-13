@@ -2,6 +2,7 @@ package com.trego.service.impl;
 
 import com.trego.dao.entity.Banner;
 import com.trego.dao.entity.Medicine;
+import com.trego.dao.entity.MedicineInformation;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.entity.Vendor;
 import com.trego.dao.impl.*;
@@ -144,41 +145,33 @@ public class MainServiceImpl implements IMainService {
 //        return vendorMap.values().stream().limit(5).toList();
 //    }
 
-    private List<VendorDTO> getTopVendors(String type) {
-        // Get all vendors
-        List<Vendor> offlineVendors = vendorRepository.findByCategory(type);
-        List<VendorDTO> topOfflineVendors = new ArrayList<>();
-
-        // Get top selling medicine IDs
-        List<Object[]> topSellingMedicineData = orderItemRepository.findTopSellingMedicineIds(PageRequest.of(0, 5));
-        Map<Long, Long> medicineSalesMap = new HashMap<>();
-        for (Object[] data : topSellingMedicineData) {
-            medicineSalesMap.put((Long) data[0], (Long) data[1]);
-        }
-
-        for (Vendor vendor : offlineVendors) {
-            VendorDTO vendorDTO = populateVendorDTO(vendor);
-            List<Stock> stocks = stockRepository.findByVendorId(vendor.getId());
-
-            // Sort stocks based on sales count (highest first)
-            stocks.sort((s1, s2) -> {
-                Long medicineId1 = s1.getMedicine().getId();
-                Long medicineId2 = s2.getMedicine().getId();
-                Long sales1 = medicineSalesMap.getOrDefault(medicineId1, 0L);
-                Long sales2 = medicineSalesMap.getOrDefault(medicineId2, 0L);
-                return sales2.compareTo(sales1); // Descending order
-            });
-
-            List<MedicineDTO> medicineDTOList = populateMedicineDTOs(stocks, medicineSalesMap);
-            vendorDTO.setMedicines(medicineDTOList);
-            // Add to both lists if less than 5 vendors in each list
-            if (topOfflineVendors.size() < 5) {
-                topOfflineVendors.add(vendorDTO);
-                // topOnlineVendors.add(vendorDTO);
-            }
-        }
-        return topOfflineVendors;
-    }
+    // getTopVendors commented out - VendorRepository.findByCategory removed (no category field in ap-db-change vendor_informations table)
+//    private List<VendorDTO> getTopVendors(String type) {
+//        List<Vendor> offlineVendors = vendorRepository.findByCategory(type);
+//        List<VendorDTO> topOfflineVendors = new ArrayList<>();
+//        List<Object[]> topSellingMedicineData = orderItemRepository.findTopSellingMedicineIds(PageRequest.of(0, 5));
+//        Map<Long, Long> medicineSalesMap = new HashMap<>();
+//        for (Object[] data : topSellingMedicineData) {
+//            medicineSalesMap.put((Long) data[0], (Long) data[1]);
+//        }
+//        for (Vendor vendor : offlineVendors) {
+//            VendorDTO vendorDTO = populateVendorDTO(vendor);
+//            List<Stock> stocks = stockRepository.findByVendorId(vendor.getId());
+//            stocks.sort((s1, s2) -> {
+//                Long medicineId1 = s1.getMedicine().getId();
+//                Long medicineId2 = s2.getMedicine().getId();
+//                Long sales1 = medicineSalesMap.getOrDefault(medicineId1, 0L);
+//                Long sales2 = medicineSalesMap.getOrDefault(medicineId2, 0L);
+//                return sales2.compareTo(sales1);
+//            });
+//            List<MedicineDTO> medicineDTOList = populateMedicineDTOs(stocks, medicineSalesMap);
+//            vendorDTO.setMedicines(medicineDTOList);
+//            if (topOfflineVendors.size() < 5) {
+//                topOfflineVendors.add(vendorDTO);
+//            }
+//        }
+//        return topOfflineVendors;
+//    }
 
     private static VendorDTO populateVendorDTO(Vendor vendor) {
         VendorDTO vendorDTO = new VendorDTO();
@@ -221,11 +214,20 @@ public class MainServiceImpl implements IMainService {
             medicineDTO.setId(medicine.getId());
             medicineDTO.setName(medicine.getName());
             medicineDTO.setMedicineType(medicine.getMedicineType());
-            medicineDTO.setManufacturer(medicine.getManufacturer());
+            medicineDTO.setManufacturer(medicine.getManufacture()); // Fixed rename
             medicineDTO.setSaltComposition(medicine.getSaltComposition());
-            medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicine.getPhoto1());
-            medicineDTO.setUseOf(medicine.getUseOf());
-            medicineDTO.setStrip(medicine.getPacking());
+            
+            MedicineInformation medicineInformation = medicine.getMedicineInformation();
+            if (medicineInformation != null) {
+                medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
+                medicineDTO.setUseOf(medicineInformation.getUseOf());
+                medicineDTO.setStrip(medicineInformation.getPacking());
+            } else {
+                medicineDTO.setPhoto1("");
+                medicineDTO.setUseOf("");
+                medicineDTO.setStrip("");
+            }
+            
             medicineDTO.setDiscount(stock.getDiscount());
             medicineDTO.setQty(stock.getQty());
             medicineDTO.setMrp(stock.getMrp());

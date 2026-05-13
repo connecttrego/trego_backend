@@ -81,7 +81,7 @@ public class MedicineController {
 
     @GetMapping("/subcategories/{subcategoryId}/medicines")
     public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(
-            @PathVariable Long subcategoryId,
+            @PathVariable Integer subcategoryId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {

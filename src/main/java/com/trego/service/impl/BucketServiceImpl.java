@@ -1,6 +1,7 @@
 package com.trego.service.impl;
 
 import com.trego.dao.entity.Medicine;
+import com.trego.dao.entity.MedicineInformation;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.entity.Vendor;
 import com.trego.dao.impl.MedicineRepository;
@@ -293,8 +294,15 @@ public class BucketServiceImpl implements IBucketService {
                     BucketItemDTO item = new BucketItemDTO();
                     item.setMedicineId(medicineId);
                     item.setMedicineName(medicine.getName());
-                    item.setMedicineImage(medicine.getPhoto1());
-                    item.setMedicineStrip(medicine.getPacking());
+                    
+                    MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                    if (medicineInformation != null) {
+                        item.setMedicineImage(medicineInformation.getPhoto1());
+                        item.setMedicineStrip(medicineInformation.getPacking());
+                    } else {
+                        item.setMedicineImage("");
+                        item.setMedicineStrip("");
+                    }
                     //item.setVendorId(vendorId);
                     //item.setVendorName(vendor != null ? vendor.getName() : "");
                     item.setMrp(stock.getMrp());
@@ -335,8 +343,16 @@ public class BucketServiceImpl implements IBucketService {
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
                 unavailableItem.setMedicineId(medicineId);
                 unavailableItem.setMedicineName(medicine.getName());
-                unavailableItem.setMedicineImage(medicine.getPhoto1());
-                unavailableItem.setMedicineStrip(medicine.getPacking());
+                
+                MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                if (medicineInformation != null) {
+                    unavailableItem.setMedicineImage(medicineInformation.getPhoto1());
+                    unavailableItem.setMedicineStrip(medicineInformation.getPacking());
+                } else {
+                    unavailableItem.setMedicineImage("");
+                    unavailableItem.setMedicineStrip("");
+                }
+                
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
@@ -449,8 +465,15 @@ public class BucketServiceImpl implements IBucketService {
                     BucketItemDTO item = new BucketItemDTO();
                     item.setMedicineId(medicineId);
                     item.setMedicineName(medicine.getName());
-                    item.setMedicineImage(medicine.getPhoto1());
-                    item.setMedicineStrip(medicine.getPacking());
+                    
+                    MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                    if (medicineInformation != null) {
+                        item.setMedicineImage(medicineInformation.getPhoto1());
+                        item.setMedicineStrip(medicineInformation.getPacking());
+                    } else {
+                        item.setMedicineImage("");
+                        item.setMedicineStrip("");
+                    }
                     //item.setVendorId(vendorId);
                     //item.setVendorName(vendor != null ? vendor.getName() : "");
                     item.setPrice(calculateUnitPrice(stock.getMrp(), stock.getDiscount()));
@@ -474,8 +497,15 @@ public class BucketServiceImpl implements IBucketService {
                     unavailableItem.setMedicineId(medicineId);
                     unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
                     unavailableItem.setRequestedQuantity(requestedQuantity);
-                    unavailableItem.setMedicineImage(medicine.getPhoto1());
-                    unavailableItem.setMedicineStrip(medicine.getPacking());
+                    
+                    MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                    if (medicineInformation != null) {
+                        unavailableItem.setMedicineImage(medicineInformation.getPhoto1());
+                        unavailableItem.setMedicineStrip(medicineInformation.getPacking());
+                    } else {
+                        unavailableItem.setMedicineImage("");
+                        unavailableItem.setMedicineStrip("");
+                    }
                     // Get substitutes for this medicine
                     try {
                         List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
@@ -491,8 +521,16 @@ public class BucketServiceImpl implements IBucketService {
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
                 unavailableItem.setMedicineId(medicineId);
                 unavailableItem.setMedicineName(medicine.getName());
-                unavailableItem.setMedicineImage(medicine.getPhoto1());
-                unavailableItem.setMedicineStrip(medicine.getPacking());
+                
+                MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                if (medicineInformation != null) {
+                    unavailableItem.setMedicineImage(medicineInformation.getPhoto1());
+                    unavailableItem.setMedicineStrip(medicineInformation.getPacking());
+                } else {
+                    unavailableItem.setMedicineImage("");
+                    unavailableItem.setMedicineStrip("");
+                }
+                
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
@@ -532,8 +570,15 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setMedicineId(unavailableMedicineId);
                 unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
                 unavailableItem.setRequestedQuantity(requestedQuantity);
-                unavailableItem.setMedicineImage(medicine.getPhoto1());
-                unavailableItem.setMedicineStrip(medicine.getPacking());
+                
+                MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                if (medicineInformation != null) {
+                    unavailableItem.setMedicineImage(medicineInformation.getPhoto1());
+                    unavailableItem.setMedicineStrip(medicineInformation.getPacking());
+                } else {
+                    unavailableItem.setMedicineImage("");
+                    unavailableItem.setMedicineStrip("");
+                }
                 // Get substitutes for this medicine
                 try {
                     List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId);

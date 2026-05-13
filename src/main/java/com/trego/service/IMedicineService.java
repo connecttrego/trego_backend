@@ -13,7 +13,7 @@ public interface IMedicineService {
 
     Page<MedicineWithStockAndVendorDTO> searchMedicines(String searchText, long vendorId, int page, int size);
 
-    Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Long subcategoryId, int page, int size);
+    Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Integer subcategoryId, int page, int size);
 
 
 }

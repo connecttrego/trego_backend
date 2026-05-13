@@ -671,9 +671,16 @@ public class OrderServiceImpl implements IOrderService {
                 Map<String, Object> medicineDetails = new HashMap<>();
                 medicineDetails.put("medicineId", orderItem.getMedicine().getId());
                 medicineDetails.put("medicineName", orderItem.getMedicine().getName());
-                medicineDetails.put("packing", orderItem.getMedicine().getPacking());
-                medicineDetails.put("medicineLogo",
-                        Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + orderItem.getMedicine().getPhoto1());
+                
+                MedicineInformation medicineInformation = orderItem.getMedicine().getMedicineInformation();
+                if (medicineInformation != null) {
+                    medicineDetails.put("packing", medicineInformation.getPacking());
+                    medicineDetails.put("medicineLogo",
+                        Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
+                } else {
+                    medicineDetails.put("packing", "");
+                    medicineDetails.put("medicineLogo", "");
+                }
 
                 orderItemDTO.setMedicine(medicineDetails);
                 orderItemsList.add(orderItemDTO);
@@ -829,19 +836,29 @@ public class OrderServiceImpl implements IOrderService {
     private MedicineDTO populateMedicalDTO(MedicineDTO medicineDTO, Stock stock) {
 
         Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
+        if (tempMedicine == null) return medicineDTO;
+        
         medicineDTO.setId(tempMedicine.getId());
         medicineDTO.setMrp(stock.getMrp());
-        medicineDTO.setId(tempMedicine.getId());
         medicineDTO.setName(tempMedicine.getName());
-        medicineDTO.setManufacturer(tempMedicine.getManufacturer());
+        medicineDTO.setManufacturer(tempMedicine.getManufacture()); // Fixed rename
         medicineDTO.setMedicineType(tempMedicine.getMedicineType());
-        medicineDTO.setUseOf(tempMedicine.getUseOf());
-        medicineDTO.setStrip(tempMedicine.getPacking());
-        medicineDTO.setImage(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + tempMedicine.getPhoto1());
+        
+        MedicineInformation medicineInformation = tempMedicine.getMedicineInformation();
+        if (medicineInformation != null) {
+            medicineDTO.setUseOf(medicineInformation.getUseOf());
+            medicineDTO.setStrip(medicineInformation.getPacking());
+            medicineDTO.setImage(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
+            medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
+        } else {
+            medicineDTO.setUseOf("");
+            medicineDTO.setStrip("");
+            medicineDTO.setImage("");
+            medicineDTO.setPhoto1("");
+        }
+        
         medicineDTO.setSaltComposition(tempMedicine.getSaltComposition());
-        medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + tempMedicine.getPhoto1());
         medicineDTO.setDiscount(stock.getDiscount());
-        medicineDTO.setMrp(stock.getMrp());
         medicineDTO.setActualPrice(stock.getMrp());
         medicineDTO.setExpiryDate(stock.getExpiryDate());
         return medicineDTO;

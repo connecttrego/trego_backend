@@ -23,50 +23,50 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
             "JOIN FETCH m.stocks s " +
             "JOIN FETCH s.vendor v " +
             "WHERE m.name LIKE %:name% AND v.id = :vendorId")
-    Page<Medicine> findByNameWithVendorId(String name, long vendorId, Pageable pageable);
+    Page<Medicine> findByNameWithVendorId(String name, int vendorId, Pageable pageable);
 
     @Query(value = """
         select
-            m.id as id,
+            m.vendor_medicine_id as id,
             m.name as name,
             m.photo1 as photo1,
             m.packing,
-            m.manufacturer as manufacturer,
-            v.name as vendorName,
+            m.manufacture as manufacturer,
+            v.ref_name as vendorName,
             v.logo as vendorLogo,
-            v.id as vendorId,
+            v.vendor_user_id as vendorId,
             s.discount as discount,
             s.mrp as mrp,
             (s.mrp - (s.mrp * s.discount / 100)) as bestPrice
-        from medicines m
+        from vendor_medicine m
         join (
             select
-                s1.medicine_id,
+                s1.vendor_medicine_id,
                 s1.vendor_id,
                 s1.discount,
                 s1.mrp,
                 (s1.mrp - (s1.mrp * s1.discount / 100)) as price
-            from stocks s1
+            from vendor_medicine_price s1
             join (
-                select medicine_id,
+                select vendor_medicine_id,
                        min(mrp - (mrp * discount / 100)) as min_price
-                from stocks
-                group by medicine_id
-            ) sm on sm.medicine_id = s1.medicine_id
+                from vendor_medicine_price
+                group by vendor_medicine_id
+            ) sm on sm.vendor_medicine_id = s1.vendor_medicine_id
                 and (s1.mrp - (s1.mrp * s1.discount / 100)) = sm.min_price
-        ) s on s.medicine_id = m.id
-        join vendors v on v.id = s.vendor_id
+        ) s on s.vendor_medicine_id = m.vendor_medicine_id
+        join vendor_informations v on v.vendor_user_id = s.vendor_id
         where m.salt_composition = (
             select m2.salt_composition
-            from medicines m2
-            where m2.id = :medicineId
+            from vendor_medicine m2
+            where m2.vendor_medicine_id = :medicineId
         )
-        and m.id != :medicineId LIMIT 2
+        and m.vendor_medicine_id != :medicineId LIMIT 2
         """, nativeQuery = true)
     List<SubstituteDetailView> findSubstituteByMedicineId(@Param("medicineId") long medicineId);
 //AND m.manufacturer IN ('Abbott', 'Lupin Ltd', 'Dr. Reddy’s Labs')
 
-//    Page<Medicine> findBySubcategoryId(Long subcategoryId, Pageable pageable);
+    Page<Medicine> findBySubcategoryId(Integer subcategoryId, Pageable pageable);
 
 
 }

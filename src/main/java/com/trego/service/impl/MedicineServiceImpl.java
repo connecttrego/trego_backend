@@ -1,6 +1,7 @@
 package com.trego.service.impl;
 
 import com.trego.dao.entity.Medicine;
+import com.trego.dao.entity.MedicineInformation;
 import com.trego.dto.MedicineDTO;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.impl.MedicineRepository;
@@ -46,38 +47,39 @@ public class MedicineServiceImpl implements IMedicineService {
     @Override
     public MedicineDTO getMedicineById(Long id) {
         Medicine medicine = medicineRepository.findById(id).orElse(null);
+        if (medicine == null) return null;
 
         MedicineDTO medicineDTO = new MedicineDTO();
         medicineDTO.setId(medicine.getId());
 
         medicineDTO.setName(medicine.getName());
-        medicineDTO.setManufacturer(medicine.getManufacturer());
+        medicineDTO.setManufacturer(medicine.getManufacture()); // Fixed rename
         medicineDTO.setSaltComposition(medicine.getSaltComposition());
         medicineDTO.setMedicineType(medicine.getMedicineType());
 
-        medicineDTO.setIntroduction(medicine.getIntroduction());
-        medicineDTO.setDescription(medicine.getDescription());
-        medicineDTO.setHowItWorks(medicine.getHowItWorks());
-        medicineDTO.setSafetyAdvise(medicine.getSafetyAdvise());
-        medicineDTO.setIfMiss(medicine.getIfMiss());
-        medicineDTO.setUseOf(medicine.getUseOf());
-        medicineDTO.setStrip(medicine.getPacking());
+        MedicineInformation medicineInformation = medicine.getMedicineInformation();
+        if (medicineInformation != null) {
+            medicineDTO.setIntroduction(medicineInformation.getIntroduction());
+            medicineDTO.setDescription(medicineInformation.getDescription());
+            medicineDTO.setHowItWorks(medicineInformation.getHowItWorks());
+            medicineDTO.setSafetyAdvise(medicineInformation.getSafetyAdvise());
+            medicineDTO.setIfMiss(medicineInformation.getIfMiss());
+            medicineDTO.setUseOf(medicineInformation.getUseOf());
+            medicineDTO.setStrip(medicineInformation.getPacking());
+            medicineDTO.setCommonSideEffect(medicineInformation.getCommonSideEffect());
+            medicineDTO.setAlcoholInteraction(medicineInformation.getAlcoholInteraction());
+            medicineDTO.setPregnancyInteraction(medicineInformation.getPregnancyInteraction());
+            medicineDTO.setLactationInteraction(medicineInformation.getLactationInteraction());
+            medicineDTO.setDrivingInteraction(medicineInformation.getDrivingInteraction());
+            medicineDTO.setKidneyInteraction(medicineInformation.getKidneyInteraction());
+            medicineDTO.setLiverInteraction(medicineInformation.getLiverInteraction());
+            medicineDTO.setQuestionAnswers(medicineInformation.getQuestionAnswers());
+            medicineDTO.setPhoto1(medicineInformation.getPhoto1());
+        }
+
         medicineDTO.setPrescriptionRequired(medicine.getPrescriptionRequired());
-        medicineDTO.setUseOf(medicine.getUseOf());
-
-
-        medicineDTO.setCommonSideEffect(medicine.getCommonSideEffect());
-        medicineDTO.setAlcoholInteraction(medicine.getAlcoholInteraction());
-        medicineDTO.setPregnancyInteraction(medicine.getPregnancyInteraction());
-        medicineDTO.setLactationInteraction(medicine.getLactationInteraction());
-        medicineDTO.setDrivingInteraction(medicine.getDrivingInteraction());
-        medicineDTO.setKidneyInteraction(medicine.getKidneyInteraction());
-        medicineDTO.setLiverInteraction(medicine.getLiverInteraction());
-        medicineDTO.setManufacturer(medicine.getManufacturer());
         medicineDTO.setCountryOfOrigin(medicine.getCountryOfOrigin());
-        medicineDTO.setQuestionAnswers(medicine.getQuestionAnswers());
-        // Remove the URL prefix
-        medicineDTO.setPhoto1(medicine.getPhoto1());
+        
         List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
         medicineDTO.setOffLineStocks(stocks);
         medicineDTO.setOnLineStocks(new ArrayList<>());
@@ -88,10 +90,9 @@ public class MedicineServiceImpl implements IMedicineService {
     @Override
     public Page<MedicineWithStockAndVendorDTO> searchMedicines(String searchText, long vendorId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = new MedicineWithStockAndVendorDTO();
         Page<Medicine> medicines = null;
         if (vendorId != 0) {
-            medicines = medicineRepository.findByNameWithVendorId(searchText, vendorId, pageable);
+            medicines = medicineRepository.findByNameWithVendorId(searchText, (int) vendorId, pageable);
 
         } else {
             medicines = medicineRepository.findByNameContainingIgnoreCaseOrNameIgnoreCase(searchText, "", pageable);
@@ -102,7 +103,7 @@ public class MedicineServiceImpl implements IMedicineService {
 
 
     @Override
-    public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Long subcategoryId, int page, int size) {
+    public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Integer subcategoryId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Medicine> medicines = medicineRepository.findBySubcategoryId(subcategoryId, pageable);
@@ -112,9 +113,7 @@ public class MedicineServiceImpl implements IMedicineService {
 
 
     private Page<MedicineWithStockAndVendorDTO> convertResponse(Page<Medicine> medicines) {
-        List<Medicine> tempMedicines = medicines.getContent();
         Page<MedicineWithStockAndVendorDTO> medicineDTOs = medicines.map(medicine -> {
-            //  List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
             MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = populateMedicineWithStockVendor(medicine);
             medicineWithStockAndVendorDTO.setStocks(medicine.getStocks());
             return medicineWithStockAndVendorDTO;
@@ -127,15 +126,19 @@ public class MedicineServiceImpl implements IMedicineService {
         medicineWithStockAndVendorDTO.setId(medicine.getId());
         medicineWithStockAndVendorDTO.setName(medicine.getName());
         medicineWithStockAndVendorDTO.setMedicineType(medicine.getMedicineType());
-        medicineWithStockAndVendorDTO.setManufacturer(medicine.getManufacturer());
+        medicineWithStockAndVendorDTO.setManufacturer(medicine.getManufacture()); // Fixed rename
         medicineWithStockAndVendorDTO.setSaltComposition(medicine.getSaltComposition());
-        // Remove the URL prefix
-        medicineWithStockAndVendorDTO.setPhoto1(medicine.getPhoto1());
-        medicineWithStockAndVendorDTO.setUseOf(medicine.getUseOf());
+        
+        MedicineInformation medicineInformation = medicine.getMedicineInformation();
+        if (medicineInformation != null) {
+            medicineWithStockAndVendorDTO.setPhoto1(medicineInformation.getPhoto1());
+            medicineWithStockAndVendorDTO.setUseOf(medicineInformation.getUseOf());
+            medicineWithStockAndVendorDTO.setPacking(medicineInformation.getPacking());
+        }
+        
         SubstituteDTO substituteDTO = new SubstituteDTO();
         substituteDTO.setText("Substitute Available ");
         medicineWithStockAndVendorDTO.setSubstituteDTO(substituteDTO);
-        medicineWithStockAndVendorDTO.setPacking(medicine.getPacking());
         return medicineWithStockAndVendorDTO;
     }
 }

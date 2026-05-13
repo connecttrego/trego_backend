@@ -2,6 +2,7 @@ package com.trego.service.impl;
 
 import com.trego.dao.entity.Banner;
 import com.trego.dao.entity.Medicine;
+import com.trego.dao.entity.MedicineInformation;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.entity.Vendor;
 import com.trego.dao.impl.BannerRepository;
@@ -119,11 +120,19 @@ public class VendorServiceImpl implements IVendorService {
                 MedicineDTO medicineDTO = new MedicineDTO();
                 medicineDTO.setId(medicine.getId());
                 medicineDTO.setName(medicine.getName());
-                medicineDTO.setManufacturer(medicine.getManufacturer());
-                medicineDTO.setMedicineType(medicine.getMedicineType());
-                medicineDTO.setDescription(medicine.getDescription());
+                
+                MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                if (medicineInformation != null) {
+                    medicineDTO.setPhoto1(medicineInformation.getPhoto1());
+                    medicineDTO.setStrip(medicineInformation.getPacking());
+                    medicineDTO.setDescription(medicineInformation.getDescription());
+                } else {
+                    medicineDTO.setDescription("");
+                    medicineDTO.setPhoto1("");
+                    medicineDTO.setStrip("");
+                }
+                
                 medicineDTO.setSaltComposition(medicine.getSaltComposition());
-                medicineDTO.setPhoto1(medicine.getPhoto1());
                 medicineDTO.setDiscount(stock.getDiscount());
                 medicineDTO.setQty(stock.getQty());
                 medicineDTO.setMrp(stock.getMrp());
