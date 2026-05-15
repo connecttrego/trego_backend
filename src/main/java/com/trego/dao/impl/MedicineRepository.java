@@ -67,6 +67,8 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
 //AND m.manufacturer IN ('Abbott', 'Lupin Ltd', 'Dr. Reddy’s Labs')
 
     Page<Medicine> findBySubcategoryId(Long subcategoryId, Pageable pageable);
+    
+    Page<Medicine> findByVendorId(Integer vendorId, Pageable pageable);
 
 
 }

@@ -20,8 +20,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +32,8 @@ public class VendorServiceImpl implements IVendorService {
     private StockRepository stockRepository;
     @Autowired
     private BannerRepository bannerRepository;
+    @Autowired
+    private com.trego.dao.impl.MedicineRepository medicineRepository;
 
     public List<VendorDTO> findVendorsByType(String type) {
         List<VendorDTO> vendorDTOs = new ArrayList<>();
@@ -43,7 +43,7 @@ public class VendorServiceImpl implements IVendorService {
         for (Vendor vendor : vendors) {
             VendorDTO vendorDTO = new VendorDTO();
             vendorDTO.setId(vendor.getId());
-            vendorDTO.setName(vendor.getName());
+            vendorDTO.setName((vendor.getName() != null && !vendor.getName().trim().isEmpty()) ? vendor.getName() : "Vendor " + vendor.getId());
             // Remove the category-based URL logic
             vendorDTO.setLogo(vendor.getLogo());
             vendorDTO.setGstNumber(vendor.getGistin());
@@ -63,10 +63,15 @@ public class VendorServiceImpl implements IVendorService {
     public VendorDTO getVendorByIdOrMedicine(Integer id, String searchText, int page, int size) {
         VendorDTO vendorDTO = new VendorDTO();
         Vendor vendor = vendorRepository.findById(id).orElse(null);
+
+        // If vendor not found, return empty DTO
+        if (vendor == null) {
+            return vendorDTO;
+        }
+
         if (page == 0) {
             vendorDTO.setId(vendor.getId());
-            vendorDTO.setName(vendor.getName());
-            // Remove the category-based URL logic
+            vendorDTO.setName((vendor.getName() != null && !vendor.getName().trim().isEmpty()) ? vendor.getName() : "Vendor " + vendor.getId());
             vendorDTO.setLogo(vendor.getLogo());
             vendorDTO.setGstNumber(vendor.getGistin());
             vendorDTO.setLicence(vendor.getDruglicense());
@@ -76,8 +81,8 @@ public class VendorServiceImpl implements IVendorService {
             vendorDTO.setDeliveryTime(vendor.getDeliveryTime());
             vendorDTO.setReviews(vendor.getReviews());
             vendorDTO.setRating(vendor.getRating());
+
             List<Banner> topBanners = bannerRepository.findByPositionAndVendorId("vendors", id);
-            // Convert Banner entities to BannerDTOs and append base path
             List<BannerDTO> topBannerDTOs = topBanners.stream()
                     .map(banner -> {
                         BannerDTO dto = new BannerDTO();
@@ -89,50 +94,61 @@ public class VendorServiceImpl implements IVendorService {
                         return dto;
                     })
                     .collect(Collectors.toList());
-
             vendorDTO.setBanners(topBannerDTOs);
         }
-        // List<StockDTO> stockDTOS = new ArrayList<>();
 
-        // Create a Pageable object
+        // Fetch paginated medicines for this vendor instead of stocks
         Pageable pageable = PageRequest.of(page, size);
-        // Fetch paginated stocks
-        Page<Stock> stocksPage = stockRepository.findByVendorId(vendor.getId(), pageable);
-        // Get the list of stocks from the page
-        List<Stock> stocks = stocksPage.getContent();
+        Page<Medicine> medicinePage = medicineRepository.findByVendorId(vendor.getId(), pageable);
+        List<Medicine> medicines = medicinePage.getContent();
 
-        // List<Stock> stocks = stockRepository.findByVendorId(vendor.getId());
+        // Build medicine list
         List<MedicineDTO> medicineDTOList = new ArrayList<>();
-        for (Stock stock : stocks) {
-            Medicine medicine = stock.getMedicine();
-            Pattern pattern = Pattern.compile(Pattern.quote(searchText), Pattern.CASE_INSENSITIVE);
-            Matcher matcher = pattern.matcher(medicine.getName());
-            if (matcher.find()) {
-                MedicineDTO medicineDTO = new MedicineDTO();
-                medicineDTO.setId(medicine.getId());
-                medicineDTO.setName(medicine.getName());
+        boolean hasSearchText = searchText != null && !searchText.trim().isEmpty();
 
-                MedicineInformation medicineInformation = medicine.getMedicineInformation();
-                if (medicineInformation != null) {
-                    medicineDTO.setPhoto1(medicineInformation.getPhoto1());
-                    medicineDTO.setStrip(medicineInformation.getPacking());
-                    medicineDTO.setDescription(medicineInformation.getDescription());
-                } else {
-                    medicineDTO.setDescription("");
-                    medicineDTO.setPhoto1("");
-                    medicineDTO.setStrip("");
-                }
+        for (Medicine medicine : medicines) {
+            // Filter by searchText only if provided; otherwise include all medicines
+            if (hasSearchText && !medicine.getName().toLowerCase().contains(searchText.toLowerCase().trim())) {
+                continue;
+            }
 
-                medicineDTO.setSaltComposition(medicine.getSaltComposition());
+            MedicineDTO medicineDTO = new MedicineDTO();
+            medicineDTO.setId(medicine.getVendorMedicineId());
+            medicineDTO.setName(medicine.getName());
+
+            MedicineInformation medicineInformation = medicine.getMedicineInformation();
+            if (medicineInformation != null) {
+                medicineDTO.setPhoto1(medicineInformation.getPhoto1());
+                medicineDTO.setStrip(medicineInformation.getPacking());
+                medicineDTO.setDescription(medicineInformation.getDescription());
+            } else {
+                medicineDTO.setDescription("");
+                medicineDTO.setPhoto1("");
+                medicineDTO.setStrip("");
+            }
+
+            medicineDTO.setSaltComposition(medicine.getSaltComposition());
+            
+            // Try to find stock info for this medicine and vendor to populate price/discount
+            List<Stock> medicineStocks = stockRepository.findByMedicineIdAndVendorId(medicine.getVendorMedicineId(), vendor.getId());
+            if (medicineStocks != null && !medicineStocks.isEmpty()) {
+                Stock stock = medicineStocks.get(0);
                 medicineDTO.setDiscount(stock.getDiscount());
                 medicineDTO.setQty(stock.getQty());
                 medicineDTO.setMrp(stock.getMrp());
                 medicineDTO.setExpiryDate(stock.getExpiryDate());
-                medicineDTOList.add(medicineDTO);
+            } else {
+                // Default values if no stock entry exists
+                medicineDTO.setDiscount(java.math.BigDecimal.ZERO);
+                medicineDTO.setQty(0);
+                medicineDTO.setMrp(java.math.BigDecimal.ZERO);
+                medicineDTO.setExpiryDate("N/A");
             }
+            
+            medicineDTOList.add(medicineDTO);
         }
+
         vendorDTO.setMedicines(medicineDTOList);
         return vendorDTO;
-
     }
 }

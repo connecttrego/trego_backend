@@ -56,9 +56,6 @@ public class Medicine {
     @Column(name = "medicine_owner", columnDefinition = "ENUM('super_admin','vendor')")
     private String medicineOwner;
 
-    @Column(name = "id")
-    private Long id;
-
     @Column(name = "medicine_id")
     private Long medicineId;
 
@@ -73,4 +70,14 @@ public class Medicine {
 
     @OneToOne(mappedBy = "medicine")
     private MedicineInformation medicineInformation;
+
+    // Delegate getId()/setId() to vendorMedicineId (the actual PK)
+    // because the legacy "id" column is NULL in DB and has been removed
+    public Long getId() {
+        return this.vendorMedicineId;
+    }
+
+    public void setId(Long id) {
+        this.vendorMedicineId = id;
+    }
 }
