@@ -4,10 +4,10 @@ import com.trego.dao.entity.Vendor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+
 
 @Repository
 public interface VendorRepository extends JpaRepository<Vendor, Integer> {
-      List<Vendor> findByCategory(String type);
+      // findByCategory removed - Vendor entity (vendor_informations) has no category field in ap-db-change schema
     // Custom queries can be defined here, if necessary
 }

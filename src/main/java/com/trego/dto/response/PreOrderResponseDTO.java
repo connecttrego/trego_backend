@@ -1,7 +1,7 @@
 package com.trego.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.trego.dto.CartDTO;
+
 import lombok.Data;
 
 import java.math.BigDecimal;

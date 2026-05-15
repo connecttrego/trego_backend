@@ -9,7 +9,7 @@ import java.util.List;
 @Data
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public class BucketDTO {
-    private Integer id;
+    private Long id;
     private String name;
     private List<BucketItemDTO> availableItems; // Available medicines
     private List<UnavailableMedicineDTO> unavailableItems; // Unavailable medicines with substitutes

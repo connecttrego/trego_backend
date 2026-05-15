@@ -2,8 +2,6 @@ package com.trego.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.trego.dto.MedicineDTO;
-import com.trego.dto.MedicinePreOrderDTO;
-import com.trego.dto.VendorDTO;
 import lombok.Data;
 
 import java.math.BigDecimal;

@@ -1,6 +1,5 @@
 package com.trego.api;
 
-import com.trego.dto.MedicineDTO;
 import com.trego.dto.PreOrderDTO;
 import com.trego.dto.response.PreOrderResponseDTO;
 import com.trego.dto.response.VandorCartResponseDTO;
@@ -10,8 +9,6 @@ import com.trego.service.IPreOrderService;
 import java.math.BigDecimal;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -39,7 +36,7 @@ public class PreOrderController {
     }
 
     @GetMapping("/vendorspecificcarts/order/{orderId}")
-    public VandorCartResponseDTO vendorSpecificPrice(@PathVariable long orderId) {
+    public VandorCartResponseDTO vendorSpecificPrice(@PathVariable Long orderId) {
         return preOrderService.vendorSpecificPrice(orderId);
     }
 

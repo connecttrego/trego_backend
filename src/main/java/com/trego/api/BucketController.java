@@ -2,9 +2,7 @@ package com.trego.api;
 
 import com.trego.dto.BucketDTO;
 import com.trego.dto.BucketRequestDTO;
-import com.trego.dto.SelectedSubstituteDTO;
 import com.trego.dto.response.VandorCartResponseDTO;
-import com.trego.dto.view.SubstituteDetailView;
 import com.trego.service.IBucketService;
 import com.trego.service.IPreOrderService;
 import org.springframework.beans.factory.annotation.Autowired;

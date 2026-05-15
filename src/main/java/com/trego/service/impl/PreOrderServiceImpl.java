@@ -6,7 +6,6 @@ import com.trego.dao.impl.*;
 import com.trego.dto.CartDTO;
 import com.trego.dto.MedicineDTO;
 import com.trego.dto.PreOrderDTO;
-import com.trego.dto.VendorDTO;
 import com.trego.dto.response.CartResponseDTO;
 import com.trego.dto.response.PreOrderResponseDTO;
 import com.trego.dto.response.VandorCartResponseDTO;
@@ -14,17 +13,12 @@ import com.trego.service.IPreOrderService;
 import com.trego.utils.Constants;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import jakarta.transaction.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -100,7 +94,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     @Override
-    public VandorCartResponseDTO vendorSpecificPrice(long orderId) {
+    public VandorCartResponseDTO vendorSpecificPrice(Long orderId) {
         PreOrder preOrder = preOrderRepository.findById(orderId).orElse(null);
         VandorCartResponseDTO vandorCartResponseDTO = new VandorCartResponseDTO();
         vandorCartResponseDTO.setUserId(preOrder.getUserId());

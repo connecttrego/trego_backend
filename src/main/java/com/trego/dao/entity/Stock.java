@@ -2,9 +2,8 @@ package com.trego.dao.entity;
 
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
-import org.checkerframework.checker.units.qual.C;
+
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
@@ -40,13 +39,15 @@ public class Stock {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "price_id")
     private Integer id;
+    @Column(columnDefinition = "DOUBLE")
     private BigDecimal mrp;
+    @Column(columnDefinition = "DOUBLE")
     private BigDecimal discount;
     @Column(name = "quantity")
     private int qty;
 
     @Column(name = "expiry_date")
-    private LocalDate expiryDate;
+    private String expiryDate;
 
     @ManyToOne
     @JoinColumn(name = "vendor_medicine_id")

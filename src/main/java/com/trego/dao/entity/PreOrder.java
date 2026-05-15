@@ -31,7 +31,7 @@ public class PreOrder {
     @Column(nullable = true, name = "order_type")
     private Integer orderType;
 
-    @Column(nullable = true, name = "total_pay_amount")
+    @Column(nullable = true, name = "total_pay_amount", columnDefinition = "DOUBLE")
     private BigDecimal totalPayAmount;
 
     @Column(name = "payment_status", nullable = true)
@@ -45,7 +45,7 @@ public class PreOrder {
 
 
     @Column(name = "address_id", nullable = true)
-    private long addressId;
+    private Long addressId;
 
     @Column(name = "created_by", nullable = false)
     private String createdBy;

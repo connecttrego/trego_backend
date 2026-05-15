@@ -1,8 +1,6 @@
 package com.trego.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.trego.dao.entity.Address;
-import com.trego.dao.entity.Order;
 import com.trego.dto.AddressDTO;
 import lombok.Data;
 

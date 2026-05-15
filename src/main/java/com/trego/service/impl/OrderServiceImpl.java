@@ -13,7 +13,6 @@ import com.trego.service.IPreOrderService;
 import com.trego.utils.Constants;
 
 import jakarta.transaction.Transactional;
-import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -765,7 +764,7 @@ public class OrderServiceImpl implements IOrderService {
         JsonObject jsonObject = new JsonObject();
         // Add fields to the JSON object
         BigDecimal amount = preOrderResponseDTO.getAmountToPay()
-                .setScale(2, BigDecimal.ROUND_HALF_UP);
+                .setScale(2, RoundingMode.HALF_UP);
         int convertedAmount = amount.multiply(BigDecimal.valueOf(100)).intValue();
 
         jsonObject.addProperty("amount", convertedAmount);
@@ -994,7 +993,7 @@ public class OrderServiceImpl implements IOrderService {
         JsonObject jsonObject = new JsonObject();
         // Add fields to the JSON object
         BigDecimal amount = preOrderResponseDTO.getAmountToPay()
-                .setScale(2, BigDecimal.ROUND_HALF_UP);
+                .setScale(2, RoundingMode.HALF_UP);
         int convertedAmount = amount.multiply(BigDecimal.valueOf(100)).intValue();
 
         jsonObject.addProperty("amount", convertedAmount);

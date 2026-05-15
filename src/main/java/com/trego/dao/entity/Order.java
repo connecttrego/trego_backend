@@ -1,6 +1,5 @@
 package com.trego.dao.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -26,10 +25,10 @@ public class Order {
     @JoinColumn(name = "vendor_id")
     private Vendor vendor;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "DOUBLE")
     private BigDecimal totalAmount;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "DOUBLE")
     private BigDecimal discount;
 
     @Column(nullable = false)
@@ -48,7 +47,7 @@ public class Order {
     private String name;
 
     @Column(nullable = true)
-    private long mobile;
+    private Long mobile;
 
     @Column(nullable = false)
     private String email;

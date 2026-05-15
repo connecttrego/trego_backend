@@ -29,13 +29,13 @@ public class OrderItem {
     @Column(nullable = true)
     private Integer qty;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "DOUBLE")
     private BigDecimal mrp;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "DOUBLE")
     private BigDecimal sellingPrice;
 
-    @Column(nullable = true)
+    @Column(nullable = true, columnDefinition = "DOUBLE")
     private BigDecimal amount;
 
     @Column(nullable = true)

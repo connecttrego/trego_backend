@@ -1,6 +1,6 @@
 package com.trego.dto.response;
 
-import com.trego.dto.MedicineDTO;
+
 import lombok.Data;
 
 import java.math.BigDecimal;

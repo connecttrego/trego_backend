@@ -1,9 +1,6 @@
 package com.trego.dto;
 
-import com.trego.dto.response.CartResponseDTO;
 import lombok.Data;
-
-import java.util.List;
 
 @Data
 public class OrderRequestDTO {

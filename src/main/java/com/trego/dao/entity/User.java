@@ -1,8 +1,5 @@
 package com.trego.dao.entity;
 
-import jakarta.persistence.Entity;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -16,7 +13,7 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
+    private Long id;
 
     private String name;
 
@@ -33,7 +30,7 @@ public class User {
     @Column(name = "remember_token")
     private String rememberToken;
 
-    private long mobile;
+    private Long mobile;
 
     private String role;
 

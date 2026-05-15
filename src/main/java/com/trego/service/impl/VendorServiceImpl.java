@@ -6,21 +6,16 @@ import com.trego.dao.entity.MedicineInformation;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.entity.Vendor;
 import com.trego.dao.impl.BannerRepository;
-import com.trego.dao.impl.MedicineRepository;
 import com.trego.dao.impl.StockRepository;
 import com.trego.dao.impl.VendorRepository;
 import com.trego.dto.BannerDTO;
 import com.trego.dto.MedicineDTO;
-import com.trego.dto.StockDTO;
 import com.trego.dto.VendorDTO;
 import com.trego.service.IVendorService;
-import com.trego.utils.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
@@ -40,15 +35,12 @@ public class VendorServiceImpl implements IVendorService {
     @Autowired
     private BannerRepository bannerRepository;
 
-    @Autowired
-    private MedicineRepository medicineRepository;
-
     public List<VendorDTO> findVendorsByType(String type) {
         List<VendorDTO> vendorDTOs = new ArrayList<>();
 
         // Remove category condition - fetch all vendors without filtering by type
-        List<Vendor>  vendors = vendorRepository.findAll(); // This will fetch all vendors
-        for (Vendor vendor : vendors){
+        List<Vendor> vendors = vendorRepository.findAll(); // This will fetch all vendors
+        for (Vendor vendor : vendors) {
             VendorDTO vendorDTO = new VendorDTO();
             vendorDTO.setId(vendor.getId());
             vendorDTO.setName(vendor.getName());
@@ -64,14 +56,14 @@ public class VendorServiceImpl implements IVendorService {
             vendorDTO.setRating(vendor.getRating());
             vendorDTOs.add(vendorDTO);
         }
-        return  vendorDTOs;
+        return vendorDTOs;
     }
 
     @Override
-    public VendorDTO getVendorByIdOrMedicine(Integer id,  String searchText, int page, int size) {
+    public VendorDTO getVendorByIdOrMedicine(Integer id, String searchText, int page, int size) {
         VendorDTO vendorDTO = new VendorDTO();
         Vendor vendor = vendorRepository.findById(id).orElse(null);
-        if(page == 0) {
+        if (page == 0) {
             vendorDTO.setId(vendor.getId());
             vendorDTO.setName(vendor.getName());
             // Remove the category-based URL logic
@@ -100,7 +92,7 @@ public class VendorServiceImpl implements IVendorService {
 
             vendorDTO.setBanners(topBannerDTOs);
         }
-        //List<StockDTO> stockDTOS = new ArrayList<>();
+        // List<StockDTO> stockDTOS = new ArrayList<>();
 
         // Create a Pageable object
         Pageable pageable = PageRequest.of(page, size);
@@ -109,10 +101,9 @@ public class VendorServiceImpl implements IVendorService {
         // Get the list of stocks from the page
         List<Stock> stocks = stocksPage.getContent();
 
-
-        //List<Stock> stocks   = stockRepository.findByVendorId(vendor.getId());
+        // List<Stock> stocks = stockRepository.findByVendorId(vendor.getId());
         List<MedicineDTO> medicineDTOList = new ArrayList<>();
-        for(Stock stock : stocks){
+        for (Stock stock : stocks) {
             Medicine medicine = stock.getMedicine();
             Pattern pattern = Pattern.compile(Pattern.quote(searchText), Pattern.CASE_INSENSITIVE);
             Matcher matcher = pattern.matcher(medicine.getName());
@@ -120,7 +111,7 @@ public class VendorServiceImpl implements IVendorService {
                 MedicineDTO medicineDTO = new MedicineDTO();
                 medicineDTO.setId(medicine.getId());
                 medicineDTO.setName(medicine.getName());
-                
+
                 MedicineInformation medicineInformation = medicine.getMedicineInformation();
                 if (medicineInformation != null) {
                     medicineDTO.setPhoto1(medicineInformation.getPhoto1());
@@ -131,7 +122,7 @@ public class VendorServiceImpl implements IVendorService {
                     medicineDTO.setPhoto1("");
                     medicineDTO.setStrip("");
                 }
-                
+
                 medicineDTO.setSaltComposition(medicine.getSaltComposition());
                 medicineDTO.setDiscount(stock.getDiscount());
                 medicineDTO.setQty(stock.getQty());

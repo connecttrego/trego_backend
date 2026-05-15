@@ -1,24 +1,14 @@
 package com.trego.service.impl;
 
-import com.trego.dao.entity.Medicine;
-import com.trego.dao.entity.Stock;
 import com.trego.dao.impl.MedicineRepository;
-import com.trego.dao.impl.StockRepository;
-import com.trego.dto.MedicineDTO;
-import com.trego.dto.MedicineWithStockAndVendorDTO;
-import com.trego.dto.SubstituteDTO;
-import com.trego.dto.SubstituteDetailDTO;
+
 import com.trego.dto.view.SubstituteDetailView;
-import com.trego.service.IMedicineService;
 import com.trego.service.ISubstituteService;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+
 import java.util.List;
 
 @Service
@@ -27,12 +17,11 @@ public class SubstituteServiceImpl implements ISubstituteService {
     @Autowired
     MedicineRepository medicineRepository;
 
-    @Autowired
-    StockRepository stockRepository;
+
 
     @Override
-    public List<SubstituteDetailView> findSubstitute(long id) {
-        List<SubstituteDetailDTO> medicineWithStockAndVendorDTOList = new ArrayList<>();
+    public List<SubstituteDetailView> findSubstitute(Long id) {
+
         List<SubstituteDetailView> medicines = medicineRepository.findSubstituteByMedicineId(id);
 //        for (Medicine medicine : medicines) {
 //

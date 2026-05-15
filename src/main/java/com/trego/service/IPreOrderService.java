@@ -9,5 +9,5 @@ public interface IPreOrderService {
 
     PreOrderResponseDTO getOrdersByUserId(Long userId);
 
-    VandorCartResponseDTO vendorSpecificPrice(long orderId);
+    VandorCartResponseDTO vendorSpecificPrice(Long orderId);
 }

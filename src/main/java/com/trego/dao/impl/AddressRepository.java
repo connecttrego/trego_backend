@@ -9,5 +9,5 @@ import java.util.List;
 @Repository
 public interface AddressRepository extends JpaRepository<Address, Long> {
     // Custom query methods can be added here if needed
-    List<Address> findByUserId(long userId);
+    List<Address> findByUserId(Long userId);
 }

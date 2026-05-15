@@ -9,7 +9,6 @@ import com.trego.service.IAddressService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -56,7 +55,7 @@ public class AddressServiceImpl implements IAddressService {
     }
 
     private List<AddressDTO> populateAddressDTO(List<Address> addressList) {
-        List<AddressDTO> addressDTOS = new ArrayList<>();
+
 
         return addressList.stream()
                 .map(address -> new AddressDTO(

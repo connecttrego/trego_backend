@@ -4,7 +4,7 @@ import com.trego.dao.entity.User;
 import com.trego.dto.UserDTO;
 
 import java.util.List;
-import java.util.Optional;
+
 
 public interface IUserService {
 

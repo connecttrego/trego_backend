@@ -6,7 +6,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-import java.math.BigDecimal;
+
 
 
 @Data
@@ -21,8 +21,10 @@ public class Address {
     private String city;
     private String landmark;
     private String pincode;
-    private BigDecimal lat;
-    private BigDecimal lng;
+
+    private Double lat;
+
+    private Double lng;
 
     @Column(name = "mobile_no")
     private String mobileNo;

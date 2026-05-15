@@ -4,7 +4,6 @@ import com.trego.dao.entity.Stock;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 //SELECT *
@@ -49,7 +48,7 @@ public class MedicineDTO {
     private BigDecimal mrp;
     private BigDecimal discount;
     private int qty;
-    private LocalDate expiryDate;
+    private String expiryDate;
     private BigDecimal actualPrice;
     private String image;
     private String strip;

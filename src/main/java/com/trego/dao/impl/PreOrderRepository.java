@@ -1,6 +1,5 @@
 package com.trego.dao.impl;
 
-import com.trego.dao.entity.Medicine;
 import com.trego.dao.entity.PreOrder;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;

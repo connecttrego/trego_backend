@@ -18,6 +18,6 @@ public class Banner {
     private  String bannerUrl;
     private String position;
     private Long medicineId;
-    private Long vendorId;
+    private Integer vendorId;
     private String createdBy;
 }

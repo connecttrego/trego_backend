@@ -1,8 +1,6 @@
 package com.trego.api;
 
 import com.trego.dto.CategoryDTO;
-import com.trego.dto.MainDTO;
-import com.trego.service.IMainService;
 import com.trego.service.IMasterService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;

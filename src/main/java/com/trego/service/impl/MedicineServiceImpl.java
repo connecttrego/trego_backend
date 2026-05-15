@@ -9,7 +9,7 @@ import com.trego.dao.impl.StockRepository;
 import com.trego.dto.MedicineWithStockAndVendorDTO;
 import com.trego.dto.SubstituteDTO;
 import com.trego.service.IMedicineService;
-import com.trego.utils.Constants;
+
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -88,11 +88,11 @@ public class MedicineServiceImpl implements IMedicineService {
     }
 
     @Override
-    public Page<MedicineWithStockAndVendorDTO> searchMedicines(String searchText, long vendorId, int page, int size) {
+    public Page<MedicineWithStockAndVendorDTO> searchMedicines(String searchText, Integer vendorId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<Medicine> medicines = null;
         if (vendorId != 0) {
-            medicines = medicineRepository.findByNameWithVendorId(searchText, (int) vendorId, pageable);
+            medicines = medicineRepository.findByNameWithVendorId(searchText, vendorId, pageable);
 
         } else {
             medicines = medicineRepository.findByNameContainingIgnoreCaseOrNameIgnoreCase(searchText, "", pageable);
@@ -103,7 +103,7 @@ public class MedicineServiceImpl implements IMedicineService {
 
 
     @Override
-    public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Integer subcategoryId, int page, int size) {
+    public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Long subcategoryId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Medicine> medicines = medicineRepository.findBySubcategoryId(subcategoryId, pageable);

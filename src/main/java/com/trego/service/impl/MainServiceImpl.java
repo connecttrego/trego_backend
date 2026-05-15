@@ -1,22 +1,16 @@
 package com.trego.service.impl;
 
 import com.trego.dao.entity.Banner;
-import com.trego.dao.entity.Medicine;
-import com.trego.dao.entity.MedicineInformation;
-import com.trego.dao.entity.Stock;
-import com.trego.dao.entity.Vendor;
 import com.trego.dao.impl.*;
 import com.trego.dto.*;
 import com.trego.service.IMainService;
 import com.trego.service.IMasterService;
-import com.trego.utils.Constants;
 
-import org.springframework.data.domain.PageRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -173,74 +167,5 @@ public class MainServiceImpl implements IMainService {
 //        return topOfflineVendors;
 //    }
 
-    private static VendorDTO populateVendorDTO(Vendor vendor) {
-        VendorDTO vendorDTO = new VendorDTO();
-        vendorDTO.setId(vendor.getId());
-        vendorDTO.setName(vendor.getName());
-        vendorDTO.setLogo(vendor.getLogo());
-        vendorDTO.setGstNumber(vendor.getGistin());
-        vendorDTO.setLicence(vendor.getDruglicense());
-        vendorDTO.setAddress(vendor.getAddress());
-        vendorDTO.setLat(vendor.getLat());
-        vendorDTO.setLng(vendor.getLng());
-        vendorDTO.setDeliveryTime(vendor.getDeliveryTime());
-        vendorDTO.setReviews(vendor.getReviews());
-        return vendorDTO;
-    }
 
-    private static List<MedicineDTO> populateMedicineDTOs(List<Stock> stocks, Map<Long, Long> medicineSalesMap) {
-        int count = 0;
-        List<MedicineDTO> medicineDTOList = new ArrayList<>();
-
-        // Sort stocks based on sales count (highest first), then by stock ID as
-        // fallback
-        stocks.sort((s1, s2) -> {
-            Long medicineId1 = s1.getMedicine().getId();
-            Long medicineId2 = s2.getMedicine().getId();
-            Long sales1 = medicineSalesMap.getOrDefault(medicineId1, 0L);
-            Long sales2 = medicineSalesMap.getOrDefault(medicineId2, 0L);
-            int salesComparison = sales2.compareTo(sales1); // Descending order of sales
-            if (salesComparison != 0) {
-                return salesComparison;
-            }
-            // If sales are equal, sort by stock ID to maintain consistent ordering
-            return Long.valueOf(s1.getId()).compareTo(Long.valueOf(s2.getId()));
-        });
-
-        for (Stock stock : stocks) {
-            count++;
-            Medicine medicine = stock.getMedicine();
-            MedicineDTO medicineDTO = new MedicineDTO();
-            medicineDTO.setId(medicine.getId());
-            medicineDTO.setName(medicine.getName());
-            medicineDTO.setMedicineType(medicine.getMedicineType());
-            medicineDTO.setManufacturer(medicine.getManufacture()); // Fixed rename
-            medicineDTO.setSaltComposition(medicine.getSaltComposition());
-            
-            MedicineInformation medicineInformation = medicine.getMedicineInformation();
-            if (medicineInformation != null) {
-                medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
-                medicineDTO.setUseOf(medicineInformation.getUseOf());
-                medicineDTO.setStrip(medicineInformation.getPacking());
-            } else {
-                medicineDTO.setPhoto1("");
-                medicineDTO.setUseOf("");
-                medicineDTO.setStrip("");
-            }
-            
-            medicineDTO.setDiscount(stock.getDiscount());
-            medicineDTO.setQty(stock.getQty());
-            medicineDTO.setMrp(stock.getMrp());
-            medicineDTO.setExpiryDate(stock.getExpiryDate());
-
-            // Add sales count information
-            Long salesCount = medicineSalesMap.getOrDefault(medicine.getId(), 0L);
-            medicineDTO.setSalesCount(salesCount);
-
-            medicineDTOList.add(medicineDTO);
-            if (count >= 10) // Changed from > 10 to >= 10 to get exactly 10 medicines
-                break;
-        }
-        return medicineDTOList;
-    }
 }

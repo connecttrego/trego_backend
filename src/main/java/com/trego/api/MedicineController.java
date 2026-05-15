@@ -2,7 +2,7 @@ package com.trego.api;
 
 import com.trego.dto.MedicineDTO;
 import com.trego.dto.MedicineWithStockAndVendorDTO;
-import com.trego.dto.SubstituteDetailDTO;
+
 import com.trego.dto.UnavailableMedicineDTO;
 import com.trego.dto.view.SubstituteDetailView;
 import com.trego.service.IMedicineService;
@@ -38,7 +38,7 @@ public class MedicineController {
     @GetMapping("/medicines/search")
     public Page<MedicineWithStockAndVendorDTO> searchProducts(
             @RequestParam String searchText,
-            @RequestParam(defaultValue = "0") long vendorId,
+            @RequestParam(defaultValue = "0") Integer vendorId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
@@ -47,7 +47,7 @@ public class MedicineController {
 
     @GetMapping("/substitute/{id}")
     public List<SubstituteDetailView> findSubstitute(
-            @PathVariable long id
+            @PathVariable Long id
     ) {
         return substituteService.findSubstitute(id);
     }
@@ -59,7 +59,7 @@ public class MedicineController {
      */
     @GetMapping("/medicines/{id}/unavailable")
     public UnavailableMedicineDTO getUnavailableMedicineInfo(
-            @PathVariable long id,
+            @PathVariable Long id,
             @RequestParam(defaultValue = "1") int requestedQuantity
     ) {
         // Create an unavailable medicine DTO with the requested information
@@ -81,7 +81,7 @@ public class MedicineController {
 
     @GetMapping("/subcategories/{subcategoryId}/medicines")
     public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(
-            @PathVariable Integer subcategoryId,
+            @PathVariable Long subcategoryId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {

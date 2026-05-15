@@ -1,7 +1,7 @@
 package com.trego.dao.impl;
 
 import com.trego.dao.entity.Medicine;
-import com.trego.dto.SubstituteDetailDTO;
+
 import com.trego.dto.view.SubstituteDetailView;
 
 import org.springframework.data.domain.Page;
@@ -23,7 +23,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
             "JOIN FETCH m.stocks s " +
             "JOIN FETCH s.vendor v " +
             "WHERE m.name LIKE %:name% AND v.id = :vendorId")
-    Page<Medicine> findByNameWithVendorId(String name, int vendorId, Pageable pageable);
+    Page<Medicine> findByNameWithVendorId(String name, Integer vendorId, Pageable pageable);
 
     @Query(value = """
         select
@@ -63,10 +63,10 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
         )
         and m.vendor_medicine_id != :medicineId LIMIT 2
         """, nativeQuery = true)
-    List<SubstituteDetailView> findSubstituteByMedicineId(@Param("medicineId") long medicineId);
+    List<SubstituteDetailView> findSubstituteByMedicineId(@Param("medicineId") Long medicineId);
 //AND m.manufacturer IN ('Abbott', 'Lupin Ltd', 'Dr. Reddy’s Labs')
 
-    Page<Medicine> findBySubcategoryId(Integer subcategoryId, Pageable pageable);
+    Page<Medicine> findBySubcategoryId(Long subcategoryId, Pageable pageable);
 
 
 }
