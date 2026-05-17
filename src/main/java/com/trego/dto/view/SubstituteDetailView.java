@@ -1,7 +1,5 @@
 package com.trego.dto.view;
 
-import java.math.BigDecimal;
-
 public interface SubstituteDetailView {
     Long getId();
     String getName();
@@ -11,7 +9,7 @@ public interface SubstituteDetailView {
     String getVendorId();
     String getVendorLogo();
     String getPacking();
-    BigDecimal getMrp();
-    BigDecimal getBestPrice();
-    BigDecimal getDiscount();
+    Double getMrp();
+    Double getBestPrice();
+    Double getDiscount();
 }

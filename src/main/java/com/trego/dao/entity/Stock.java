@@ -1,13 +1,10 @@
 package com.trego.dao.entity;
 
-
-import java.math.BigDecimal;
-
-
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 //
 //CREATE TABLE `vendor_medicine_price` (
 //        `price_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -30,7 +27,6 @@ import lombok.Data;
 //CONSTRAINT `fk_vendor_price_id` FOREIGN KEY (`vendor_id`) REFERENCES `vendor_signup` (`vendor_id`)
 //        ) ENGINE=InnoDB AUTO_INCREMENT=56 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-
 @Data
 @Entity(name = "vendor_medicine_price")
 public class Stock {
@@ -39,10 +35,12 @@ public class Stock {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "price_id")
     private Integer id;
+    @JdbcTypeCode(SqlTypes.DOUBLE)
     @Column(columnDefinition = "DOUBLE")
-    private BigDecimal mrp;
+    private Double mrp;
+    @JdbcTypeCode(SqlTypes.DOUBLE)
     @Column(columnDefinition = "DOUBLE")
-    private BigDecimal discount;
+    private Double discount;
     @Column(name = "quantity")
     private int qty;
 

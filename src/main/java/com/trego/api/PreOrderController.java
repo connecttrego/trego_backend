@@ -6,8 +6,6 @@ import com.trego.dto.response.VandorCartResponseDTO;
 import com.trego.exception.InvalidAmountException;
 import com.trego.service.IPreOrderService;
 
-import java.math.BigDecimal;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,7 +21,7 @@ public class PreOrderController {
 
         PreOrderResponseDTO preOrderResponseDTO = preOrderService.savePreOrder(preOrder);
         if (preOrderResponseDTO.getAmountToPay() == null ||
-                preOrderResponseDTO.getAmountToPay().compareTo(BigDecimal.ZERO) <= 0) {
+                preOrderResponseDTO.getAmountToPay() <= 0.0) {
 
             throw new InvalidAmountException("Amount to pay must be greater than zero.");
         }

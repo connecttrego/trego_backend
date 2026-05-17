@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.trego.dto.AddressDTO;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -13,9 +12,9 @@ public class OrderResponseDTO {
     private Long userId;
     private Long orderId;
     private String razorpayOrderId;
-    private BigDecimal totalCartValue;
-    private BigDecimal amountToPay;
-    private BigDecimal discount;
+    private Double totalCartValue;
+    private Double amountToPay;
+    private Double discount;
     private String mobileNo;
     private AddressDTO address;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")

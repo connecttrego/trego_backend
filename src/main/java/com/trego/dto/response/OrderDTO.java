@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.trego.dto.VendorDTO;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -13,8 +12,8 @@ public class OrderDTO {
 
 
     private long  orderId;
-    private BigDecimal totalAmount;
-    private BigDecimal discount;
+    private Double totalAmount;
+    private Double discount;
     private String orderStatus;
     private String paymentStatus;
     private String address;
@@ -25,7 +24,6 @@ public class OrderDTO {
     private List<OrderItemDTO> orderItemsList;
     private String cancelReason;
     private String cancelReasonId;
-
 
 
 }

@@ -2,8 +2,9 @@ package com.trego.dao.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,18 +22,19 @@ public class PreOrder {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String payload;
-    
+
     @Column(nullable = true, columnDefinition = "TEXT")
     private String vendorPayload;
 
     @Column(nullable = true, name = "razorpay_order_id")
-	private String razorpayOrderId;
-    
+    private String razorpayOrderId;
+
     @Column(nullable = true, name = "order_type")
     private Integer orderType;
 
+    @JdbcTypeCode(SqlTypes.DOUBLE)
     @Column(nullable = true, name = "total_pay_amount", columnDefinition = "DOUBLE")
-    private BigDecimal totalPayAmount;
+    private Double totalPayAmount;
 
     @Column(name = "payment_status", nullable = true)
     private String paymentStatus;
@@ -43,22 +45,21 @@ public class PreOrder {
     @Column(name = "mobile_no", nullable = true)
     private String mobileNo;
 
-
     @Column(name = "address_id", nullable = true)
     private Long addressId;
 
     @Column(name = "created_by", nullable = false)
     private String createdBy;
-    
+
     @Column(name = "modified_by", nullable = true)
     private String modifiedBy;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
-    
+
     @Column(name = "modified_at", nullable = true)
     private LocalDateTime modifiedAt;
-    
+
     @Column(name = "selected_vendor_id", nullable = true)
     private Integer selectedVendorId;
 
@@ -67,7 +68,7 @@ public class PreOrder {
         this.createdAt = LocalDateTime.now();
         this.modifiedAt = LocalDateTime.now();
     }
-    
+
     @PreUpdate
     protected void onUpdate() {
         this.modifiedAt = LocalDateTime.now(); // Update automatically before every save

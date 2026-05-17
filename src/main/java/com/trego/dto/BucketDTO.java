@@ -3,7 +3,6 @@ package com.trego.dto;
 import lombok.Data;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -14,10 +13,10 @@ public class BucketDTO {
     private List<BucketItemDTO> availableItems; // Available medicines
     private List<UnavailableMedicineDTO> unavailableItems; // Unavailable medicines with substitutes
     private List<SelectedSubstituteDTO> selectedSubstitutes; // User-selected substitutes
-    private BigDecimal totalPrice;
-    private BigDecimal deliveryCharges;
-    private BigDecimal amountToPay;
-    private BigDecimal totalDiscount; // Total discount across all items in the bucket
+    private Double totalPrice;
+    private Double deliveryCharges;
+    private Double amountToPay;
+    private Double totalDiscount; // Total discount across all items in the bucket
     private Integer vendorId; // If all items are from the same vendor
     private String vendorName; // If all items are from the same vendor
     private String logo;

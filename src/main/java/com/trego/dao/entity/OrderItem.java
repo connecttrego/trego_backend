@@ -2,8 +2,9 @@ package com.trego.dao.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 
@@ -19,24 +20,23 @@ public class OrderItem {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @ManyToOne
-    @JoinColumn(name = "vendor_medicine_id", nullable = false)
-    private Medicine medicine;
-
-/*    @Column(nullable = true)
-    private Integer medicineId;*/
+    @Column(name = "medicine_id", nullable = false)
+    private Long medicineId;
 
     @Column(nullable = true)
     private Integer qty;
 
+    @JdbcTypeCode(SqlTypes.DOUBLE)
     @Column(nullable = true, columnDefinition = "DOUBLE")
-    private BigDecimal mrp;
+    private Double mrp;
 
+    @JdbcTypeCode(SqlTypes.DOUBLE)
     @Column(nullable = true, columnDefinition = "DOUBLE")
-    private BigDecimal sellingPrice;
+    private Double sellingPrice;
 
+    @JdbcTypeCode(SqlTypes.DOUBLE)
     @Column(nullable = true, columnDefinition = "DOUBLE")
-    private BigDecimal amount;
+    private Double amount;
 
     @Column(nullable = true)
     private String thumbnail;

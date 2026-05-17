@@ -2,8 +2,9 @@ package com.trego.dao.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,11 +26,13 @@ public class Order {
     @JoinColumn(name = "vendor_id")
     private Vendor vendor;
 
+    @JdbcTypeCode(SqlTypes.DOUBLE)
     @Column(nullable = false, columnDefinition = "DOUBLE")
-    private BigDecimal totalAmount;
+    private Double totalAmount;
 
+    @JdbcTypeCode(SqlTypes.DOUBLE)
     @Column(nullable = false, columnDefinition = "DOUBLE")
-    private BigDecimal discount;
+    private Double discount;
 
     @Column(nullable = false)
     private String address;

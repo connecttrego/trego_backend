@@ -2,6 +2,7 @@ package com.trego.service;
 
 import com.trego.dto.MedicineDTO;
 import com.trego.dto.MedicineWithStockAndVendorDTO;
+import com.trego.dto.response.VendorMedicinePriceResponseDTO;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -15,5 +16,17 @@ public interface IMedicineService {
 
     Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Long subcategoryId, int page, int size);
 
+    /**
+     * Search medicines by name and return a list of VendorMedicinePriceResponseDTO,
+     * each containing all vendors selling that medicine sorted by cheapest price first.
+     */
+    List<VendorMedicinePriceResponseDTO> searchMedicineVendorPrices(String searchText);
+
+    /**
+     * Get a single medicine with ALL its vendors and their best prices,
+     * sorted by cheapest selling price first.
+     * Used when user clicks on a specific medicine from search results.
+     */
+    VendorMedicinePriceResponseDTO getMedicineVendorPrices(Long medicineId);
 
 }

@@ -2,7 +2,6 @@ package com.trego.dto;
 
 
 import lombok.Data;
-import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -14,8 +13,8 @@ public class VendorDTO {
     private String gstNumber;
     private String address;
     private String logo;
-    private BigDecimal lat;
-    private BigDecimal lng;
+    private Double lat;
+    private Double lng;
     private Integer deliveryTime;
     private String reviews;
     private String rating;

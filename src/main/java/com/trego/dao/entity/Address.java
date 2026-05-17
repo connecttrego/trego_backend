@@ -4,6 +4,8 @@ package com.trego.dao.entity;
 import com.trego.enums.AddressType;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -22,8 +24,12 @@ public class Address {
     private String landmark;
     private String pincode;
 
+    @JdbcTypeCode(SqlTypes.DOUBLE)
+    @Column(columnDefinition = "DOUBLE")
     private Double lat;
 
+    @JdbcTypeCode(SqlTypes.DOUBLE)
+    @Column(columnDefinition = "DOUBLE")
     private Double lng;
 
     @Column(name = "mobile_no")

@@ -1,7 +1,5 @@
 package com.trego.dto;
 
-import java.math.BigDecimal;
-
 import lombok.Data;
 
 @Data
@@ -10,12 +8,12 @@ public class BucketItemDTO {
     private String medicineName;
     private String medicineImage;
     private String medicineStrip;
-    //private Long vendorId;
-    //private String vendorName;
+    // private Long vendorId;
+    // private String vendorName;
 
-    private BigDecimal mrp; // Price per unit
+    private Double mrp; // Price per unit
     private double price; // Price per unit
-    private BigDecimal discount;
+    private Double discount;
     private int availableQuantity; // Available quantity from vendor
     private int requestedQuantity; // Quantity requested by user
     private double totalPrice; // Total price (price per unit * requested quantity)

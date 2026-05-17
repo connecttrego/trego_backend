@@ -1,8 +1,5 @@
 package com.trego.utils;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-
 public class Constants {
     public static  final String LOGO_BASE_URL = "";
 
@@ -18,15 +15,30 @@ public class Constants {
 
     public static  final String ONLINE_BASE_URL = "";
 
-    public static BigDecimal calculateUnitPrice(BigDecimal mrp, BigDecimal discount) {
+    public static final String DEFAULT_VENDOR_LOGO = "https://ik.imagekit.io/kqgqzlxfs/vendor/logo_1.png";
 
-    if (mrp == null) return BigDecimal.ZERO;
-    if (discount == null || discount.compareTo(BigDecimal.ZERO) <= 0) return mrp;
+    /**
+     * Returns a valid vendor logo URL with fallback.
+     * If the provided logo is null, empty, or not a valid HTTP URL,
+     * returns the default fallback vendor logo.
+     *
+     * @param logo the logo URL from DB
+     * @return valid logo URL (never null or invalid)
+     */
+    public static String getVendorLogoWithFallback(String logo) {
+        if (logo == null || logo.trim().isEmpty() || !logo.startsWith("http")) {
+            return DEFAULT_VENDOR_LOGO;
+        }
+        return logo;
+    }
 
-    BigDecimal discountAmount = mrp
-            .multiply(discount)
-            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    public static Double calculateUnitPrice(Double mrp, Double discount) {
 
-    return mrp.subtract(discountAmount);
+    if (mrp == null) return 0.0;
+    if (discount == null || discount <= 0.0) return mrp;
+
+    double discountAmount = mrp * discount / 100.0;
+
+    return mrp - discountAmount;
 }
 }

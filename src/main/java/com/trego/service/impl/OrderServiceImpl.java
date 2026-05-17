@@ -20,8 +20,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -99,9 +97,9 @@ public class OrderServiceImpl implements IOrderService {
         if (StringUtils.isEmpty(preOrder.getRazorpayOrderId())
                 || preOrderResponseDTO.getAmountToPay() == null
                 || preOrder.getTotalPayAmount() == null
-                || preOrderResponseDTO.getAmountToPay().compareTo(BigDecimal.ZERO) <= 0
-                || preOrderResponseDTO.getAmountToPay()
-                        .compareTo(preOrder.getTotalPayAmount()) != 0) {
+                || preOrderResponseDTO.getAmountToPay() <= 0.0
+                || !preOrderResponseDTO.getAmountToPay()
+                        .equals(preOrder.getTotalPayAmount())) {
 
             razorpayOrderId = createRazorPayOrder(orderRequest, preOrderResponseDTO);
             preOrder.setRazorpayOrderId(razorpayOrderId);
@@ -170,11 +168,11 @@ public class OrderServiceImpl implements IOrderService {
             System.out.println("Selected bucket vendor ID: " + selectedBucket.getVendorId());
 
             // Use the exact amount from the bucket to ensure consistency
-            BigDecimal bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
-            BigDecimal bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
-            BigDecimal originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
+            Double bucketAmount = selectedBucket.getAmountToPay(); // This is the final amount after discount
+            Double bucketDiscount = selectedBucket.getTotalDiscount(); // Total discount across all items
+            Double originalTotal = selectedBucket.getTotalPrice(); // Original price before discount
 
-            // Create a PreOrder entity for the bucket-based orde
+            // Create a PreOrder entity for the bucket-based order
             PreOrder preOrder = originalPreOrder;
             preOrder.setAddressId(bucketOrderRequest.getAddressId());
             preOrder.setPaymentStatus("unpaid");
@@ -192,8 +190,8 @@ public class OrderServiceImpl implements IOrderService {
             // For bucket orders, we need to create a cart for the selected vendor only
             CartResponseDTO bucketCart = new CartResponseDTO();
             bucketCart.setVendorId(selectedBucket.getVendorId());
-            bucketCart.setTotalCartValue((originalTotal));
-            bucketCart.setAmountToPay((bucketAmount));
+            bucketCart.setTotalCartValue(originalTotal);
+            bucketCart.setAmountToPay(bucketAmount);
             bucketCart.setDiscount(bucketDiscount);
 
             // Convert bucket items to medicine DTOs
@@ -204,26 +202,22 @@ public class OrderServiceImpl implements IOrderService {
                     medicineDTO.setId(bucketItem.getMedicineId());
                     medicineDTO.setName(bucketItem.getMedicineName());
                     medicineDTO.setStrip(bucketItem.getMedicineStrip());
-                    medicineDTO.setMrp(new BigDecimal(bucketItem.getPrice())); // Discounted price
+                    medicineDTO.setMrp(bucketItem.getPrice()); // Discounted price
                     medicineDTO.setDiscount(bucketItem.getDiscount());
                     medicineDTO.setQty(bucketItem.getRequestedQuantity());
                     // Calculate original price before discount
-                    BigDecimal price = new BigDecimal(bucketItem.getPrice());
-                    BigDecimal discount = bucketItem.getDiscount();
+                    Double price = bucketItem.getPrice();
+                    Double discount = bucketItem.getDiscount();
 
-                    BigDecimal originalPrice;
+                    Double originalPrice;
 
-                    if (discount != null && discount.compareTo(BigDecimal.ZERO) > 0) {
-
-                        BigDecimal discountFactor = BigDecimal.ONE.subtract(
-                                discount.divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
-
-                        if (discountFactor.compareTo(BigDecimal.ZERO) == 0) {
+                    if (discount != null && discount > 0.0) {
+                        Double discountFactor = 1.0 - (discount / 100.0);
+                        if (discountFactor == 0.0) {
                             originalPrice = price; // fallback safety
                         } else {
-                            originalPrice = price.divide(discountFactor, 2, RoundingMode.HALF_UP);
+                            originalPrice = price / discountFactor;
                         }
-
                     } else {
                         originalPrice = price;
                     }
@@ -291,12 +285,13 @@ public class OrderServiceImpl implements IOrderService {
             throw new Exception("PreOrder not found: " + orderValidateRequestDTO.getOrderId());
         }
 
+        Integer orderType = preOrder.getOrderType() != null ? preOrder.getOrderType() : 0;
         System.out.println("Found PreOrder ID: " + preOrder.getId() + " with payment status: "
-                + preOrder.getPaymentStatus() + "  OrderType is " + (preOrder.getOrderType() == 1));
+                + preOrder.getPaymentStatus() + "  OrderType is " + (orderType == 1));
         preOrder.setPaymentStatus("paid");
 
         Gson gson = new Gson();
-        String payload = preOrder.getOrderType() == 1 ? preOrder.getVendorPayload() : preOrder.getPayload();
+        String payload = orderType == 1 ? preOrder.getVendorPayload() : preOrder.getPayload();
         PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(payload, PreOrderResponseDTO.class);
         preOrderResponseDTO.setOrderId(preOrder.getId());
 
@@ -305,7 +300,12 @@ public class OrderServiceImpl implements IOrderService {
             preOrderResponseDTO.setAddressId(preOrder.getAddressId());
         }
 
-        if (preOrder.getOrderType() == 1) {
+        // Ensure user ID preserved (fixes NoSuchElementException when userId is missing from payload)
+        if (preOrderResponseDTO.getUserId() == 0) {
+            preOrderResponseDTO.setUserId(preOrder.getUserId());
+        }
+
+        if (orderType == 1) {
             System.out.println(
                     "Selected Vendor ID found: " + preOrder.getSelectedVendorId() + ". Processing as BUCKET ORDER.");
             processBucketOrder(preOrder, preOrderResponseDTO);
@@ -437,7 +437,7 @@ public class OrderServiceImpl implements IOrderService {
 
                 // Collect Medicine IDs
                 List<Long> medIds = items.stream()
-                        .map(i -> i.getMedicine().getId())
+                        .map(i -> i.getMedicineId())
                         .toList();
 
                 PrescriptionRecord record = new PrescriptionRecord();
@@ -530,7 +530,7 @@ public class OrderServiceImpl implements IOrderService {
                 }
 
                 List<Long> medIds = items.stream()
-                        .map(i -> i.getMedicine().getId())
+                        .map(i -> i.getMedicineId())
                         .collect(Collectors.toList());
 
                 PrescriptionRecord record = new PrescriptionRecord();
@@ -591,7 +591,6 @@ public class OrderServiceImpl implements IOrderService {
         });
 
         return responseDTOPage;
-
     }
 
     @Override
@@ -645,18 +644,21 @@ public class OrderServiceImpl implements IOrderService {
             VendorDTO vendorDTO = new VendorDTO();
             vendorDTO.setId(order.getVendor().getId());
             vendorDTO.setName(order.getVendor().getName());
-
-//            if (order.getVendor().getCategory().equalsIgnoreCase("retail")) {
-//                vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL + order.getVendor().getLogo());
-//            } else {
-//                vendorDTO.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL + order.getVendor().getLogo());
-//            }
+            vendorDTO.setLogo(Constants.getVendorLogoWithFallback(order.getVendor().getLogo()));
+            vendorDTO.setLicence(order.getVendor().getDruglicense());
+            vendorDTO.setGstNumber(order.getVendor().getGistin());
+            vendorDTO.setAddress(order.getVendor().getAddress());
+            vendorDTO.setLat(order.getVendor().getLat() != null ? order.getVendor().getLat().doubleValue() : null);
+            vendorDTO.setLng(order.getVendor().getLng() != null ? order.getVendor().getLng().doubleValue() : null);
+            vendorDTO.setDeliveryTime(order.getVendor().getDeliveryTime());
+            vendorDTO.setReviews(order.getVendor().getReviews());
+            vendorDTO.setRating(order.getVendor().getRating());
 
             orderDTO.setVendor(vendorDTO);
 
             // Populate OrderItems list
             List<OrderItemDTO> orderItemsList = new ArrayList<>();
-            BigDecimal totalAmount = new BigDecimal(0);
+            double totalAmount = 0.0;
 
             for (var orderItem : order.getOrderItems()) {
                 OrderItemDTO orderItemDTO = new OrderItemDTO();
@@ -665,18 +667,25 @@ public class OrderServiceImpl implements IOrderService {
                 orderItemDTO.setMrp(orderItem.getMrp());
                 orderItemDTO.setPrice(orderItem.getSellingPrice());
                 orderItemDTO.setTotalAmount(orderItem.getAmount());
-                totalAmount = totalAmount.add(orderItem.getAmount());
+                totalAmount += orderItem.getAmount();
 
                 Map<String, Object> medicineDetails = new HashMap<>();
-                medicineDetails.put("medicineId", orderItem.getMedicine().getId());
-                medicineDetails.put("medicineName", orderItem.getMedicine().getName());
-                
-                MedicineInformation medicineInformation = orderItem.getMedicine().getMedicineInformation();
-                if (medicineInformation != null) {
-                    medicineDetails.put("packing", medicineInformation.getPacking());
-                    medicineDetails.put("medicineLogo",
-                        Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
+                medicineDetails.put("medicineId", orderItem.getMedicineId());
+
+                Medicine medicine = medicineRepository.findById(orderItem.getMedicineId()).orElse(null);
+                if (medicine != null) {
+                    medicineDetails.put("medicineName", medicine.getName());
+                    MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                    if (medicineInformation != null) {
+                        medicineDetails.put("packing", medicineInformation.getPacking());
+                        medicineDetails.put("medicineLogo",
+                            Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
+                    } else {
+                        medicineDetails.put("packing", "");
+                        medicineDetails.put("medicineLogo", "");
+                    }
                 } else {
+                    medicineDetails.put("medicineName", "");
                     medicineDetails.put("packing", "");
                     medicineDetails.put("medicineLogo", "");
                 }
@@ -763,9 +772,8 @@ public class OrderServiceImpl implements IOrderService {
         // Create a JSON object
         JsonObject jsonObject = new JsonObject();
         // Add fields to the JSON object
-        BigDecimal amount = preOrderResponseDTO.getAmountToPay()
-                .setScale(2, RoundingMode.HALF_UP);
-        int convertedAmount = amount.multiply(BigDecimal.valueOf(100)).intValue();
+        Double amount = preOrderResponseDTO.getAmountToPay();
+        int convertedAmount = (int) Math.round(amount * 100);
 
         jsonObject.addProperty("amount", convertedAmount);
         jsonObject.addProperty("currency", "INR");
@@ -826,9 +834,9 @@ public class OrderServiceImpl implements IOrderService {
             return cart;
         }).collect(Collectors.toList());
 
-        BigDecimal totalCartValue = getTotalCartValue(cartDTOs);
+        double totalCartValue = getTotalCartValue(cartDTOs);
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
-        preOrderResponseDTO.setAmountToPay(totalCartValue.subtract(getDiscount(cartDTOs)));
+        preOrderResponseDTO.setAmountToPay(totalCartValue - getDiscount(cartDTOs));
         preOrderResponseDTO.setCarts(cartDTOs);
     }
 
@@ -863,76 +871,30 @@ public class OrderServiceImpl implements IOrderService {
         return medicineDTO;
     }
 
-    private static BigDecimal getTotalCartValue(List<CartResponseDTO> cartDTOs) {
+    private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
 
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .map(medicine -> medicine.getMrp()
-                        .multiply(BigDecimal.valueOf(medicine.getQty())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
+                .sum();
     }
 
-    private static BigDecimal getDiscount(List<CartResponseDTO> cartDTOs) {
+    private static double getDiscount(List<CartResponseDTO> cartDTOs) {
 
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .map(medicine -> {
-
-                    BigDecimal mrp = medicine.getMrp();
-                    BigDecimal qty = BigDecimal.valueOf(medicine.getQty());
-                    BigDecimal discount = medicine.getDiscount();
-
-                    BigDecimal totalPrice = mrp.multiply(qty);
-
-                    return totalPrice
-                            .multiply(discount)
-                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                .mapToDouble(medicine -> {
+                    double totalPrice = medicine.getMrp() * medicine.getQty();
+                    return totalPrice * medicine.getDiscount() / 100.0;
                 })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .sum();
     }
 
     public PreOrderDTO calculateAmountToPay(PreOrderDTO preOrderResponseDTO) {
 
         List<CartDTO> carts = preOrderResponseDTO.getCarts();
 
-        BigDecimal amountToPay = carts.stream()
-                .flatMap(cart -> cart.getMedicine().stream()
-                        .map(medicine -> {
-
-                            Integer vendorId = cart.getVendorId();
-                            long medicineId = medicine.getId();
-                            BigDecimal qty = BigDecimal.valueOf(medicine.getQty());
-
-                            List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
-
-                            if (!stocks.isEmpty()) {
-
-                                Stock stock = stocks.get(0);
-
-                                BigDecimal price = stock.getMrp();
-                                BigDecimal discountPercentage = stock.getDiscount();
-
-                                BigDecimal totalCartValue = price.multiply(qty);
-
-                                BigDecimal discountAmount = totalCartValue
-                                        .multiply(discountPercentage)
-                                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-                                return totalCartValue.subtract(discountAmount);
-                            }
-
-                            return BigDecimal.ZERO;
-                        }))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        preOrderResponseDTO.setAmountToPay(amountToPay);
-
-        return preOrderResponseDTO;
-    }
-
-    private void calculateTotalCartValue(PreOrderDTO preOrderResponseDTO) {
-
-        BigDecimal totalCartValue = preOrderResponseDTO.getCarts().stream()
+        double amountToPay = carts.stream()
                 .flatMap(cart -> cart.getMedicine().stream()
                         .map(medicine -> {
 
@@ -946,24 +908,65 @@ public class OrderServiceImpl implements IOrderService {
 
                                 Stock stock = stocks.get(0);
 
-                                BigDecimal price = stock.getMrp();
-                                medicine.setMrp(price);
+                                Double price = stock.getMrp();
+                                Double discountPercentage = stock.getDiscount();
 
-                                return price.multiply(BigDecimal.valueOf(qty));
+                                double totalCartValue = price * qty;
+
+                                double discountAmount = totalCartValue * discountPercentage / 100.0;
+
+                                return totalCartValue - discountAmount;
                             }
 
-                            return BigDecimal.ZERO;
+                            return 0.0;
                         }))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(0.0, Double::sum);
+
+        preOrderResponseDTO.setAmountToPay(amountToPay);
+
+        return preOrderResponseDTO;
+    }
+
+    private void calculateTotalCartValue(PreOrderDTO preOrderResponseDTO) {
+
+        double totalCartValue = preOrderResponseDTO.getCarts().stream()
+                .flatMap(cart -> cart.getMedicine().stream()
+                        .map(medicine -> {
+
+                            Integer vendorId = cart.getVendorId();
+                            long medicineId = medicine.getId();
+                            int qty = medicine.getQty();
+
+                            List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
+
+                            if (!stocks.isEmpty()) {
+
+                                Stock stock = stocks.get(0);
+
+                                Double price = stock.getMrp();
+                                medicine.setMrp(price);
+
+                                return price * qty;
+                            }
+
+                            return 0.0;
+                        }))
+                .reduce(0.0, Double::sum);
 
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
     }
 
     private Order populateOrder(PreOrderResponseDTO orderRequest) {
 
-        Address address = addressRepository.findById(orderRequest.getAddressId()).get();
+        Address address = addressRepository.findById(orderRequest.getAddressId()).orElse(null);
         Order order = new Order();
-        User user = userRepository.findById(orderRequest.getUserId()).get();
+        User user = userRepository.findById(orderRequest.getUserId()).orElse(null);
+        if (user == null) {
+            throw new RuntimeException("User not found: " + orderRequest.getUserId());
+        }
+        if (address == null) {
+            throw new RuntimeException("Address not found: " + orderRequest.getAddressId());
+        }
         order.setEmail(user.getEmail());
         order.setMobile(user.getMobile());
         order.setUser(user);
@@ -992,9 +995,8 @@ public class OrderServiceImpl implements IOrderService {
         // Create a JSON object
         JsonObject jsonObject = new JsonObject();
         // Add fields to the JSON object
-        BigDecimal amount = preOrderResponseDTO.getAmountToPay()
-                .setScale(2, RoundingMode.HALF_UP);
-        int convertedAmount = amount.multiply(BigDecimal.valueOf(100)).intValue();
+        Double amount = preOrderResponseDTO.getAmountToPay();
+        int convertedAmount = (int) Math.round(amount * 100);
 
         jsonObject.addProperty("amount", convertedAmount);
         jsonObject.addProperty("currency", "INR");
@@ -1078,15 +1080,18 @@ public class OrderServiceImpl implements IOrderService {
                 System.out.println("Number of medicines in cart: " + selectedCart.getMedicine().size());
                 for (MedicineDTO medicine : selectedCart.getMedicine()) {
                     OrderItem item = new OrderItem();
-                    Medicine med = new Medicine();
-                    med.setId(medicine.getId());
-                    item.setMedicine(med);
+                    Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
+                    if (med == null || med.getMedicineId() == null) {
+                        System.err.println("SKIPPING order item: Medicine not found or medicine_id is null for vendorMedicineId=" + medicine.getId());
+                        continue;
+                    }
+                    item.setMedicineId(med.getMedicineId());
                     item.setQty(medicine.getQty());
-                    item.setMrp(medicine.getMrp());
-                    item.setSellingPrice(Constants.calculateUnitPrice(medicine.getMrp(), medicine.getDiscount()));
-                    item.setAmount(
-                            medicine.getMrp()
-                                    .multiply(BigDecimal.valueOf(medicine.getQty())));
+                    Double mrp = medicine.getMrp() != null ? medicine.getMrp() : 0.0;
+                    Double discount = medicine.getDiscount() != null ? medicine.getDiscount() : 0.0;
+                    item.setMrp(mrp);
+                    item.setSellingPrice(Constants.calculateUnitPrice(mrp, discount));
+                    item.setAmount(mrp * medicine.getQty());
                     item.setOrderStatus("pending");
                     item.setOrder(savedOrder);
                     orderItems.add(item);
@@ -1107,37 +1112,38 @@ public class OrderServiceImpl implements IOrderService {
 
         // ✅ Step added: Calculate cart-wise total and amountToPay before saving orders
         for (CartResponseDTO cart : preOrderResponseDTO.getCarts()) {
-            BigDecimal totalCartValue = BigDecimal.ZERO;
-            BigDecimal totalDiscount = BigDecimal.ZERO;
+            double totalCartValue = 0.0;
+            double totalDiscount = 0.0;
 
             if (cart.getMedicine() != null) {
                 for (var med : cart.getMedicine()) {
 
-                    BigDecimal price = med.getMrp();
-                    BigDecimal qty = BigDecimal.valueOf(med.getQty());
-                    BigDecimal discount = med.getDiscount();
+                    Double price = med.getMrp() != null ? med.getMrp() : 0.0;
+                    int qty = med.getQty();
+                    Double discount = med.getDiscount() != null ? med.getDiscount() : 0.0;
 
-                    BigDecimal itemTotal = price.multiply(qty);
+                    double itemTotal = price * qty;
 
-                    BigDecimal itemDiscount = itemTotal
-                            .multiply(discount)
-                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                    double itemDiscount = itemTotal * discount / 100.0;
 
-                    totalCartValue = totalCartValue.add(itemTotal);
-                    totalDiscount = totalDiscount.add(itemDiscount);
+                    totalCartValue += itemTotal;
+                    totalDiscount += itemDiscount;
                 }
             }
 
-            BigDecimal amountToPay = totalCartValue.subtract(totalDiscount);
+            double amountToPay = totalCartValue - totalDiscount;
             cart.setTotalCartValue(totalCartValue);
             cart.setDiscount(totalDiscount);
             cart.setAmountToPay(amountToPay);
 
         }
 
-        if (preOrderResponseDTO.getCarts() != null) {
-            System.out.println("Number of carts in regular order: " + preOrderResponseDTO.getCarts().size());
+        if (preOrderResponseDTO.getCarts() == null || preOrderResponseDTO.getCarts().isEmpty()) {
+            System.out.println("No carts found in regular order, skipping order creation");
+            return;
         }
+
+        System.out.println("Number of carts in regular order: " + preOrderResponseDTO.getCarts().size());
 
         // Ensure preOrder.orders is initialized (avoid NPE)
         if (preOrder.getOrders() == null) {
@@ -1167,15 +1173,24 @@ public class OrderServiceImpl implements IOrderService {
             preOrder.getOrders().add(savedOrder);
 
             List<OrderItem> orderItems = cart.getMedicine().stream()
+                    .filter(medicine -> {
+                        Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
+                        if (med == null || med.getMedicineId() == null) {
+                            System.err.println("SKIPPING order item: Medicine not found or medicine_id is null for vendorMedicineId=" + medicine.getId());
+                            return false;
+                        }
+                        return true;
+                    })
                     .map(medicine -> {
                         OrderItem item = new OrderItem();
-                        Medicine med = new Medicine();
-                        med.setId(medicine.getId());
-                        item.setMedicine(med);
+                        Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
+                        item.setMedicineId(med.getMedicineId());
                         item.setQty(medicine.getQty());
-                        item.setMrp(medicine.getMrp());
-                        item.setSellingPrice(Constants.calculateUnitPrice(medicine.getMrp(), medicine.getDiscount()));
-                        item.setAmount(medicine.getMrp().multiply(BigDecimal.valueOf(medicine.getQty())));
+                        Double mrp = medicine.getMrp() != null ? medicine.getMrp() : 0.0;
+                        Double discount = medicine.getDiscount() != null ? medicine.getDiscount() : 0.0;
+                        item.setMrp(mrp);
+                        item.setSellingPrice(Constants.calculateUnitPrice(mrp, discount));
+                        item.setAmount(mrp * medicine.getQty());
                         item.setOrderStatus("pending");
                         item.setOrder(savedOrder);
                         return item;
@@ -1187,7 +1202,6 @@ public class OrderServiceImpl implements IOrderService {
             System.out.println("Saved " + orderItems.size() + " order items for order ID: " + savedOrder.getId());
         });
 
-        // Persist the updated PreOrder (with orders added)
         preOrderRepository.save(preOrder);
     }
 

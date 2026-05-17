@@ -15,8 +15,6 @@ import com.trego.utils.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -66,8 +64,14 @@ public class PreOrderServiceImpl implements IPreOrderService {
             preOrder.setAddressId(preOrderRequest.getAddressId());
 
         } else {
+            // Reusing existing preorder: update all relevant fields and clear stale payment data
             preOrder.setPayload(gson.toJson(preOrderRequest));
-
+            preOrder.setMobileNo(preOrderRequest.getMobileNo());
+            preOrder.setAddressId(preOrderRequest.getAddressId());
+            // Clear previous RazorPay order data so a fresh order is always created
+            preOrder.setRazorpayOrderId(null);
+            preOrder.setTotalPayAmount(null);
+            preOrder.setPaymentStatus("unpaid");
         }
         preOrderRepository.save(preOrder);
 
@@ -136,36 +140,28 @@ public class PreOrderServiceImpl implements IPreOrderService {
             if (vendor != null) {
                 cart.setVendorId(vendor.getId());
                 cart.setName(vendor.getName());
-//                if (vendor.getCategory().equalsIgnoreCase("retail")) {
-//                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.OFFLINE_BASE_URL + vendor.getLogo());
-//                } else {
-//                    cart.setLogo(Constants.LOGO_BASE_URL + Constants.ONLINE_BASE_URL + vendor.getLogo());
-//                }
+                cart.setLogo(Constants.getVendorLogoWithFallback(vendor.getLogo()));
                 cart.setGstNumber(vendor.getGistin());
                 cart.setLicence(vendor.getDruglicense());
                 // cart.setAddress(vendor.getAddress());
-                cart.setLat(vendor.getLat());
-                cart.setLng(vendor.getLng());
+                cart.setLat(vendor.getLat() != null ? vendor.getLat().doubleValue() : null);
+                cart.setLng(vendor.getLng() != null ? vendor.getLng().doubleValue() : null);
                 cart.setDeliveryTime(vendor.getDeliveryTime());
                 cart.setReviews(vendor.getReviews());
             }
 
-            BigDecimal totalCartValue = medicines.stream()
-                    .map(m -> m.getMrp()
-                            .multiply(BigDecimal.valueOf(m.getQty())))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal discount = medicines.stream()
-                    .map(m -> {
-                        BigDecimal price = m.getMrp()
-                                .multiply(BigDecimal.valueOf(m.getQty()));
-
-                        return price.multiply(m.getDiscount())
-                                .divide(BigDecimal.valueOf(100));
+            double totalCartValue = medicines.stream()
+                    .mapToDouble(m -> m.getMrp() * m.getQty())
+                    .sum();
+            double discount = medicines.stream()
+                    .mapToDouble(m -> {
+                        double price = m.getMrp() * m.getQty();
+                        return price * m.getDiscount() / 100.0;
                     })
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    .sum();
 
             cart.setTotalCartValue(totalCartValue);
-            cart.setAmountToPay(totalCartValue.subtract(discount));
+            cart.setAmountToPay(totalCartValue - discount);
             return cart;
         }).collect(Collectors.toList());
 
@@ -204,27 +200,23 @@ public class PreOrderServiceImpl implements IPreOrderService {
             if (vendor != null) {
                 cart.setVendorId(vendor.getId());
                 cart.setName(vendor.getName());
-//                if (vendor.getCategory().equalsIgnoreCase("retail")) {
-//                    cart.setLogo(vendor.getLogo());
-//                } else {
-//                    cart.setLogo(vendor.getLogo());
-//                }
+                cart.setLogo(Constants.getVendorLogoWithFallback(vendor.getLogo()));
                 cart.setGstNumber(vendor.getGistin());
                 cart.setLicence(vendor.getDruglicense());
                 // cart.setAddress(vendor.getAddress());
-                cart.setLat(vendor.getLat());
-                cart.setLng(vendor.getLng());
+                cart.setLat(vendor.getLat() != null ? vendor.getLat().doubleValue() : null);
+                cart.setLng(vendor.getLng() != null ? vendor.getLng().doubleValue() : null);
                 cart.setDeliveryTime(vendor.getDeliveryTime());
                 cart.setReviews(vendor.getReviews());
             }
             return cart;
         }).collect(Collectors.toList());
 
-        BigDecimal totalCartValue = getTotalCartValue(cartDTOs);
-        BigDecimal deliveryCharges = BigDecimal.ZERO;
+        double totalCartValue = getTotalCartValue(cartDTOs);
+        double deliveryCharges = 0.0;
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
         preOrderResponseDTO.setDeliveryCharges(deliveryCharges);
-        preOrderResponseDTO.setAmountToPay(totalCartValue.subtract(getDiscount(cartDTOs)).add(deliveryCharges));
+        preOrderResponseDTO.setAmountToPay(totalCartValue - getDiscount(cartDTOs) + deliveryCharges);
         preOrderResponseDTO.setCarts(cartDTOs);
     }
 
@@ -273,83 +265,39 @@ public class PreOrderServiceImpl implements IPreOrderService {
         unavailableMedicine.setPhoto1(medicineDTO.getPhoto1());
 
         // Set default values indicating unavailability
-        unavailableMedicine.setMrp(new BigDecimal(0));
-        unavailableMedicine.setDiscount(new BigDecimal(0));
+        unavailableMedicine.setMrp(0.0);
+        unavailableMedicine.setDiscount(0.0);
         unavailableMedicine.setQty(0);
-        unavailableMedicine.setActualPrice(new BigDecimal(0));
+        unavailableMedicine.setActualPrice(0.0);
         unavailableMedicine.setExpiryDate(null);
 
         return unavailableMedicine;
     }
 
-    private static BigDecimal getTotalCartValue(List<CartResponseDTO> cartDTOs) {
+    private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
 
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .map(medicine -> medicine.getMrp()
-                        .multiply(BigDecimal.valueOf(medicine.getQty())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .mapToDouble(medicine -> medicine.getMrp() * medicine.getQty())
+                .sum();
     }
 
-    private static BigDecimal getDiscount(List<CartResponseDTO> cartDTOs) {
+    private static double getDiscount(List<CartResponseDTO> cartDTOs) {
 
         return cartDTOs.stream()
                 .flatMap(cart -> cart.getMedicine().stream())
-                .map(medicine -> {
-
-                    BigDecimal totalPrice = medicine.getMrp()
-                            .multiply(BigDecimal.valueOf(medicine.getQty()));
-
-                    return totalPrice
-                            .multiply(medicine.getDiscount())
-                            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                .mapToDouble(medicine -> {
+                    double totalPrice = medicine.getMrp() * medicine.getQty();
+                    return totalPrice * medicine.getDiscount() / 100.0;
                 })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .sum();
     }
 
     public PreOrderDTO calculateAmountToPay(PreOrderDTO preOrderResponseDTO) {
 
         List<CartDTO> carts = preOrderResponseDTO.getCarts();
 
-        BigDecimal amountToPay = carts.stream()
-                .flatMap(cart -> cart.getMedicine().stream()
-                        .map(medicine -> {
-
-                            Integer vendorId = cart.getVendorId();
-                            long medicineId = medicine.getId();
-                            BigDecimal qty = BigDecimal.valueOf(medicine.getQty());
-
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId,
-                                    vendorId);
-
-                            if (!stocks.isEmpty()) {
-
-                                Stock stock = stocks.get(0);
-
-                                BigDecimal price = stock.getMrp();
-                                BigDecimal discountPercentage = stock.getDiscount();
-
-                                BigDecimal totalCartValue = price.multiply(qty);
-
-                                BigDecimal discountAmount = totalCartValue
-                                        .multiply(discountPercentage)
-                                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-                                return totalCartValue.subtract(discountAmount);
-                            }
-
-                            return BigDecimal.ZERO;
-                        }))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        preOrderResponseDTO.setAmountToPay(amountToPay);
-
-        return preOrderResponseDTO;
-    }
-
-    private void calculateTotalCartValue(PreOrderDTO preOrderResponseDTO) {
-
-        BigDecimal totalCartValue = preOrderResponseDTO.getCarts().stream()
+        double amountToPay = carts.stream()
                 .flatMap(cart -> cart.getMedicine().stream()
                         .map(medicine -> {
 
@@ -364,20 +312,56 @@ public class PreOrderServiceImpl implements IPreOrderService {
 
                                 Stock stock = stocks.get(0);
 
-                                BigDecimal price = stock.getMrp();
-                                BigDecimal discount = stock.getDiscount();
+                                Double price = stock.getMrp();
+                                Double discountPercentage = stock.getDiscount();
+
+                                double totalCartValue = price * qty;
+
+                                double discountAmount = totalCartValue * discountPercentage / 100.0;
+
+                                return totalCartValue - discountAmount;
+                            }
+
+                            return 0.0;
+                        }))
+                .reduce(0.0, Double::sum);
+
+        preOrderResponseDTO.setAmountToPay(amountToPay);
+
+        return preOrderResponseDTO;
+    }
+
+    private void calculateTotalCartValue(PreOrderDTO preOrderResponseDTO) {
+
+        double totalCartValue = preOrderResponseDTO.getCarts().stream()
+                .flatMap(cart -> cart.getMedicine().stream()
+                        .map(medicine -> {
+
+                            Integer vendorId = cart.getVendorId();
+                            long medicineId = medicine.getId();
+                            int qty = medicine.getQty();
+
+                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId,
+                                    vendorId);
+
+                            if (!stocks.isEmpty()) {
+
+                                Stock stock = stocks.get(0);
+
+                                Double price = stock.getMrp();
+                                Double discount = stock.getDiscount();
 
                                 medicine.setMrp(price);
                                 medicine.setDiscount(discount);
 
                                 // qty * price
-                                return price.multiply(BigDecimal.valueOf(qty));
+                                return price * qty;
 
                             } else {
-                                return BigDecimal.ZERO;
+                                return 0.0;
                             }
                         }))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(0.0, Double::sum);
         preOrderResponseDTO.setTotalCartValue(totalCartValue);
 
     }

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -14,10 +13,10 @@ public class PreOrderResponseDTO {
     private long userId;
     private long orderId;
     private long addressId;
-    private BigDecimal totalCartValue;
-    private BigDecimal amountToPay;
-    private BigDecimal discount;
-    private BigDecimal deliveryCharges;
+    private Double totalCartValue;
+    private Double amountToPay;
+    private Double discount;
+    private Double deliveryCharges;
 
     private List<CartResponseDTO> carts;
 

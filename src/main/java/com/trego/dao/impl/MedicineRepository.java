@@ -3,6 +3,7 @@ package com.trego.dao.impl;
 import com.trego.dao.entity.Medicine;
 
 import com.trego.dto.view.SubstituteDetailView;
+import com.trego.dto.view.VendorMedicinePriceView;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -70,5 +71,106 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
     
     Page<Medicine> findByVendorId(Integer vendorId, Pageable pageable);
 
+    /**
+     * Search medicines by name and return ALL vendors selling matching medicines,
+     * sorted by selling price (cheapest first).
+     * 
+     * The query:
+     * 1. Searches vendor_medicine by name (LIKE %searchText%)
+     * 2. Joins with vendor_medicine_price (stock) to get pricing/qty/expiry
+     * 3. Joins with vendor_informations to get vendor name/logo/rating/delivery time
+     * 4. Computes selling_price = mrp - (mrp * discount / 100)
+     * 5. For each (vendor, medicine) pair, picks the cheapest stock variant
+     * 6. Orders all results by selling_price ASC (cheapest first)
+     */
+    @Query(value = """
+        SELECT
+            m.vendor_medicine_id AS medicineId,
+            m.name AS medicineName,
+            m.manufacture AS manufacturer,
+            m.salt_composition AS saltComposition,
+            mi.image_1 AS photo1,
+            IFNULL(mi.packing, m.packing_type) AS packing,
+            mi.use_of AS useOf,
+            s.price_id AS stockId,
+            s.mrp AS mrp,
+            s.discount AS discount,
+            s.quantity AS qty,
+            s.expiry_date AS expiryDate,
+            (s.mrp - (s.mrp * s.discount / 100)) AS sellingPrice,
+            v.vendor_user_id AS vendorId,
+            v.ref_name AS vendorName,
+            v.logo AS vendorLogo,
+            v.rating AS vendorRating,
+            v.delivery_time_minutes AS deliveryTime
+        FROM vendor_medicine m
+        JOIN vendor_medicine_information mi ON mi.vendor_medicine_id = m.vendor_medicine_id
+        JOIN vendor_medicine_price s ON s.vendor_medicine_id = m.vendor_medicine_id
+        JOIN vendor_informations v ON v.vendor_user_id = s.vendor_id
+        WHERE m.name LIKE CONCAT('%', :searchText, '%')
+          AND s.quantity > 0
+          AND s.price_id = (
+              SELECT sp.price_id
+              FROM vendor_medicine_price sp
+              WHERE sp.vendor_medicine_id = m.vendor_medicine_id
+                AND sp.vendor_id = v.vendor_user_id
+                AND sp.quantity > 0
+              ORDER BY (sp.mrp - (sp.mrp * sp.discount / 100)) ASC
+              LIMIT 1
+          )
+        ORDER BY sellingPrice ASC
+        """, nativeQuery = true)
+    List<VendorMedicinePriceView> searchMedicineVendorPrices(@Param("searchText") String searchText);
+
+    /**
+     * Get ALL vendors selling a specific medicine by medicineId,
+     * sorted by selling price (cheapest first).
+     *
+     * The query:
+     * 1. Looks up a single medicine by its ID
+     * 2. Joins with vendor_medicine_price (stock) to get pricing/qty/expiry
+     * 3. Joins with vendor_informations to get vendor name/logo/rating/delivery time
+     * 4. Computes selling_price = mrp - (mrp * discount / 100)
+     * 5. For each (vendor, medicine) pair, picks the cheapest stock variant
+     * 6. Orders all results by selling_price ASC (cheapest first)
+     */
+    @Query(value = """
+        SELECT
+            m.vendor_medicine_id AS medicineId,
+            m.name AS medicineName,
+            m.manufacture AS manufacturer,
+            m.salt_composition AS saltComposition,
+            mi.image_1 AS photo1,
+            IFNULL(mi.packing, m.packing_type) AS packing,
+            mi.use_of AS useOf,
+            s.price_id AS stockId,
+            s.mrp AS mrp,
+            s.discount AS discount,
+            s.quantity AS qty,
+            s.expiry_date AS expiryDate,
+            (s.mrp - (s.mrp * s.discount / 100)) AS sellingPrice,
+            v.vendor_user_id AS vendorId,
+            v.ref_name AS vendorName,
+            v.logo AS vendorLogo,
+            v.rating AS vendorRating,
+            v.delivery_time_minutes AS deliveryTime
+        FROM vendor_medicine m
+        JOIN vendor_medicine_information mi ON mi.vendor_medicine_id = m.vendor_medicine_id
+        JOIN vendor_medicine_price s ON s.vendor_medicine_id = m.vendor_medicine_id
+        JOIN vendor_informations v ON v.vendor_user_id = s.vendor_id
+        WHERE m.vendor_medicine_id = :medicineId
+          AND s.quantity > 0
+          AND s.price_id = (
+              SELECT sp.price_id
+              FROM vendor_medicine_price sp
+              WHERE sp.vendor_medicine_id = m.vendor_medicine_id
+                AND sp.vendor_id = v.vendor_user_id
+                AND sp.quantity > 0
+              ORDER BY (sp.mrp - (sp.mrp * sp.discount / 100)) ASC
+              LIMIT 1
+          )
+        ORDER BY sellingPrice ASC
+        """, nativeQuery = true)
+    List<VendorMedicinePriceView> getVendorsForMedicine(@Param("medicineId") Long medicineId);
 
 }

@@ -4,6 +4,7 @@ import com.trego.dto.MedicineDTO;
 import com.trego.dto.MedicineWithStockAndVendorDTO;
 
 import com.trego.dto.UnavailableMedicineDTO;
+import com.trego.dto.response.VendorMedicinePriceResponseDTO;
 import com.trego.dto.view.SubstituteDetailView;
 import com.trego.service.IMedicineService;
 import com.trego.service.ISubstituteService;
@@ -86,6 +87,31 @@ public class MedicineController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return medicineService.getMedicinesBySubcategory(subcategoryId, page, size);
+    }
+
+    /**
+     * Search medicines by name and return ALL vendors selling each matching medicine.
+     * Results are grouped by medicine, and within each medicine, vendors are sorted
+     * by selling price in ascending order (cheapest first).
+     *
+     * Usage: GET /medicines/search/vendors?searchText=crocin
+     */
+    @GetMapping("/medicines/search/vendors")
+    public List<VendorMedicinePriceResponseDTO> searchMedicineVendorPrices(
+            @RequestParam String searchText
+    ) {
+        return medicineService.searchMedicineVendorPrices(searchText);
+    }
+
+    /**
+     * Get ALL vendors selling a specific medicine (by medicine ID).
+     
+     */
+    @GetMapping("/medicines/{id}/vendors")
+    public VendorMedicinePriceResponseDTO getMedicineVendorPrices(
+            @PathVariable Long id
+    ) {
+        return medicineService.getMedicineVendorPrices(id);
     }
 
 }

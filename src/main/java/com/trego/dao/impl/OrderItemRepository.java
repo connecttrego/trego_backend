@@ -10,9 +10,9 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
-    @Query("SELECT oi.medicine.id, COUNT(oi) as salesCount " +
+    @Query("SELECT oi.medicineId, COUNT(oi) as salesCount " +
             "FROM OrderItem oi " +
-            "GROUP BY oi.medicine.id " +
+            "GROUP BY oi.medicineId " +
             "ORDER BY COUNT(oi) DESC")
     List<Object[]> findTopSellingMedicineIds(Pageable pageable);
 
@@ -20,10 +20,10 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 //    List<Object[]> findTopSellingMedicineIdsByVendor(@Param("vendorId") Long vendorId);
 
     @Query("""
-                SELECT oi.order.vendor.id as vendorId, oi.medicine.id as medicineId, 
+                SELECT oi.order.vendor.id as vendorId, oi.medicineId as medicineId,
                        COUNT(oi.id) as salesCount, MAX(oi.mrp) as mrp, MAX(oi.qty) as qty
                 FROM OrderItem oi
-                GROUP BY oi.order.vendor.id, oi.medicine.id
+                GROUP BY oi.order.vendor.id, oi.medicineId
                 ORDER BY salesCount DESC
             """)
     List<Object[]> findVendorMedicineSales();
