@@ -57,7 +57,7 @@ public class Medicine {
     private String medicineOwner;
 
     @Column(name = "medicine_id")
-    private Long medicineId;
+    private Integer medicineId;
 
     @Column(name = "category")
     private String category;
@@ -65,7 +65,7 @@ public class Medicine {
     @Column(name = "sub_category")
     private String subCategory;
 
-    @OneToMany(mappedBy = "medicine")
+    @OneToMany(mappedBy = "medicine",fetch = FetchType.LAZY)
     private List<Stock> stocks;
 
     @OneToOne(mappedBy = "medicine")

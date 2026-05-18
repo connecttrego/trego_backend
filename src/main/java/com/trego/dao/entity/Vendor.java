@@ -15,6 +15,9 @@ public class Vendor {
     @Column(name = "vendor_user_id")
     private Integer id;
 
+    @Column(name = "vendor_id")
+    private Integer vendorId;
+
     @Column(name = "ref_name")
     private String name;
 

@@ -165,12 +165,7 @@ public class BucketServiceImpl implements IBucketService {
         System.out.println("Found " + medicines.size() + " medicines in database");
 
         // Get all stocks for these medicines
-        List<Stock> allStocks = stockRepository.findAll();
-        List<Stock> relevantStocks = allStocks.stream()
-                .filter(stock -> medicineIds.contains(stock.getMedicine().getId()))
-                .collect(Collectors.toList());
-
-        System.out.println("Found " + relevantStocks.size() + " relevant stocks");
+       List<Stock> relevantStocks = stockRepository.findByMedicineIds(medicineIds);
 
         // Filter out medicines that are not available from any vendor
         Set<Long> availableMedicineIds = relevantStocks.stream()

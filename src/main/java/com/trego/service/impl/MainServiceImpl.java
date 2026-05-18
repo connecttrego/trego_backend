@@ -112,9 +112,9 @@ public class MainServiceImpl implements IMainService {
                // medDTO.setSalesCount(salesCount.intValue());
 
                System.out.println("vendorId " + vendorId + "  medicineId " + medicineId);
-               // Get stock info - Use the new method that returns a List to handle multiple
-               // stocks
-               List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId, vendorId);
+                Vendor vendorEntity = vendorRepository.findById(vendorId).orElse(null);
+                Integer externalVendorId = vendorEntity != null ? vendorEntity.getVendorId() : vendorId;
+                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId, vendorId, externalVendorId);
                if (!stocks.isEmpty()) {
                    Stock stock = stocks.get(0);
 

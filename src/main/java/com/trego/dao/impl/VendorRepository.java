@@ -10,4 +10,5 @@ import org.springframework.stereotype.Repository;
 public interface VendorRepository extends JpaRepository<Vendor, Integer> {
       // findByCategory removed - Vendor entity (vendor_informations) has no category field in ap-db-change schema
     // Custom queries can be defined here, if necessary
+    java.util.Optional<Vendor> findByVendorId(Integer vendorId);
 }

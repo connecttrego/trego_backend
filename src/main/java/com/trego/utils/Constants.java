@@ -16,6 +16,7 @@ public class Constants {
     public static  final String ONLINE_BASE_URL = "";
 
     public static final String DEFAULT_VENDOR_LOGO = "https://ik.imagekit.io/kqgqzlxfs/vendor/logo_1.png";
+    public static final String DEFAULT_MEDICINE_IMAGE = "https://res.cloudinary.com/dxoy1r7v8/image/upload/v1779086320/3_2_sdbzzh.jpg";
 
     /**
      * Returns a valid vendor logo URL with fallback.
@@ -30,6 +31,19 @@ public class Constants {
             return DEFAULT_VENDOR_LOGO;
         }
         return logo;
+    }
+
+    /**
+     * Returns a valid medicine image URL with fallback.
+     *
+     * @param photo the photo URL
+     * @return valid photo URL (never null or empty)
+     */
+    public static String getMedicineImageWithFallback(String photo) {
+        if (photo == null || photo.trim().isEmpty() || !photo.startsWith("http")) {
+            return DEFAULT_MEDICINE_IMAGE;
+        }
+        return photo;
     }
 
     public static Double calculateUnitPrice(Double mrp, Double discount) {

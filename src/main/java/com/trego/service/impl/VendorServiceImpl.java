@@ -5,6 +5,8 @@ import com.trego.dao.entity.Medicine;
 import com.trego.dao.entity.MedicineInformation;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.entity.Vendor;
+import com.trego.dao.entity.MasterMedicine;
+import com.trego.dao.impl.MasterMedicineRepository;
 import com.trego.dao.impl.BannerRepository;
 import com.trego.dao.impl.StockRepository;
 import com.trego.dao.impl.VendorRepository;
@@ -31,8 +33,12 @@ public class VendorServiceImpl implements IVendorService {
 
     @Autowired
     private StockRepository stockRepository;
+
     @Autowired
     private BannerRepository bannerRepository;
+
+    @Autowired
+    private MasterMedicineRepository masterMedicineRepository;
 
     public List<VendorDTO> findVendorsByType(String type) {
         List<VendorDTO> vendorDTOs = new ArrayList<>();
@@ -99,7 +105,7 @@ public class VendorServiceImpl implements IVendorService {
 
         // Fetch paginated stocks for this vendor
         Pageable pageable = PageRequest.of(page, size);
-        Page<Stock> stocksPage = stockRepository.findByVendorId(vendor.getId(), pageable);
+        Page<Stock> stocksPage = stockRepository.findByExternalVendorId(vendor.getVendorId(), pageable);
         List<Stock> stocks = stocksPage.getContent();
 
         // Build medicine list
@@ -115,22 +121,48 @@ public class VendorServiceImpl implements IVendorService {
                     continue;
                 }
 
-                MedicineDTO medicineDTO = new MedicineDTO();
-                medicineDTO.setId(medicine.getVendorMedicineId());
-                medicineDTO.setName(medicine.getName());
-
-                MedicineInformation medicineInformation = medicine.getMedicineInformation();
-                if (medicineInformation != null) {
-                    medicineDTO.setPhoto1(medicineInformation.getPhoto1());
-                    medicineDTO.setStrip(medicineInformation.getPacking());
-                    medicineDTO.setDescription(medicineInformation.getDescription());
-                } else {
-                    medicineDTO.setDescription("");
-                    medicineDTO.setPhoto1("");
-                    medicineDTO.setStrip("");
+                // Retrieve master medicine to serve as catalog fallback
+                MasterMedicine masterMed = null;
+                if (medicine.getMedicineId() != null) {
+                    masterMed = masterMedicineRepository.findById(medicine.getMedicineId()).orElse(null);
+                } else if (medicine.getName() != null && !medicine.getName().trim().isEmpty()) {
+                    List<MasterMedicine> matchedMeds = masterMedicineRepository.findByNameIgnoreCase(medicine.getName().trim());
+                    if (matchedMeds != null && !matchedMeds.isEmpty()) {
+                        masterMed = matchedMeds.get(0);
+                    }
                 }
 
-                medicineDTO.setSaltComposition(medicine.getSaltComposition());
+                MedicineDTO medicineDTO = new MedicineDTO();
+                medicineDTO.setId(medicine.getVendorMedicineId());
+                medicineDTO.setName(medicine.getName() != null && !medicine.getName().trim().isEmpty() ? medicine.getName() : (masterMed != null ? masterMed.getName() : ""));
+
+                MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                String photo = "";
+                String strip = "";
+                String desc = "";
+
+                if (medicineInformation != null) {
+                    photo = medicineInformation.getPhoto1();
+                    strip = medicineInformation.getPacking();
+                    desc = medicineInformation.getDescription();
+                }
+
+                // Apply master medicine fallback if fields are empty
+                if (photo == null || photo.trim().isEmpty()) {
+                    photo = (masterMed != null) ? masterMed.getPhoto1() : "";
+                }
+                if (strip == null || strip.trim().isEmpty()) {
+                    strip = (masterMed != null && masterMed.getPackaging() != null) ? masterMed.getPackaging() : "";
+                }
+                if (desc == null || desc.trim().isEmpty()) {
+                    desc = (masterMed != null && masterMed.getDescription() != null) ? masterMed.getDescription() : "";
+                }
+
+                medicineDTO.setPhoto1(Constants.getMedicineImageWithFallback(photo));
+                medicineDTO.setStrip(strip);
+                medicineDTO.setDescription(desc);
+
+                medicineDTO.setSaltComposition(medicine.getSaltComposition() != null && !medicine.getSaltComposition().trim().isEmpty() ? medicine.getSaltComposition() : (masterMed != null ? masterMed.getSaltComposition() : ""));
                 
                 // Set stock info for this medicine
                 medicineDTO.setDiscount(stock.getDiscount());

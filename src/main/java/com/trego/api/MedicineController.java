@@ -3,6 +3,7 @@ package com.trego.api;
 import com.trego.dto.MedicineDTO;
 import com.trego.dto.MedicineWithStockAndVendorDTO;
 
+import com.trego.dao.entity.MasterMedicine;
 import com.trego.dto.UnavailableMedicineDTO;
 import com.trego.dto.response.VendorMedicinePriceResponseDTO;
 import com.trego.dto.view.SubstituteDetailView;
@@ -37,7 +38,7 @@ public class MedicineController {
     }
 
     @GetMapping("/medicines/search")
-    public Page<MedicineWithStockAndVendorDTO> searchProducts(
+    public Page<MasterMedicine> searchProducts(
             @RequestParam String searchText,
             @RequestParam(defaultValue = "0") Integer vendorId,
             @RequestParam(defaultValue = "0") int page,
@@ -90,28 +91,15 @@ public class MedicineController {
     }
 
     /**
-     * Search medicines by name and return ALL vendors selling each matching medicine.
-     * Results are grouped by medicine, and within each medicine, vendors are sorted
-     * by selling price in ascending order (cheapest first).
+     * Get ALL vendors selling a specific medicine, sorted by cheapest selling price.
      *
-     * Usage: GET /medicines/search/vendors?searchText=crocin
+     * Usage: GET /medicines/search/vendors?medicineId=1
      */
     @GetMapping("/medicines/search/vendors")
     public List<VendorMedicinePriceResponseDTO> searchMedicineVendorPrices(
-            @RequestParam String searchText
+            @RequestParam Long medicineId
     ) {
-        return medicineService.searchMedicineVendorPrices(searchText);
-    }
-
-    /**
-     * Get ALL vendors selling a specific medicine (by medicine ID).
-     
-     */
-    @GetMapping("/medicines/{id}/vendors")
-    public VendorMedicinePriceResponseDTO getMedicineVendorPrices(
-            @PathVariable Long id
-    ) {
-        return medicineService.getMedicineVendorPrices(id);
+        return medicineService.searchMedicineVendorPrices(medicineId);
     }
 
 }

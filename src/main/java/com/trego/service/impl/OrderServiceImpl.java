@@ -61,6 +61,9 @@ public class OrderServiceImpl implements IOrderService {
     private MedicineRepository medicineRepository;
 
     @Autowired
+    private MasterMedicineRepository masterMedicineRepository;
+
+    @Autowired
     private AddressRepository addressRepository;
 
     @Autowired
@@ -74,7 +77,8 @@ public class OrderServiceImpl implements IOrderService {
         OrderResponseDTO orderResponseDTO = new OrderResponseDTO();
 
         orderResponseDTO.setUserId(orderRequest.getUserId());
-        PreOrder preOrder = preOrderRepository.findById(orderRequest.getPreOrderId()).get();
+        PreOrder preOrder = preOrderRepository.findById(orderRequest.getPreOrderId())
+                .orElseThrow(() -> new IllegalArgumentException("PreOrder with ID " + orderRequest.getPreOrderId() + " not found."));
 
         Gson gson = new Gson();
         PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
@@ -205,6 +209,12 @@ public class OrderServiceImpl implements IOrderService {
                     medicineDTO.setMrp(bucketItem.getPrice()); // Discounted price
                     medicineDTO.setDiscount(bucketItem.getDiscount());
                     medicineDTO.setQty(bucketItem.getRequestedQuantity());
+                    // Set medicine image from bucket item or fallback
+                    String medicineImage = (bucketItem.getMedicineImage() != null && !bucketItem.getMedicineImage().isEmpty())
+                            ? bucketItem.getMedicineImage()
+                            : Constants.getMedicineImageWithFallback("");
+                    medicineDTO.setPhoto1(medicineImage);
+                    medicineDTO.setImage(medicineImage);
                     // Calculate original price before discount
                     Double price = bucketItem.getPrice();
                     Double discount = bucketItem.getDiscount();
@@ -604,7 +614,11 @@ public class OrderServiceImpl implements IOrderService {
             orderIds.forEach(orderId -> {
                 System.out.println("Processing order ID: " + orderId);
                 // Add logic here to update order status, fetch details, etc.
-                PreOrder preOrder = preOrderRepository.findById(orderId).get();
+                PreOrder preOrder = preOrderRepository.findById(orderId).orElse(null);
+                if (preOrder == null) {
+                    System.out.println("Warning: PreOrder with ID " + orderId + " not found while cancelling orders.");
+                    return;
+                }
                 subOrderIds.addAll(preOrder.getOrders().stream()
                         .map(Order::getId) // Assuming Order has a getId() method
                         .collect(Collectors.toList()));
@@ -675,15 +689,34 @@ public class OrderServiceImpl implements IOrderService {
                 Medicine medicine = medicineRepository.findById(orderItem.getMedicineId()).orElse(null);
                 if (medicine != null) {
                     medicineDetails.put("medicineName", medicine.getName());
-                    MedicineInformation medicineInformation = medicine.getMedicineInformation();
-                    if (medicineInformation != null) {
-                        medicineDetails.put("packing", medicineInformation.getPacking());
-                        medicineDetails.put("medicineLogo",
-                            Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
-                    } else {
-                        medicineDetails.put("packing", "");
-                        medicineDetails.put("medicineLogo", "");
+                    
+                    // Retrieve master medicine for catalog fallback
+                    MasterMedicine masterMed = null;
+                    if (medicine.getMedicineId() != null) {
+                        masterMed = masterMedicineRepository.findById(medicine.getMedicineId()).orElse(null);
+                    } else if (medicine.getName() != null && !medicine.getName().trim().isEmpty()) {
+                        List<MasterMedicine> matchedMeds = masterMedicineRepository.findByNameIgnoreCase(medicine.getName().trim());
+                        if (matchedMeds != null && !matchedMeds.isEmpty()) {
+                            masterMed = matchedMeds.get(0);
+                        }
                     }
+
+                    MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                    String packing = "";
+                    String imageUrl = "";
+                    if (medicineInformation != null) {
+                        packing = medicineInformation.getPacking();
+                        imageUrl = medicineInformation.getPhoto1();
+                    }
+                    // Apply master medicine fallback
+                    if ((packing == null || packing.trim().isEmpty()) && masterMed != null && masterMed.getPackaging() != null) {
+                        packing = masterMed.getPackaging();
+                    }
+                    if ((imageUrl == null || imageUrl.trim().isEmpty()) && masterMed != null && masterMed.getPhoto1() != null) {
+                        imageUrl = masterMed.getPhoto1();
+                    }
+                    medicineDetails.put("packing", packing != null ? packing : "");
+                    medicineDetails.put("medicineLogo", Constants.getMedicineImageWithFallback(imageUrl));
                 } else {
                     medicineDetails.put("medicineName", "");
                     medicineDetails.put("packing", "");
@@ -763,6 +796,11 @@ public class OrderServiceImpl implements IOrderService {
 
     public String createRazorPayOrder(OrderRequestDTO orderRequest, PreOrderResponseDTO preOrderResponseDTO)
             throws Exception {
+        Double amount = preOrderResponseDTO.getAmountToPay();
+        if (amount == null || amount <= 0) {
+            throw new Exception("Invalid amount to pay: " + amount + ". Amount must be greater than 0.");
+        }
+
         String keyId = "rzp_test_oZBGm1luIG1Rpl"; // Replace with actual key
         String keySecret = "S0Pxnueo7AdCYS2HFIa7LXK6"; // Replace with actual key
         String credentials = keyId + ":" + keySecret;
@@ -772,16 +810,16 @@ public class OrderServiceImpl implements IOrderService {
         // Create a JSON object
         JsonObject jsonObject = new JsonObject();
         // Add fields to the JSON object
-        Double amount = preOrderResponseDTO.getAmountToPay();
         int convertedAmount = (int) Math.round(amount * 100);
 
         jsonObject.addProperty("amount", convertedAmount);
         jsonObject.addProperty("currency", "INR");
-        jsonObject.addProperty("receipt", "receipt#123");
+        jsonObject.addProperty("receipt", "receipt#" + System.currentTimeMillis());
 
         // Create a nested JSON object
         JsonObject notes = new JsonObject();
         notes.addProperty("userId", preOrderResponseDTO.getUserId());
+        notes.addProperty("preOrderId", preOrderResponseDTO.getOrderId());
 
         // Add the nested JSON object to the main object
         jsonObject.add("notes", notes);
@@ -800,19 +838,29 @@ public class OrderServiceImpl implements IOrderService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         // Print Response
-        System.out.println("Response Code: " + response.statusCode());
-        System.out.println("Response Body: " + response.body());
-        String orderId = null;
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode rootNode = mapper.readTree(response.body());
+        System.out.println("createRazorPayOrder Response Code: " + response.statusCode());
+        System.out.println("createRazorPayOrder Response Body: " + response.body());
 
-            // Extract individual fields
-            orderId = rootNode.get("id").asText();
-
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (response.statusCode() != 200) {
+            throw new Exception("RazorPay order creation failed with status " + response.statusCode()
+                    + ". Response: " + response.body());
         }
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode rootNode = mapper.readTree(response.body());
+
+        // Check for RazorPay error response
+        if (rootNode.has("error")) {
+            String errorDesc = rootNode.get("error").get("description").asText();
+            throw new Exception("RazorPay error: " + errorDesc);
+        }
+
+        // Extract individual fields
+        String orderId = rootNode.get("id").asText();
+        if (orderId == null || orderId.isBlank()) {
+            throw new Exception("RazorPay returned null/empty order ID. Response: " + response.body());
+        }
+        System.out.println("RazorPay Order created successfully. Order ID: " + orderId);
         return orderId;
     }
 
@@ -845,26 +893,52 @@ public class OrderServiceImpl implements IOrderService {
         Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
         if (tempMedicine == null) return medicineDTO;
         
+        // Retrieve master medicine to serve as catalog fallback
+        MasterMedicine masterMed = null;
+        if (tempMedicine.getMedicineId() != null) {
+            masterMed = masterMedicineRepository.findById(tempMedicine.getMedicineId()).orElse(null);
+        } else if (tempMedicine.getName() != null && !tempMedicine.getName().trim().isEmpty()) {
+            List<MasterMedicine> matchedMeds = masterMedicineRepository.findByNameIgnoreCase(tempMedicine.getName().trim());
+            if (matchedMeds != null && !matchedMeds.isEmpty()) {
+                masterMed = matchedMeds.get(0);
+            }
+        }
+
         medicineDTO.setId(tempMedicine.getId());
         medicineDTO.setMrp(stock.getMrp());
-        medicineDTO.setName(tempMedicine.getName());
-        medicineDTO.setManufacturer(tempMedicine.getManufacture()); // Fixed rename
+        medicineDTO.setName(tempMedicine.getName() != null && !tempMedicine.getName().trim().isEmpty() ? tempMedicine.getName() : (masterMed != null ? masterMed.getName() : ""));
+        medicineDTO.setManufacturer(tempMedicine.getManufacture() != null && !tempMedicine.getManufacture().trim().isEmpty() ? tempMedicine.getManufacture() : (masterMed != null ? masterMed.getManufacture() : ""));
         medicineDTO.setMedicineType(tempMedicine.getMedicineType());
         
         MedicineInformation medicineInformation = tempMedicine.getMedicineInformation();
+        String useOf = "";
+        String strip = "";
+        String rawPhoto = "";
+
         if (medicineInformation != null) {
-            medicineDTO.setUseOf(medicineInformation.getUseOf());
-            medicineDTO.setStrip(medicineInformation.getPacking());
-            medicineDTO.setImage(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
-            medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
-        } else {
-            medicineDTO.setUseOf("");
-            medicineDTO.setStrip("");
-            medicineDTO.setImage("");
-            medicineDTO.setPhoto1("");
+            useOf = medicineInformation.getUseOf();
+            strip = medicineInformation.getPacking();
+            rawPhoto = medicineInformation.getPhoto1();
         }
+
+        // Apply master medicine fallbacks
+        if (useOf == null || useOf.trim().isEmpty()) {
+            useOf = (masterMed != null && masterMed.getUseOf() != null) ? masterMed.getUseOf() : "";
+        }
+        if (strip == null || strip.trim().isEmpty()) {
+            strip = (masterMed != null && masterMed.getPackaging() != null) ? masterMed.getPackaging() : "";
+        }
+        if (rawPhoto == null || rawPhoto.trim().isEmpty()) {
+            rawPhoto = (masterMed != null && masterMed.getPhoto1() != null) ? masterMed.getPhoto1() : "";
+        }
+
+        String photoUrl = Constants.getMedicineImageWithFallback(rawPhoto);
+        medicineDTO.setUseOf(useOf);
+        medicineDTO.setStrip(strip);
+        medicineDTO.setImage(photoUrl);
+        medicineDTO.setPhoto1(photoUrl);
         
-        medicineDTO.setSaltComposition(tempMedicine.getSaltComposition());
+        medicineDTO.setSaltComposition(tempMedicine.getSaltComposition() != null && !tempMedicine.getSaltComposition().trim().isEmpty() ? tempMedicine.getSaltComposition() : (masterMed != null ? masterMed.getSaltComposition() : ""));
         medicineDTO.setDiscount(stock.getDiscount());
         medicineDTO.setActualPrice(stock.getMrp());
         medicineDTO.setExpiryDate(stock.getExpiryDate());
@@ -986,6 +1060,11 @@ public class OrderServiceImpl implements IOrderService {
 
     public String createRazorPayOrderForBucket(BucketOrderRequestDTO bucketOrderRequest,
             PreOrderResponseDTO preOrderResponseDTO) throws Exception {
+        Double amount = preOrderResponseDTO.getAmountToPay();
+        if (amount == null || amount <= 0) {
+            throw new Exception("Invalid amount to pay: " + amount + ". Amount must be greater than 0.");
+        }
+
         String keyId = "rzp_test_oZBGm1luIG1Rpl"; // Replace with actual key
         String keySecret = "S0Pxnueo7AdCYS2HFIa7LXK6"; // Replace with actual key
         String credentials = keyId + ":" + keySecret;
@@ -995,16 +1074,16 @@ public class OrderServiceImpl implements IOrderService {
         // Create a JSON object
         JsonObject jsonObject = new JsonObject();
         // Add fields to the JSON object
-        Double amount = preOrderResponseDTO.getAmountToPay();
         int convertedAmount = (int) Math.round(amount * 100);
 
         jsonObject.addProperty("amount", convertedAmount);
         jsonObject.addProperty("currency", "INR");
-        jsonObject.addProperty("receipt", "receipt#123");
+        jsonObject.addProperty("receipt", "receipt#" + System.currentTimeMillis());
 
         // Create a nested JSON object
         JsonObject notes = new JsonObject();
         notes.addProperty("userId", preOrderResponseDTO.getUserId());
+        notes.addProperty("preOrderId", preOrderResponseDTO.getOrderId());
 
         // Add the nested JSON object to the main object
         jsonObject.add("notes", notes);
@@ -1023,19 +1102,29 @@ public class OrderServiceImpl implements IOrderService {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         // Print Response
-        System.out.println("Response Code: " + response.statusCode());
-        System.out.println("Response Body: " + response.body());
-        String orderId = null;
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode rootNode = mapper.readTree(response.body());
+        System.out.println("createRazorPayOrderForBucket Response Code: " + response.statusCode());
+        System.out.println("createRazorPayOrderForBucket Response Body: " + response.body());
 
-            // Extract individual fields
-            orderId = rootNode.get("id").asText();
-
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (response.statusCode() != 200) {
+            throw new Exception("RazorPay order creation failed with status " + response.statusCode()
+                    + ". Response: " + response.body());
         }
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode rootNode = mapper.readTree(response.body());
+
+        // Check for RazorPay error response
+        if (rootNode.has("error")) {
+            String errorDesc = rootNode.get("error").get("description").asText();
+            throw new Exception("RazorPay error: " + errorDesc);
+        }
+
+        // Extract individual fields
+        String orderId = rootNode.get("id").asText();
+        if (orderId == null || orderId.isBlank()) {
+            throw new Exception("RazorPay returned null/empty order ID. Response: " + response.body());
+        }
+        System.out.println("RazorPay Order created successfully. Order ID: " + orderId);
         return orderId;
     }
 
@@ -1081,11 +1170,11 @@ public class OrderServiceImpl implements IOrderService {
                 for (MedicineDTO medicine : selectedCart.getMedicine()) {
                     OrderItem item = new OrderItem();
                     Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
-                    if (med == null || med.getMedicineId() == null) {
-                        System.err.println("SKIPPING order item: Medicine not found or medicine_id is null for vendorMedicineId=" + medicine.getId());
+                    if (med == null) {
+                        System.err.println("SKIPPING order item: Medicine not found for vendorMedicineId=" + medicine.getId());
                         continue;
                     }
-                    item.setMedicineId(med.getMedicineId());
+                    item.setMedicineId(med.getId());
                     item.setQty(medicine.getQty());
                     Double mrp = medicine.getMrp() != null ? medicine.getMrp() : 0.0;
                     Double discount = medicine.getDiscount() != null ? medicine.getDiscount() : 0.0;
@@ -1175,8 +1264,8 @@ public class OrderServiceImpl implements IOrderService {
             List<OrderItem> orderItems = cart.getMedicine().stream()
                     .filter(medicine -> {
                         Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
-                        if (med == null || med.getMedicineId() == null) {
-                            System.err.println("SKIPPING order item: Medicine not found or medicine_id is null for vendorMedicineId=" + medicine.getId());
+                        if (med == null) {
+                            System.err.println("SKIPPING order item: Medicine not found for vendorMedicineId=" + medicine.getId());
                             return false;
                         }
                         return true;
@@ -1184,7 +1273,7 @@ public class OrderServiceImpl implements IOrderService {
                     .map(medicine -> {
                         OrderItem item = new OrderItem();
                         Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
-                        item.setMedicineId(med.getMedicineId());
+                        item.setMedicineId(med.getId());
                         item.setQty(medicine.getQty());
                         Double mrp = medicine.getMrp() != null ? medicine.getMrp() : 0.0;
                         Double discount = medicine.getDiscount() != null ? medicine.getDiscount() : 0.0;

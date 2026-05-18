@@ -34,18 +34,17 @@ public class MedicineServiceImpl implements IMedicineService {
     @Autowired
     StockRepository stockRepository;
 
+    @Autowired
+    com.trego.dao.impl.MasterMedicineRepository masterMedicineRepository;
+
     @Override
     public List<MedicineWithStockAndVendorDTO> findAll() {
         List<MedicineWithStockAndVendorDTO> medicineWithStockAndVendorDTOList = new ArrayList<>();
         List<Medicine> medicines = medicineRepository.findAll();
         for (Medicine medicine : medicines) {
-
             MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = populateMedicineWithStockVendor(medicine);
-            List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
-            medicineWithStockAndVendorDTO.setStocks(stocks);
             medicineWithStockAndVendorDTOList.add(medicineWithStockAndVendorDTO);
         }
-
         return medicineWithStockAndVendorDTOList;
     }
 
@@ -80,7 +79,8 @@ public class MedicineServiceImpl implements IMedicineService {
             medicineDTO.setKidneyInteraction(medicineInformation.getKidneyInteraction());
             medicineDTO.setLiverInteraction(medicineInformation.getLiverInteraction());
             medicineDTO.setQuestionAnswers(medicineInformation.getQuestionAnswers());
-            medicineDTO.setPhoto1(medicineInformation.getPhoto1());
+            medicineDTO.setPhoto1(Constants.getMedicineImageWithFallback(medicineInformation.getPhoto1()));
+            medicineDTO.setImage(Constants.getMedicineImageWithFallback(medicineInformation.getPhoto1()));
         }
 
         medicineDTO.setPrescriptionRequired(medicine.getPrescriptionRequired());
@@ -94,18 +94,10 @@ public class MedicineServiceImpl implements IMedicineService {
     }
 
     @Override
-    public Page<MedicineWithStockAndVendorDTO> searchMedicines(String searchText, Integer vendorId, int page,
+    public Page<com.trego.dao.entity.MasterMedicine> searchMedicines(String searchText, Integer vendorId, int page,
             int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<Medicine> medicines = null;
-        if (vendorId != 0) {
-            medicines = medicineRepository.findByNameWithVendorId(searchText, vendorId, pageable);
-
-        } else {
-            medicines = medicineRepository.findByNameContainingIgnoreCaseOrNameIgnoreCase(searchText, "", pageable);
-        }
-        return convertResponse(medicines);
-
+        return masterMedicineRepository.findByNameContainingIgnoreCase(searchText, pageable);
     }
 
     @Override
@@ -120,7 +112,6 @@ public class MedicineServiceImpl implements IMedicineService {
     private Page<MedicineWithStockAndVendorDTO> convertResponse(Page<Medicine> medicines) {
         Page<MedicineWithStockAndVendorDTO> medicineDTOs = medicines.map(medicine -> {
             MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = populateMedicineWithStockVendor(medicine);
-            medicineWithStockAndVendorDTO.setStocks(medicine.getStocks());
             return medicineWithStockAndVendorDTO;
         });
         return medicineDTOs;
@@ -142,26 +133,30 @@ public class MedicineServiceImpl implements IMedicineService {
      * 5. Return the list of VendorMedicinePriceResponseDTO
      */
     @Override
-    public List<VendorMedicinePriceResponseDTO> searchMedicineVendorPrices(String searchText) {
-        List<VendorMedicinePriceView> views = medicineRepository.searchMedicineVendorPrices(searchText);
+    public List<VendorMedicinePriceResponseDTO> searchMedicineVendorPrices(Long medicineId) {
+        // Fetch Master Medicine details to fallback on for missing catalog information
+        com.trego.dao.entity.MasterMedicine masterMed = masterMedicineRepository.findById(medicineId.intValue()).orElse(null);
+
+        // Direct FK lookup: vendor_medicine.medicine_id → medicine_master_db_table.medicine_id
+        List<VendorMedicinePriceView> views = medicineRepository.searchMedicineVendorPrices(medicineId.intValue());
 
         // Use LinkedHashMap to preserve insertion order (already sorted by selling
         // price ASC from DB)
         Map<Long, VendorMedicinePriceResponseDTO> medicineMap = new LinkedHashMap<>();
 
         for (VendorMedicinePriceView view : views) {
-            Long medicineId = view.getMedicineId();
+            Long viewMedicineId = view.getMedicineId();
 
             // Get or create the medicine-level response
-            VendorMedicinePriceResponseDTO medicineResponse = medicineMap.computeIfAbsent(medicineId, id -> {
+            VendorMedicinePriceResponseDTO medicineResponse = medicineMap.computeIfAbsent(viewMedicineId, id -> {
                 VendorMedicinePriceResponseDTO dto = new VendorMedicinePriceResponseDTO();
                 dto.setMedicineId(view.getMedicineId());
-                dto.setMedicineName(view.getMedicineName());
-                dto.setManufacturer(view.getManufacturer());
-                dto.setSaltComposition(view.getSaltComposition());
-                dto.setPhoto1(view.getPhoto1());
-                dto.setPacking(view.getPacking());
-                dto.setUseOf(view.getUseOf());
+                dto.setMedicineName(masterMed != null ? masterMed.getName() : view.getMedicineName());
+                dto.setManufacturer(view.getManufacturer() != null && !view.getManufacturer().trim().isEmpty() ? view.getManufacturer() : (masterMed != null ? masterMed.getManufacture() : ""));
+                dto.setSaltComposition(view.getSaltComposition() != null && !view.getSaltComposition().trim().isEmpty() ? view.getSaltComposition() : (masterMed != null ? masterMed.getSaltComposition() : ""));
+                dto.setPhoto1(Constants.getMedicineImageWithFallback(view.getPhoto1() != null && !view.getPhoto1().trim().isEmpty() ? view.getPhoto1() : (masterMed != null ? masterMed.getPhoto1() : "")));
+                dto.setPacking(view.getPacking() != null && !view.getPacking().trim().isEmpty() ? view.getPacking() : (masterMed != null && masterMed.getPackaging() != null ? masterMed.getPackaging() : ""));
+                dto.setUseOf(view.getUseOf() != null && !view.getUseOf().trim().isEmpty() ? view.getUseOf() : (masterMed != null && masterMed.getUseOf() != null ? masterMed.getUseOf() : ""));
                 dto.setVendorPrices(new ArrayList<>());
                 return dto;
             });
@@ -172,14 +167,14 @@ public class MedicineServiceImpl implements IMedicineService {
             vendorPrice.setVendorId(view.getVendorId());
             vendorPrice.setVendorName(view.getVendorName());
             vendorPrice.setVendorLogo(Constants.getVendorLogoWithFallback(view.getVendorLogo()));
-            vendorPrice.setVendorRating(view.getVendorRating());
-            vendorPrice.setDeliveryTimeMinutes(view.getDeliveryTime());
+            vendorPrice.setVendorRating(view.getVendorRating() != null ? view.getVendorRating() : "0");
+            vendorPrice.setDeliveryTimeMinutes(view.getDeliveryTime() != null ? view.getDeliveryTime() : 0);
             vendorPrice.setMrp(view.getMrp());
             vendorPrice.setDiscount(view.getDiscount());
             vendorPrice.setSellingPrice(view.getSellingPrice());
             vendorPrice.setQty(view.getQty());
-            vendorPrice.setExpiryDate(view.getExpiryDate());
-            vendorPrice.setPacking(view.getPacking());
+            vendorPrice.setExpiryDate(view.getExpiryDate() != null ? view.getExpiryDate() : "");
+            vendorPrice.setPacking(view.getPacking() != null ? view.getPacking() : "");
 
             medicineResponse.getVendorPrices().add(vendorPrice);
         }
@@ -192,62 +187,6 @@ public class MedicineServiceImpl implements IMedicineService {
         return new ArrayList<>(medicineMap.values());
     }
 
-    /**
-     * Get a single medicine by ID with all vendors selling it.
-     * Groups all vendor prices under one medicine response.
-     *
-     * Logic:
-     * 1. Query DB using medicineId to get all (vendor, stock, price) rows
-     * 2. Results are already sorted by sellingPrice ASC from the query
-     * 3. Build single VendorMedicinePriceResponseDTO with medicine info
-     * 4. Populate vendorPrices list with all vendors for this medicine
-     *
-     * @return VendorMedicinePriceResponseDTO with all vendor prices, or null if
-     *         medicine not found
-     */
-    @Override
-    public VendorMedicinePriceResponseDTO getMedicineVendorPrices(Long medicineId) {
-        List<VendorMedicinePriceView> views = medicineRepository.getVendorsForMedicine(medicineId);
-
-        if (views.isEmpty()) {
-            return null;
-        }
-
-        // First row gives us the medicine info
-        VendorMedicinePriceView firstView = views.get(0);
-        VendorMedicinePriceResponseDTO response = new VendorMedicinePriceResponseDTO();
-        response.setMedicineId(firstView.getMedicineId());
-        response.setMedicineName(firstView.getMedicineName());
-        response.setManufacturer(firstView.getManufacturer());
-        response.setSaltComposition(firstView.getSaltComposition());
-        response.setPhoto1(firstView.getPhoto1());
-        response.setPacking(firstView.getPacking());
-        response.setUseOf(firstView.getUseOf());
-        response.setVendorPrices(new ArrayList<>());
-
-        for (VendorMedicinePriceView view : views) {
-            VendorPriceDTO vendorPrice = new VendorPriceDTO();
-            vendorPrice.setStockId(view.getStockId());
-            vendorPrice.setVendorId(view.getVendorId());
-            vendorPrice.setVendorName(view.getVendorName());
-            vendorPrice.setVendorLogo(Constants.getVendorLogoWithFallback(view.getVendorLogo()));
-            vendorPrice.setVendorRating(view.getVendorRating());
-            vendorPrice.setDeliveryTimeMinutes(view.getDeliveryTime());
-            vendorPrice.setMrp(view.getMrp());
-            vendorPrice.setDiscount(view.getDiscount());
-            vendorPrice.setSellingPrice(view.getSellingPrice());
-            vendorPrice.setQty(view.getQty());
-            vendorPrice.setExpiryDate(view.getExpiryDate());
-            vendorPrice.setPacking(view.getPacking());
-
-            response.getVendorPrices().add(vendorPrice);
-        }
-
-        response.setTotalVendors(response.getVendorPrices().size());
-
-        return response;
-    }
-
     private MedicineWithStockAndVendorDTO populateMedicineWithStockVendor(Medicine medicine) {
         MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = new MedicineWithStockAndVendorDTO();
         medicineWithStockAndVendorDTO.setId(medicine.getId());
@@ -258,7 +197,7 @@ public class MedicineServiceImpl implements IMedicineService {
 
         MedicineInformation medicineInformation = medicine.getMedicineInformation();
         if (medicineInformation != null) {
-            medicineWithStockAndVendorDTO.setPhoto1(medicineInformation.getPhoto1());
+            medicineWithStockAndVendorDTO.setPhoto1(Constants.getMedicineImageWithFallback(medicineInformation.getPhoto1()));
             medicineWithStockAndVendorDTO.setUseOf(medicineInformation.getUseOf());
             medicineWithStockAndVendorDTO.setPacking(medicineInformation.getPacking());
         }

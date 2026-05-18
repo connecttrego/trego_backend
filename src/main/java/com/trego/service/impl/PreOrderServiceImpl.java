@@ -37,6 +37,9 @@ public class PreOrderServiceImpl implements IPreOrderService {
     @Autowired
     private MedicineRepository medicineRepository;
 
+    @Autowired
+    private MasterMedicineRepository masterMedicineRepository;
+
     @Override
     public PreOrderResponseDTO savePreOrder(PreOrderDTO preOrderRequest) {
 
@@ -118,8 +121,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
 
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
             List<MedicineDTO> medicines = cart.getMedicine().stream().map(medicine -> {
-                // Use the new method that returns a List to handle multiple stocks
-                List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(),
+                List<Stock> stocks = getStocksForMedicineAndVendor(medicine.getId(),
                         cart.getVendorId());
                 Optional<Stock> optionalStock = stocks.isEmpty() ? Optional.empty() : Optional.of(stocks.get(0));
                 // Instead of returning null, return the medicine with indication of
@@ -175,8 +177,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
 
             List<MedicineDTO> medicines = cart.getMedicine().stream()
                     .map(medicine -> {
-                        // Use the new method that returns a List to handle multiple stocks
-                        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicine.getId(),
+                        List<Stock> stocks = getStocksForMedicineAndVendor(medicine.getId(),
                                 cart.getVendorId());
                         Optional<Stock> optionalStock = stocks.isEmpty() ? Optional.empty()
                                 : Optional.of(stocks.get(0));
@@ -225,26 +226,56 @@ public class PreOrderServiceImpl implements IPreOrderService {
         Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
         if (tempMedicine == null) return medicineDTO;
         
+        // Retrieve master medicine to serve as catalog fallback
+        MasterMedicine masterMed = null;
+        if (tempMedicine.getMedicineId() != null) {
+            masterMed = masterMedicineRepository.findById(tempMedicine.getMedicineId()).orElse(null);
+        } else if (tempMedicine.getName() != null && !tempMedicine.getName().trim().isEmpty()) {
+            List<MasterMedicine> matchedMeds = masterMedicineRepository.findByNameIgnoreCase(tempMedicine.getName().trim());
+            if (matchedMeds != null && !matchedMeds.isEmpty()) {
+                masterMed = matchedMeds.get(0);
+            }
+        }
+
         medicineDTO.setId(tempMedicine.getId());
         medicineDTO.setMrp(stock.getMrp());
-        medicineDTO.setName(tempMedicine.getName());
-        medicineDTO.setManufacturer(tempMedicine.getManufacture()); // Fixed rename
+        medicineDTO.setName(tempMedicine.getName() != null && !tempMedicine.getName().trim().isEmpty() ? tempMedicine.getName() : (masterMed != null ? masterMed.getName() : ""));
+        medicineDTO.setManufacturer(tempMedicine.getManufacture() != null && !tempMedicine.getManufacture().trim().isEmpty() ? tempMedicine.getManufacture() : (masterMed != null ? masterMed.getManufacture() : ""));
         medicineDTO.setMedicineType(tempMedicine.getMedicineType());
         
         MedicineInformation medicineInformation = tempMedicine.getMedicineInformation();
+        String useOf = "";
+        String strip = "";
+        String rawPhoto = "";
+
         if (medicineInformation != null) {
-            medicineDTO.setUseOf(medicineInformation.getUseOf());
-            medicineDTO.setStrip(medicineInformation.getPacking());
-            medicineDTO.setImage(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
-            medicineDTO.setPhoto1(Constants.LOGO_BASE_URL + Constants.MEDICINES_BASE_URL + medicineInformation.getPhoto1());
-        } else {
-            medicineDTO.setUseOf("");
-            medicineDTO.setStrip("");
-            medicineDTO.setImage("");
-            medicineDTO.setPhoto1("");
+            useOf = medicineInformation.getUseOf();
+            strip = medicineInformation.getPacking();
+            rawPhoto = medicineInformation.getPhoto1();
+        }
+
+        // Apply master medicine fallbacks for useOf and strip
+        if (useOf == null || useOf.trim().isEmpty()) {
+            useOf = (masterMed != null && masterMed.getUseOf() != null) ? masterMed.getUseOf() : "";
+        }
+        if (strip == null || strip.trim().isEmpty()) {
+            strip = (masterMed != null && masterMed.getPackaging() != null) ? masterMed.getPackaging() : "";
         }
         
-        medicineDTO.setSaltComposition(tempMedicine.getSaltComposition());
+        // Apply master medicine fallback for photo — only if vendor-specific photo is null/empty
+        if (rawPhoto == null || rawPhoto.trim().isEmpty()) {
+            rawPhoto = (masterMed != null && masterMed.getPhoto1() != null) ? masterMed.getPhoto1() : "";
+        }
+
+        // Use unified fallback (consistent with VendorServiceImpl and OrderServiceImpl)
+        String finalPhotoUrl = Constants.getMedicineImageWithFallback(rawPhoto);
+
+        medicineDTO.setUseOf(useOf);
+        medicineDTO.setStrip(strip);
+        medicineDTO.setImage(finalPhotoUrl);
+        medicineDTO.setPhoto1(finalPhotoUrl);
+        
+        medicineDTO.setSaltComposition(tempMedicine.getSaltComposition() != null && !tempMedicine.getSaltComposition().trim().isEmpty() ? tempMedicine.getSaltComposition() : (masterMed != null ? masterMed.getSaltComposition() : ""));
         medicineDTO.setDiscount(stock.getDiscount());
         medicineDTO.setActualPrice(stock.getMrp());
         medicineDTO.setExpiryDate(stock.getExpiryDate());
@@ -252,26 +283,65 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     private MedicineDTO populateUnavailableMedicalDTO(MedicineDTO medicineDTO) {
-        // Create a copy of the medicine DTO with default values indicating
-        // unavailability
-        MedicineDTO unavailableMedicine = new MedicineDTO();
-        unavailableMedicine.setId(medicineDTO.getId());
-        unavailableMedicine.setName(medicineDTO.getName());
-        unavailableMedicine.setManufacturer(medicineDTO.getManufacturer());
-        unavailableMedicine.setSaltComposition(medicineDTO.getSaltComposition());
-        unavailableMedicine.setMedicineType(medicineDTO.getMedicineType());
-        unavailableMedicine.setUseOf(medicineDTO.getUseOf());
-        unavailableMedicine.setStrip(medicineDTO.getStrip());
-        unavailableMedicine.setPhoto1(medicineDTO.getPhoto1());
+        Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
+        if (tempMedicine != null) {
+            // Retrieve master medicine to serve as catalog fallback
+            MasterMedicine masterMed = null;
+            if (tempMedicine.getMedicineId() != null) {
+                masterMed = masterMedicineRepository.findById(tempMedicine.getMedicineId()).orElse(null);
+            } else if (tempMedicine.getName() != null && !tempMedicine.getName().trim().isEmpty()) {
+                List<MasterMedicine> matchedMeds = masterMedicineRepository.findByNameIgnoreCase(tempMedicine.getName().trim());
+                if (matchedMeds != null && !matchedMeds.isEmpty()) {
+                    masterMed = matchedMeds.get(0);
+                }
+            }
+
+            medicineDTO.setName(tempMedicine.getName() != null && !tempMedicine.getName().trim().isEmpty() ? tempMedicine.getName() : (masterMed != null ? masterMed.getName() : ""));
+            medicineDTO.setManufacturer(tempMedicine.getManufacture() != null && !tempMedicine.getManufacture().trim().isEmpty() ? tempMedicine.getManufacture() : (masterMed != null ? masterMed.getManufacture() : ""));
+            medicineDTO.setMedicineType(tempMedicine.getMedicineType());
+            
+            MedicineInformation medicineInformation = tempMedicine.getMedicineInformation();
+            String useOf = "";
+            String strip = "";
+            String rawPhoto = "";
+
+            if (medicineInformation != null) {
+                useOf = medicineInformation.getUseOf();
+                strip = medicineInformation.getPacking();
+                rawPhoto = medicineInformation.getPhoto1();
+            }
+
+            // Apply master medicine fallbacks for useOf and strip
+            if (useOf == null || useOf.trim().isEmpty()) {
+                useOf = (masterMed != null && masterMed.getUseOf() != null) ? masterMed.getUseOf() : "";
+            }
+            if (strip == null || strip.trim().isEmpty()) {
+                strip = (masterMed != null && masterMed.getPackaging() != null) ? masterMed.getPackaging() : "";
+            }
+            
+            // Apply master medicine fallback for photo — only if vendor-specific photo is null/empty
+            if (rawPhoto == null || rawPhoto.trim().isEmpty()) {
+                rawPhoto = (masterMed != null && masterMed.getPhoto1() != null) ? masterMed.getPhoto1() : "";
+            }
+
+            // Use unified fallback (consistent with VendorServiceImpl and OrderServiceImpl)
+            String finalPhotoUrl = Constants.getMedicineImageWithFallback(rawPhoto);
+
+            medicineDTO.setUseOf(useOf);
+            medicineDTO.setStrip(strip);
+            medicineDTO.setImage(finalPhotoUrl);
+            medicineDTO.setPhoto1(finalPhotoUrl);
+            medicineDTO.setSaltComposition(tempMedicine.getSaltComposition() != null && !tempMedicine.getSaltComposition().trim().isEmpty() ? tempMedicine.getSaltComposition() : (masterMed != null ? masterMed.getSaltComposition() : ""));
+        }
 
         // Set default values indicating unavailability
-        unavailableMedicine.setMrp(0.0);
-        unavailableMedicine.setDiscount(0.0);
-        unavailableMedicine.setQty(0);
-        unavailableMedicine.setActualPrice(0.0);
-        unavailableMedicine.setExpiryDate(null);
+        medicineDTO.setMrp(0.0);
+        medicineDTO.setDiscount(0.0);
+        medicineDTO.setQty(0);
+        medicineDTO.setActualPrice(0.0);
+        medicineDTO.setExpiryDate(null);
 
-        return unavailableMedicine;
+        return medicineDTO;
     }
 
     private static double getTotalCartValue(List<CartResponseDTO> cartDTOs) {
@@ -305,7 +375,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId,
+                            List<Stock> stocks = getStocksForMedicineAndVendor(medicineId,
                                     vendorId);
 
                             if (!stocks.isEmpty()) {
@@ -341,7 +411,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 
-                            List<Stock> stocks = stockRepository.findStocksByMedicineIdAndVendorId(medicineId,
+                            List<Stock> stocks = getStocksForMedicineAndVendor(medicineId,
                                     vendorId);
 
                             if (!stocks.isEmpty()) {
@@ -362,8 +432,28 @@ public class PreOrderServiceImpl implements IPreOrderService {
                             }
                         }))
                 .reduce(0.0, Double::sum);
-        preOrderResponseDTO.setTotalCartValue(totalCartValue);
+    }
 
+    private List<Stock> getStocksForMedicineAndVendor(long medicineId, Integer vendorId) {
+        if (vendorId == null) {
+            return java.util.Collections.emptyList();
+        }
+        
+        // Find vendor using either internal ID or external ID
+        Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
+        if (vendor == null) {
+            vendor = vendorRepository.findByVendorId(vendorId).orElse(null);
+        }
+        
+        Integer vendorUserId = vendorId;
+        Integer externalVendorId = vendorId;
+        
+        if (vendor != null) {
+            vendorUserId = vendor.getId();
+            externalVendorId = vendor.getVendorId();
+        }
+        
+        return stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId, vendorUserId, externalVendorId);
     }
 
 }
