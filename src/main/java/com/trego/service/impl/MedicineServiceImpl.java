@@ -37,6 +37,9 @@ public class MedicineServiceImpl implements IMedicineService {
     @Autowired
     com.trego.dao.impl.MasterMedicineRepository masterMedicineRepository;
 
+    @Autowired
+    com.trego.dao.impl.VendorRepository vendorRepository;
+
     @Override
     public List<MedicineWithStockAndVendorDTO> findAll() {
         List<MedicineWithStockAndVendorDTO> medicineWithStockAndVendorDTOList = new ArrayList<>();
@@ -50,6 +53,63 @@ public class MedicineServiceImpl implements IMedicineService {
 
     @Override
     public MedicineDTO getMedicineById(Long id) {
+        // Try looking up in master catalog first (since frontend searches return master medicine IDs)
+        com.trego.dao.entity.MasterMedicine masterMedicine = masterMedicineRepository.findById(id.intValue()).orElse(null);
+        if (masterMedicine != null) {
+            MedicineDTO medicineDTO = new MedicineDTO();
+            medicineDTO.setId(masterMedicine.getMedicineId().longValue());
+            medicineDTO.setName(masterMedicine.getName());
+            medicineDTO.setManufacturer(masterMedicine.getManufacture());
+            medicineDTO.setSaltComposition(masterMedicine.getSaltComposition());
+            medicineDTO.setMedicineType(masterMedicine.getMedicineType());
+            medicineDTO.setIntroduction(masterMedicine.getIntroduction());
+            medicineDTO.setDescription(masterMedicine.getDescription());
+            medicineDTO.setHowItWorks(masterMedicine.getHowItWorks() != null ? masterMedicine.getHowItWorks() : masterMedicine.getHowWorks());
+            medicineDTO.setSafetyAdvise(masterMedicine.getSafetyAdvice() != null ? masterMedicine.getSafetyAdvice() : masterMedicine.getSafetyAdvise());
+            medicineDTO.setIfMiss(masterMedicine.getIfMiss());
+            medicineDTO.setUseOf(masterMedicine.getUseOf());
+            medicineDTO.setStrip(masterMedicine.getPackaging());
+            medicineDTO.setCommonSideEffect(masterMedicine.getCommonSideEffect());
+            medicineDTO.setAlcoholInteraction(masterMedicine.getAlcoholInteraction());
+            medicineDTO.setPregnancyInteraction(masterMedicine.getPregnancyInteraction());
+            medicineDTO.setLactationInteraction(masterMedicine.getLactationInteraction());
+            medicineDTO.setDrivingInteraction(masterMedicine.getDrivingInteraction());
+            medicineDTO.setKidneyInteraction(masterMedicine.getKidneyInteraction());
+            medicineDTO.setLiverInteraction(masterMedicine.getLiverInteraction());
+            medicineDTO.setQuestionAnswers(masterMedicine.getQuestionAnswers());
+            
+            String photo1 = Constants.getMedicineImageWithFallback(masterMedicine.getPhoto1());
+            medicineDTO.setPhoto1(photo1);
+            medicineDTO.setImage(photo1);
+            
+            medicineDTO.setPrescriptionRequired(masterMedicine.getPrescriptionRequired());
+            medicineDTO.setCountryOfOrigin(masterMedicine.getCountryOfOrigin());
+            
+            // Find all vendor medicines associated with this master medicine
+            List<Medicine> vendorMedicines = medicineRepository.findByMedicineId(masterMedicine.getMedicineId());
+            List<Stock> allStocks = new ArrayList<>();
+            for (Medicine vm : vendorMedicines) {
+                List<Stock> stocks = stockRepository.findByMedicineId(vm.getId());
+                if (stocks != null) {
+                    for (Stock s : stocks) {
+                        if (s.getVendor() == null && s.getRawVendorId() != null) {
+                            com.trego.dao.entity.Vendor v = vendorRepository.findById(s.getRawVendorId()).orElse(null);
+                            if (v == null) {
+                                v = vendorRepository.findByVendorId(s.getRawVendorId()).orElse(null);
+                            }
+                            s.setVendor(v);
+                        }
+                    }
+                    allStocks.addAll(stocks);
+                }
+            }
+            medicineDTO.setOffLineStocks(allStocks);
+            medicineDTO.setOnLineStocks(new ArrayList<>());
+            
+            return medicineDTO;
+        }
+
+        // Fallback to legacy vendor medicine lookup if not found in master catalog
         Medicine medicine = medicineRepository.findById(id).orElse(null);
         if (medicine == null)
             return null;
@@ -87,6 +147,17 @@ public class MedicineServiceImpl implements IMedicineService {
         medicineDTO.setCountryOfOrigin(medicine.getCountryOfOrigin());
 
         List<Stock> stocks = stockRepository.findByMedicineId(medicine.getId());
+        if (stocks != null) {
+            for (Stock s : stocks) {
+                if (s.getVendor() == null && s.getRawVendorId() != null) {
+                    com.trego.dao.entity.Vendor v = vendorRepository.findById(s.getRawVendorId()).orElse(null);
+                    if (v == null) {
+                        v = vendorRepository.findByVendorId(s.getRawVendorId()).orElse(null);
+                    }
+                    s.setVendor(v);
+                }
+            }
+        }
         medicineDTO.setOffLineStocks(stocks);
         medicineDTO.setOnLineStocks(new ArrayList<>());
 
@@ -94,11 +165,60 @@ public class MedicineServiceImpl implements IMedicineService {
     }
 
     @Override
-    public Page<com.trego.dao.entity.MasterMedicine> searchMedicines(String searchText, Integer vendorId, int page,
+    public Page<MedicineWithStockAndVendorDTO> searchMedicines(String searchText, Integer vendorId, int page,
             int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return masterMedicineRepository.findByNameContainingIgnoreCase(searchText, pageable);
+        Page<com.trego.dao.entity.MasterMedicine> masterMedicines = masterMedicineRepository.findByNameContainingIgnoreCase(searchText, pageable);
+        return masterMedicines.map(this::convertMasterToDto);
     }
+
+    private MedicineWithStockAndVendorDTO convertMasterToDto(com.trego.dao.entity.MasterMedicine masterMedicine) {
+        MedicineWithStockAndVendorDTO dto = new MedicineWithStockAndVendorDTO();
+        dto.setId(masterMedicine.getMedicineId().longValue());
+        dto.setName(masterMedicine.getName());
+        dto.setManufacturer(masterMedicine.getManufacture());
+        dto.setSaltComposition(masterMedicine.getSaltComposition());
+        dto.setPhoto1(Constants.getMedicineImageWithFallback(masterMedicine.getPhoto1()));
+        dto.setPacking(masterMedicine.getPackaging());
+        dto.setUseOf(masterMedicine.getUseOf());
+        dto.setMedicineType(masterMedicine.getMedicineType());
+
+        // Find all vendor medicines and stocks
+        List<Medicine> vendorMedicines = medicineRepository.findByMedicineId(masterMedicine.getMedicineId());
+        List<Stock> allStocks = new ArrayList<>();
+        for (Medicine vm : vendorMedicines) {
+            List<Stock> stocks = stockRepository.findByMedicineId(vm.getId());
+            if (stocks != null) {
+                for (Stock s : stocks) {
+                    if (s.getVendor() == null && s.getRawVendorId() != null) {
+                        com.trego.dao.entity.Vendor v = vendorRepository.findById(s.getRawVendorId()).orElse(null);
+                        if (v == null) {
+                            v = vendorRepository.findByVendorId(s.getRawVendorId()).orElse(null);
+                        }
+                        s.setVendor(v);
+                    }
+                }
+                allStocks.addAll(stocks);
+            }
+        }
+        
+        // Sort stocks by sellingPrice ASC so the cheapest is first (useful for card price display!)
+        allStocks.sort((s1, s2) -> {
+            Double p1 = s1.getDiscount() != null && s1.getMrp() != null ? (s1.getMrp() - s1.getDiscount()) : (s1.getMrp() != null ? s1.getMrp() : 0.0);
+            Double p2 = s2.getDiscount() != null && s2.getMrp() != null ? (s2.getMrp() - s2.getDiscount()) : (s2.getMrp() != null ? s2.getMrp() : 0.0);
+            return p1.compareTo(p2);
+        });
+
+        dto.setStocks(allStocks);
+        dto.setSubstitutes(new ArrayList<>());
+        
+        SubstituteDTO subDto = new SubstituteDTO();
+        subDto.setText("Substitute Available");
+        dto.setSubstituteDTO(subDto);
+
+        return dto;
+    }
+
 
     @Override
     public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Long subcategoryId, int page, int size) {

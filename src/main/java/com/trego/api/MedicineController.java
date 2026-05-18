@@ -38,7 +38,7 @@ public class MedicineController {
     }
 
     @GetMapping("/medicines/search")
-    public Page<MasterMedicine> searchProducts(
+    public Page<MedicineWithStockAndVendorDTO> searchProducts(
             @RequestParam String searchText,
             @RequestParam(defaultValue = "0") Integer vendorId,
             @RequestParam(defaultValue = "0") int page,

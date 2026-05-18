@@ -71,6 +71,8 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
     
     Page<Medicine> findByVendorId(Integer vendorId, Pageable pageable);
 
+    List<Medicine> findByMedicineId(Integer medicineId);
+
     /**
      * Given a medicine_id (FK to medicine_master_db_table), return ALL vendors
      * selling that medicine along with their cheapest stock variant,

@@ -47,13 +47,16 @@ public class Stock {
     @Column(name = "expiry_date")
     private String expiryDate;
 
+    @Column(name = "vendor_id", insertable = false, updatable = false)
+    private Integer rawVendorId;
+
     @ManyToOne
     @JoinColumn(name = "vendor_medicine_id")
     @JsonIgnore
     private Medicine medicine;
 
     @ManyToOne
-    @JoinColumn(name = "vendor_id")
+    @JoinColumn(name = "vendor_id", referencedColumnName = "vendor_id")
     private Vendor vendor = null;
 
 }
