@@ -37,6 +37,6 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
      """)
      List<Stock> findByMedicineIds(@Param("medicineIds") List<Long> medicineIds);
 
-    @Query(value = "SELECT * FROM vendor_medicine_price WHERE vendor_medicine_id = :medicineId AND (vendor_id = :vendorUserId OR vendor_id = :externalVendorId)", nativeQuery = true)
+    @Query(value = "SELECT * FROM vendor_medicine_price WHERE (vendor_medicine_id = :medicineId OR vendor_medicine_id IN (SELECT vendor_medicine_id FROM vendor_medicine WHERE medicine_id = :medicineId AND (vendor_id = :vendorUserId OR vendor_id = :externalVendorId))) AND (vendor_id = :vendorUserId OR vendor_id = :externalVendorId)", nativeQuery = true)
     List<Stock> findStocksByMedicineIdAndBothVendorIds(@Param("medicineId") long medicineId, @Param("vendorUserId") Integer vendorUserId, @Param("externalVendorId") Integer externalVendorId);
 }

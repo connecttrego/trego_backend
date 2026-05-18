@@ -97,6 +97,9 @@ public class OrderServiceImpl implements IOrderService {
             preOrder.setSelectedVendorId(orderRequest.getSelectedVendorId());
         }
 
+        // Dynamically recalculate cart response amounts (such as amountToPay) to ensure it is accurate and up-to-date
+        populateCartResponse(preOrderResponseDTO);
+
         String razorpayOrderId = null;
         if (StringUtils.isEmpty(preOrder.getRazorpayOrderId())
                 || preOrderResponseDTO.getAmountToPay() == null
@@ -868,7 +871,7 @@ public class OrderServiceImpl implements IOrderService {
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
             List<MedicineDTO> medicines = cart.getMedicine().stream()
                     .map(medicine -> {
-                        List<Stock> stockList = stockRepository.findByMedicineIdAndVendorId(medicine.getId(),
+                        List<Stock> stockList = getStocksForMedicineAndVendor(medicine.getId(),
                                 cart.getVendorId());
 
                         return stockList.stream()
@@ -1292,6 +1295,28 @@ public class OrderServiceImpl implements IOrderService {
         });
 
         preOrderRepository.save(preOrder);
+    }
+
+    private List<Stock> getStocksForMedicineAndVendor(long medicineId, Integer vendorId) {
+        if (vendorId == null) {
+            return java.util.Collections.emptyList();
+        }
+        
+        // Find vendor using either internal ID or external ID
+        Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
+        if (vendor == null) {
+            vendor = vendorRepository.findByVendorId(vendorId).orElse(null);
+        }
+        
+        Integer vendorUserId = vendorId;
+        Integer externalVendorId = vendorId;
+        
+        if (vendor != null) {
+            vendorUserId = vendor.getId();
+            externalVendorId = vendor.getVendorId();
+        }
+        
+        return stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId, vendorUserId, externalVendorId);
     }
 
 }
