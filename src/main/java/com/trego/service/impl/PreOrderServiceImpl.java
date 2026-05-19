@@ -224,6 +224,12 @@ public class PreOrderServiceImpl implements IPreOrderService {
     private MedicineDTO populateMedicalDTO(MedicineDTO medicineDTO, Stock stock) {
 
         Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
+        if (tempMedicine == null) {
+            List<Medicine> list = medicineRepository.findByMedicineId((int) medicineDTO.getId());
+            if (list != null && !list.isEmpty()) {
+                tempMedicine = list.get(0);
+            }
+        }
         if (tempMedicine == null) return medicineDTO;
         
         // Retrieve master medicine to serve as catalog fallback
@@ -284,6 +290,12 @@ public class PreOrderServiceImpl implements IPreOrderService {
 
     private MedicineDTO populateUnavailableMedicalDTO(MedicineDTO medicineDTO) {
         Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
+        if (tempMedicine == null) {
+            List<Medicine> list = medicineRepository.findByMedicineId((int) medicineDTO.getId());
+            if (list != null && !list.isEmpty()) {
+                tempMedicine = list.get(0);
+            }
+        }
         if (tempMedicine != null) {
             // Retrieve master medicine to serve as catalog fallback
             MasterMedicine masterMed = null;
