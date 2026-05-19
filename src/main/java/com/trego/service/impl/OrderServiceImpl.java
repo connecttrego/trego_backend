@@ -689,7 +689,13 @@ public class OrderServiceImpl implements IOrderService {
                 Map<String, Object> medicineDetails = new HashMap<>();
                 medicineDetails.put("medicineId", orderItem.getMedicineId());
 
-                Medicine medicine = medicineRepository.findById(orderItem.getMedicineId()).orElse(null);
+                Medicine medicine = null;
+                if (orderItem.getVendorMedicineId() != null) {
+                    medicine = medicineRepository.findById(orderItem.getVendorMedicineId()).orElse(null);
+                }
+                if (medicine == null) {
+                    medicine = medicineRepository.findById(orderItem.getMedicineId()).orElse(null);
+                }
                 if (medicine != null) {
                     medicineDetails.put("medicineName", medicine.getName());
                     
