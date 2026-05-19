@@ -23,6 +23,9 @@ public class OrderItem {
     @Column(name = "medicine_id", nullable = false)
     private Long medicineId;
 
+    @Column(name = "vendor_medicine_id")
+    private Long vendorMedicineId;
+
     @Column(nullable = true)
     private Integer qty;
 

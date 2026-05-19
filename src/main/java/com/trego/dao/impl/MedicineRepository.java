@@ -30,8 +30,8 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
         select
             m.vendor_medicine_id as id,
             m.name as name,
-            m.photo1 as photo1,
-            m.packing,
+            meds.photo1 as photo1,
+            meds.packing as packing,
             m.manufacture as manufacturer,
             v.ref_name as vendorName,
             v.logo as vendorLogo,
@@ -40,6 +40,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
             s.mrp as mrp,
             (s.mrp - (s.mrp * s.discount / 100)) as bestPrice
         from vendor_medicine m
+        left join medicines meds on meds.medicine_id = m.medicine_id
         join (
             select
                 s1.vendor_medicine_id,
@@ -56,7 +57,7 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
             ) sm on sm.vendor_medicine_id = s1.vendor_medicine_id
                 and (s1.mrp - (s1.mrp * s1.discount / 100)) = sm.min_price
         ) s on s.vendor_medicine_id = m.vendor_medicine_id
-        join vendor_informations v on v.vendor_user_id = s.vendor_id
+        join vendor_informations v on (v.vendor_user_id = s.vendor_id or v.vendor_id = s.vendor_id)
         where m.salt_composition = (
             select m2.salt_composition
             from vendor_medicine m2

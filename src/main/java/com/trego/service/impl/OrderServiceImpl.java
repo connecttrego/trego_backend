@@ -1172,12 +1172,13 @@ public class OrderServiceImpl implements IOrderService {
                 System.out.println("Number of medicines in cart: " + selectedCart.getMedicine().size());
                 for (MedicineDTO medicine : selectedCart.getMedicine()) {
                     OrderItem item = new OrderItem();
-                    Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
+                    Medicine med = resolveMedicine(medicine.getId(), selectedCart.getVendorId());
                     if (med == null) {
                         System.err.println("SKIPPING order item: Medicine not found for vendorMedicineId=" + medicine.getId());
                         continue;
                     }
-                    item.setMedicineId(med.getId());
+                    item.setMedicineId(Long.valueOf(med.getMedicineId()));
+                    item.setVendorMedicineId(med.getId());
                     item.setQty(medicine.getQty());
                     Double mrp = medicine.getMrp() != null ? medicine.getMrp() : 0.0;
                     Double discount = medicine.getDiscount() != null ? medicine.getDiscount() : 0.0;
@@ -1266,7 +1267,7 @@ public class OrderServiceImpl implements IOrderService {
 
             List<OrderItem> orderItems = cart.getMedicine().stream()
                     .filter(medicine -> {
-                        Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
+                        Medicine med = resolveMedicine(medicine.getId(), cart.getVendorId());
                         if (med == null) {
                             System.err.println("SKIPPING order item: Medicine not found for vendorMedicineId=" + medicine.getId());
                             return false;
@@ -1275,8 +1276,9 @@ public class OrderServiceImpl implements IOrderService {
                     })
                     .map(medicine -> {
                         OrderItem item = new OrderItem();
-                        Medicine med = medicineRepository.findById(medicine.getId()).orElse(null);
-                        item.setMedicineId(med.getId());
+                        Medicine med = resolveMedicine(medicine.getId(), cart.getVendorId());
+                        item.setMedicineId(Long.valueOf(med.getMedicineId()));
+                        item.setVendorMedicineId(med.getId());
                         item.setQty(medicine.getQty());
                         Double mrp = medicine.getMrp() != null ? medicine.getMrp() : 0.0;
                         Double discount = medicine.getDiscount() != null ? medicine.getDiscount() : 0.0;
@@ -1317,6 +1319,33 @@ public class OrderServiceImpl implements IOrderService {
         }
         
         return stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId, vendorUserId, externalVendorId);
+    }
+
+    private Medicine resolveMedicine(long medicineId, Integer vendorId) {
+        Medicine med = medicineRepository.findById(medicineId).orElse(null);
+        if (med == null && vendorId != null) {
+            Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
+            if (vendor == null) {
+                vendor = vendorRepository.findByVendorId(vendorId).orElse(null);
+            }
+            Integer vendorUserId = vendorId;
+            Integer externalVendorId = vendorId;
+            if (vendor != null) {
+                vendorUserId = vendor.getId();
+                externalVendorId = vendor.getVendorId();
+            }
+            List<Medicine> meds = medicineRepository.findByMedicineId((int) medicineId);
+            if (meds != null) {
+                for (Medicine m : meds) {
+                    if (m.getVendorId() != null && 
+                        (m.getVendorId().equals(vendorUserId) || m.getVendorId().equals(externalVendorId))) {
+                        med = m;
+                        break;
+                    }
+                }
+            }
+        }
+        return med;
     }
 
 }
