@@ -44,7 +44,7 @@ public class VendorServiceImpl implements IVendorService {
         List<VendorDTO> vendorDTOs = new ArrayList<>();
 
         // Remove category condition - fetch all vendors without filtering by type
-        List<Vendor> vendors = vendorRepository.findAll(); // This will fetch all vendors
+        List<Vendor> vendors = vendorRepository.findByVendorIdIsNotNull();
         for (Vendor vendor : vendors) {
             VendorDTO vendorDTO = new VendorDTO();
             vendorDTO.setId(vendor.getId());
