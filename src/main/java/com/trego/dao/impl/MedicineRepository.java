@@ -126,4 +126,6 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
         """, nativeQuery = true)
     List<VendorMedicinePriceView> searchMedicineVendorPrices(@Param("medicineId") Integer medicineId);
 
+    List<Medicine> findByMedicineIdIn(List<Integer> medicineIds);
+
 }

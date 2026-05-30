@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -103,21 +105,55 @@ public class PreOrderServiceImpl implements IPreOrderService {
     @Override
     public VandorCartResponseDTO vendorSpecificPrice(Long orderId) {
         PreOrder preOrder = preOrderRepository.findById(orderId).orElse(null);
+        if (preOrder == null) {
+            System.out.println("PreOrder not found for ID: " + orderId);
+            return new VandorCartResponseDTO();
+        }
+
         VandorCartResponseDTO vandorCartResponseDTO = new VandorCartResponseDTO();
         vandorCartResponseDTO.setUserId(preOrder.getUserId());
         vandorCartResponseDTO.setOrderId(orderId);
 
+        if (preOrder.getPayload() == null || preOrder.getPayload().trim().isEmpty()) {
+            System.out.println("PreOrder payload is null or empty for ID: " + orderId);
+            vandorCartResponseDTO.setCarts(new ArrayList<>());
+            return vandorCartResponseDTO;
+        }
+
         Gson gson = new Gson();
         PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
+        if (preOrderResponseDTO == null) {
+            System.out.println("Parsed PreOrderResponseDTO is null for ID: " + orderId);
+            vandorCartResponseDTO.setCarts(new ArrayList<>());
+            return vandorCartResponseDTO;
+        }
         preOrderResponseDTO.setOrderId(preOrder.getId());
+
+        // Capture the total cart value from the preorder payload for "Switch to Cheaper" comparison
+        if (preOrderResponseDTO.getTotalCartValue() != null && preOrderResponseDTO.getTotalCartValue() > 0) {
+            vandorCartResponseDTO.setTotalCartValue(preOrderResponseDTO.getTotalCartValue());
+        }
+
+        if (preOrderResponseDTO.getCarts() == null || preOrderResponseDTO.getCarts().isEmpty()) {
+            System.out.println("PreOrder carts list is null or empty for ID: " + orderId);
+            vandorCartResponseDTO.setCarts(new ArrayList<>());
+            return vandorCartResponseDTO;
+        }
 
         // Get all unique medicine IDs from all carts
         List<Medicine> allMedicines = medicineRepository.findAllById(
                 preOrderResponseDTO.getCarts().stream()
-                        .flatMap(cart -> cart.getMedicine().stream())
+                        .filter(Objects::nonNull)
+                        .flatMap(cart -> {
+                            if (cart.getMedicine() == null) return java.util.stream.Stream.empty();
+                            return cart.getMedicine().stream();
+                        })
+                        .filter(Objects::nonNull)
                         .map(MedicineDTO::getId)
+                        .filter(Objects::nonNull)
                         .distinct()
                         .collect(Collectors.toList()));
+
 
         List<CartResponseDTO> cartDTOs = preOrderResponseDTO.getCarts().stream().map(cart -> {
             List<MedicineDTO> medicines = cart.getMedicine().stream().map(medicine -> {
@@ -349,7 +385,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
         // Set default values indicating unavailability
         medicineDTO.setMrp(0.0);
         medicineDTO.setDiscount(0.0);
-        medicineDTO.setQty(0);
+        // Preserve the original requested quantity instead of setting to 0
         medicineDTO.setActualPrice(0.0);
         medicineDTO.setExpiryDate(null);
 
@@ -465,7 +501,22 @@ public class PreOrderServiceImpl implements IPreOrderService {
             externalVendorId = vendor.getVendorId();
         }
         
-        return stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId, vendorUserId, externalVendorId);
+        // Primary lookup: by vendor_medicine_id directly
+        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId, vendorUserId, externalVendorId);
+        
+        // Fallback: if not found, try by master medicine_id (medicine_id column in vendor_medicine)
+        // This handles cases where cart has vendor_medicine_id from vendor A, but selected vendor B
+        // uses a different vendor_medicine_id for the same master medicine
+        if (stocks.isEmpty()) {
+            // Find the master medicine_id for this vendor_medicine_id
+            com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(medicineId).orElse(null);
+            if (vendorMed != null && vendorMed.getMedicineId() != null) {
+                stocks = stockRepository.findStocksByMasterMedicineIdAndBothVendorIds(
+                        vendorMed.getMedicineId().longValue(), vendorUserId, externalVendorId);
+            }
+        }
+        
+        return stocks;
     }
 
 }

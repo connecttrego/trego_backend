@@ -1,9 +1,11 @@
 package com.trego.service.impl;
 
+import com.trego.dao.entity.MasterMedicine;
 import com.trego.dao.entity.Medicine;
 import com.trego.dao.entity.MedicineInformation;
 import com.trego.dao.entity.Stock;
 import com.trego.dao.entity.Vendor;
+import com.trego.dao.impl.MasterMedicineRepository;
 import com.trego.dao.impl.MedicineRepository;
 import com.trego.dao.impl.StockRepository;
 import com.trego.dao.impl.VendorRepository;
@@ -40,6 +42,9 @@ public class BucketServiceImpl implements IBucketService {
 
     @Autowired
     private ISubstituteService substituteService;
+
+    @Autowired
+    private MasterMedicineRepository masterMedicineRepository;
 
     @Override
     public List<BucketDTO> createOptimizedBuckets(BucketRequestDTO request) {
@@ -109,7 +114,7 @@ public class BucketServiceImpl implements IBucketService {
             // Create a bucket for this vendor with available medicines only
             BucketDTO bucket = createBucketForVendorWithPartialAvailability(vendorId, vendorStocks, medicines,
                     medicineQuantities, unavailableMedicineIds);
-            if (bucket != null && (!bucket.getAvailableItems().isEmpty() || !bucket.getUnavailableItems().isEmpty())) {
+            if (bucket != null && !bucket.getAvailableItems().isEmpty()) {
                 buckets.add(bucket);
             }
         }
@@ -151,7 +156,7 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         System.out.println("Total unique medicines: " + medicineIds.size());
-        System.out.println("Medicine quantities: " + medicineQuantities);
+        System.out.println("Medicine quantities (raw cart IDs): " + medicineQuantities);
         System.out.println("User selected vendors: " + selectedVendorIds);
 
         // Check if medicineIds is empty
@@ -160,16 +165,53 @@ public class BucketServiceImpl implements IBucketService {
             return new ArrayList<>();
         }
 
-        // Get all medicines
-        List<Medicine> medicines = medicineRepository.findAllById(medicineIds);
+        // ── RESOLVE vendor_medicine_id → master medicine_id ──────────────────
+        // Cart payload stores vendor_medicine_id (e.g. 133, 1001).
+        // We need the master medicine_id (e.g. 1, 2, 3) to search across ALL vendors.
+        Map<Long, Long> cartIdToMasterId = new HashMap<>();
+        for (Long cartId : medicineIds) {
+            // First check if this IS already a master medicine_id (id exists in
+            // vendor_medicine.medicine_id)
+            com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(cartId).orElse(null);
+            if (vendorMed != null && vendorMed.getMedicineId() != null) {
+                // cartId is a vendor_medicine_id — resolve to master
+                cartIdToMasterId.put(cartId, vendorMed.getMedicineId().longValue());
+                System.out.println(
+                        "Resolved vendor_medicine_id " + cartId + " → master medicine_id " + vendorMed.getMedicineId());
+            } else {
+                // cartId is already a master medicine_id (or not found, keep as-is)
+                cartIdToMasterId.put(cartId, cartId);
+                System.out.println(
+                        "Cart ID " + cartId + " used as-is (already master ID or not found as vendor_medicine_id)");
+            }
+        }
+
+        // Rebuild medicineQuantities keyed by master medicine_id
+        Map<Long, Integer> masterMedicineQuantities = new HashMap<>();
+        for (Map.Entry<Long, Integer> entry : medicineQuantities.entrySet()) {
+            Long masterMedId = cartIdToMasterId.getOrDefault(entry.getKey(), entry.getKey());
+            masterMedicineQuantities.merge(masterMedId, entry.getValue(), Integer::sum);
+        }
+
+        // Replace medicineIds and medicineQuantities with master-ID versions
+        medicineIds = new ArrayList<>(masterMedicineQuantities.keySet());
+        medicineQuantities = masterMedicineQuantities;
+
+        System.out.println("Master medicine IDs: " + medicineIds);
+        System.out.println("Medicine quantities (master IDs): " + medicineQuantities);
+
+        // Get all vendor_medicine records for these master IDs
+        List<Integer> masterIds = medicineIds.stream().map(Long::intValue).collect(Collectors.toList());
+        List<Medicine> medicines = medicineRepository.findByMedicineIdIn(masterIds);
         System.out.println("Found " + medicines.size() + " medicines in database");
 
-        // Get all stocks for these medicines
-       List<Stock> relevantStocks = stockRepository.findByMedicineIds(medicineIds);
+        // Get all stocks for these medicines across ALL vendors
+        List<Stock> relevantStocks = stockRepository.findByMedicineIds(masterIds);
 
         // Filter out medicines that are not available from any vendor
         Set<Long> availableMedicineIds = relevantStocks.stream()
-                .map(stock -> stock.getMedicine().getId())
+                .filter(stock -> stock.getMedicine() != null && stock.getMedicine().getMedicineId() != null)
+                .map(stock -> stock.getMedicine().getMedicineId().longValue())
                 .collect(Collectors.toSet());
 
         // Identify unavailable medicines
@@ -191,7 +233,8 @@ public class BucketServiceImpl implements IBucketService {
 
         // Update the medicines list to only include available medicines
         medicines = medicines.stream()
-                .filter(medicine -> availableMedicineIds.contains(medicine.getId()))
+                .filter(medicine -> medicine.getMedicineId() != null
+                        && availableMedicineIds.contains(medicine.getMedicineId().longValue()))
                 .collect(Collectors.toList());
 
         System.out.println(
@@ -206,6 +249,7 @@ public class BucketServiceImpl implements IBucketService {
 
         // Group stocks by vendor
         Map<Integer, List<Stock>> stocksByVendor = relevantStocks.stream()
+                .filter(stock -> stock.getVendor() != null && stock.getVendor().getId() != null)
                 .collect(Collectors.groupingBy(stock -> stock.getVendor().getId()));
 
         System.out.println("Stocks grouped by " + stocksByVendor.size() + " vendors");
@@ -215,34 +259,116 @@ public class BucketServiceImpl implements IBucketService {
 
         for (Map.Entry<Integer, List<Stock>> entry : stocksByVendor.entrySet()) {
             Integer vendorId = entry.getKey();
+            if (!selectedVendorIds.contains(vendorId)) {
+                continue;
+            }
             List<Stock> vendorStocks = entry.getValue();
 
-            // Only create buckets for vendors selected by the user
-            if (selectedVendorIds.contains(vendorId)) {
-                System.out.println("Creating bucket for user-selected vendor ID: " + vendorId);
-                // Create a bucket for this vendor with available medicines only
-                BucketDTO bucket = createBucketForVendorWithPartialAvailability(vendorId, vendorStocks, medicines,
-                        medicineQuantities, unavailableMedicineIds);
-                if (bucket != null
-                        && (!bucket.getAvailableItems().isEmpty() || !bucket.getUnavailableItems().isEmpty())) {
-                    buckets.add(bucket);
-                }
-            } else {
-                System.out.println("Skipping vendor ID: " + vendorId + " (not selected by user)");
+            // Create a bucket for this vendor with available medicines only
+            BucketDTO bucket = createBucketForVendorWithPartialAvailability(vendorId, vendorStocks, medicines,
+                    medicineQuantities, unavailableMedicineIds);
+            if (bucket != null && !bucket.getAvailableItems().isEmpty()) {
+                buckets.add(bucket);
             }
         }
 
         System.out.println("Created " + buckets.size() + " buckets");
 
-        // Sort buckets by total price
+        // Calculate current cart total (what user is paying across all split vendors)
+        double currentCartTotal = 0.0;
+        for (CartResponseDTO cart : preorderData.getCarts()) {
+            for (MedicineDTO m : cart.getMedicine()) {
+                double price = m.getMrp() != null ? m.getMrp() : 0.0;
+                int qty = m.getQty();
+                // Only count medicines with real prices (mrp > 0 means vendor had real stock)
+                if (price > 0 && qty > 0) {
+                    currentCartTotal += price * qty;
+                }
+            }
+        }
+        // If currentCartTotal is still 0 (qty=0 due to dummy vendor -1), use
+        // totalCartValue from preorder
+        if (currentCartTotal == 0.0 && preorderData.getTotalCartValue() != null
+                && preorderData.getTotalCartValue() > 0) {
+            currentCartTotal = preorderData.getTotalCartValue();
+        }
+        System.out.println("Current cart total: " + currentCartTotal);
+
+        // ── BUILD PER-MEDICINE USER PRICE MAP ──────────────────────────────────
+        // Key = master medicine_id, Value = price user is currently paying per unit
+        // This lets us do FAIR per-medicine comparison for partial vendors
+        Map<Long, Double> userPricePerMedicine = new HashMap<>();
+        for (CartResponseDTO cart : preorderData.getCarts()) {
+            for (MedicineDTO m : cart.getMedicine()) {
+                Long cartId = m.getId();
+                Long masterMedId = cartIdToMasterId.getOrDefault(cartId, cartId);
+                double price = m.getMrp() != null ? m.getMrp() : 0.0;
+                if (price > 0) {
+                    userPricePerMedicine.put(masterMedId, price);
+                }
+            }
+        }
+        System.out.println("User price per medicine (master IDs): " + userPricePerMedicine);
+
+        // ── SET SAVINGS: compare against USER'S CURRENT PRICE for SAME medicines ─
+        // Example:
+        // User: Augmentin ₹162 (Jan Aushadhi) + Ascoril ₹98 (MedEase)
+        // Delhi Pharma Hub: Augmentin ₹178 + Ascoril ₹121 = ₹299
+        // Partial user total for same 2 = ₹162 + ₹98 = ₹260
+        // Savings = ₹260 - ₹299 = -₹39 → NOT cheaper → filtered out ✅
+        for (BucketDTO bucket : buckets) {
+            bucket.setCurrentCartTotal(currentCartTotal);
+            double amountToPay = bucket.getAmountToPay() != null ? bucket.getAmountToPay() : 0.0;
+
+            // Calculate what user CURRENTLY pays for the SAME medicines this vendor has
+            double partialUserTotal = 0.0;
+            if (bucket.getAvailableItems() != null) {
+                for (BucketItemDTO item : bucket.getAvailableItems()) {
+                    Long medId = item.getMedicineId();
+                    int qty = item.getRequestedQuantity() > 0 ? item.getRequestedQuantity() : 1;
+                    double userPrice = userPricePerMedicine.getOrDefault(medId, 0.0);
+                    partialUserTotal += userPrice * qty;
+                }
+            }
+
+            // Fair saving = what user pays for those medicines NOW minus what vendor
+            // charges
+            double saving = partialUserTotal - amountToPay;
+            System.out.println("Vendor: " + bucket.getVendorName()
+                    + " | amountToPay=" + amountToPay
+                    + " | partialUserTotal=" + partialUserTotal
+                    + " | saving=" + saving);
+
+            bucket.setSavings(Math.max(0.0, saving));
+            bucket.setIsCheaperOption(saving > 0 && amountToPay > 0);
+        }
+
+        // Sort buckets by available items count (desc), then by savings (desc)
         buckets.sort(Comparator
-                .comparingInt((BucketDTO b) -> b.getAvailableItems().size()) // 1. by item count
-                .reversed() // 2. max first
-                .thenComparing(BucketDTO::getAmountToPay)); // 3. by amountToPay if tie
+                .comparingInt((BucketDTO b) -> b.getAvailableItems().size())
+                .reversed()
+                .thenComparing(Comparator.comparingDouble(
+                        (BucketDTO b) -> b.getSavings() != null ? b.getSavings() : 0.0).reversed()));
 
-        System.out.println("Buckets sorted by available items count (desc) and amountToPay (asc)");
+        System.out.println("Buckets sorted by available items count (desc) and savings (desc)");
 
-        return buckets;
+        // ── FILTER: Only return vendors that are GENUINELY cheaper ────────────
+        // 1. savings > 0 → vendor actually saves money on the medicines it covers
+        // 2. Fully covers the cart (no unavailable items) OR has 2+ medicines available
+        // - This allows 1-item carts to be optimized while keeping multi-item partial
+        // vendor filtering.
+        List<BucketDTO> cheaperBuckets = buckets.stream()
+                .filter(b -> b.getSavings() != null
+                        && b.getAvailableItems() != null
+                        && ((b.getUnavailableItems() == null || b.getUnavailableItems().isEmpty())
+                                || b.getAvailableItems().size() > 1))
+                .collect(Collectors.toList());
+
+        System.out.println("Filtered cheaper buckets: " + cheaperBuckets.size()
+                + " out of " + buckets.size() + " total");
+
+        return cheaperBuckets;
+
     }
 
     private BucketDTO createBucketForVendorWithPartialAvailability(Integer vendorId, List<Stock> vendorStocks,
@@ -272,15 +398,24 @@ public class BucketServiceImpl implements IBucketService {
         double totalDiscount = 0.0; // Track total discount
 
         // Process available medicines
-        for (Medicine medicine : medicines) {
-            Long medicineId = medicine.getId();
+        for (Long medicineId : medicineQuantities.keySet()) {
             int requestedQuantity = medicineQuantities.get(medicineId);
 
             System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
 
+            Medicine medicine = medicines.stream()
+                    .filter(m -> m.getMedicineId() != null && m.getMedicineId().longValue() == medicineId)
+                    .findFirst().orElse(null);
+
+            if (medicine == null) {
+                System.out.println("Could not find medicine details for ID: " + medicineId);
+                continue;
+            }
+
             // Find the stock for this medicine from this vendor
             Optional<Stock> stockOptional = vendorStocks.stream()
-                    .filter(s -> s.getMedicine().getId() == medicineId)
+                    .filter(s -> s.getMedicine() != null && s.getMedicine().getMedicineId() != null
+                            && s.getMedicine().getMedicineId().longValue() == medicineId)
                     .findFirst();
 
             if (stockOptional.isPresent()) {
@@ -295,14 +430,20 @@ public class BucketServiceImpl implements IBucketService {
                     item.setMedicineId(medicineId);
                     item.setMedicineName(medicine.getName());
 
-                    MedicineInformation medicineInformation = medicine.getMedicineInformation();
-                    if (medicineInformation != null) {
-                        item.setMedicineImage(medicineInformation.getPhoto1());
-                        item.setMedicineStrip(medicineInformation.getPacking());
+                    // Fetch image from master medicine table (vendor_medicine_information is empty)
+                    MasterMedicine masterMed = medicine.getMedicineId() != null
+                            ? masterMedicineRepository.findById(medicine.getMedicineId()).orElse(null)
+                            : null;
+                    if (masterMed != null) {
+                        item.setMedicineImage(masterMed.getPhoto1());
                     } else {
-                        item.setMedicineImage("");
-                        item.setMedicineStrip("");
+                        MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                        item.setMedicineImage(medicineInformation != null ? medicineInformation.getPhoto1() : "");
                     }
+                    // Set strip/packing info
+                    MedicineInformation medicineInformation = medicine.getMedicineInformation();
+                    item.setMedicineStrip(
+                            medicineInformation != null ? medicineInformation.getPacking() : medicine.getPackingType());
                     // item.setVendorId(vendorId);
                     // item.setVendorName(vendor != null ? vendor.getName() : "");
                     item.setMrp(stock.getMrp());

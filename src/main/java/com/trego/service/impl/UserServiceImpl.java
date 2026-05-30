@@ -42,10 +42,11 @@ public class UserServiceImpl implements IUserService {
     @Override
     public UserDTO getUserById(Long id) {
         UserDTO userDTO = new UserDTO();
-        User user= userRepository.findById(id).get();
-        userDTO.setId(user.getId());
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + id));
+        userDTO.setId(user.getId() != null ? user.getId() : 0L);
         userDTO.setRole(user.getRole());
-        userDTO.setMobile(user.getMobile());
+        userDTO.setMobile(user.getMobile() != null ? user.getMobile() : 0L);
         userDTO.setName(user.getName());
         userDTO.setEmail(user.getEmail());
 

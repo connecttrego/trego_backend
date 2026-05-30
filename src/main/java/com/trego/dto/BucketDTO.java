@@ -21,6 +21,9 @@ public class BucketDTO {
     private String vendorName; // If all items are from the same vendor
     private String logo;
     private String deliveryTime;
+    private Double currentCartTotal; // What user is currently paying across split vendors
+    private Double savings;          // How much cheaper this bucket is vs currentCartTotal
+    private Boolean isCheaperOption; // True when this bucket saves money vs current cart
 
     @Override
     public String toString() {

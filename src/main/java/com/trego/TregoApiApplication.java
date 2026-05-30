@@ -16,4 +16,4 @@ public class TregoApiApplication {
         SpringApplication.run(TregoApiApplication.class, args);
     }
 
-}
+} 

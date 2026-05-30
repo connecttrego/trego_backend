@@ -22,12 +22,9 @@ public class S3Config {
 
     @Bean
     public S3Client s3Client() {
-        // If no access key is provided, return null or a mock client
+        // If no access key is provided, return null to fall back to local file storage gracefully
         if (accessKeyId == null || accessKeyId.isEmpty() || "YOUR_ACCESS_KEY_ID".equals(accessKeyId)) {
-            // Return a default client without credentials for local testing
-            return S3Client.builder()
-                    .region(Region.of(region))
-                    .build();
+            return null;
         }
         
         AwsBasicCredentials awsCreds = AwsBasicCredentials.create(accessKeyId, secretAccessKey);

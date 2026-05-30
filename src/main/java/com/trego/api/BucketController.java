@@ -49,6 +49,7 @@ public class BucketController {
             List<BucketDTO> buckets = bucketService.createOptimizedBucketsFromPreorder(vendorCartData);
             return ResponseEntity.ok(buckets);
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.badRequest().build();
         }
     }

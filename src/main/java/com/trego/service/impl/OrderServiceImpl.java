@@ -592,9 +592,22 @@ public class OrderServiceImpl implements IOrderService {
                 responseDTO.setAddress(addressDTO);
             }
 
-            responseDTO.setAmountToPay(preOrder.getTotalPayAmount());
-            responseDTO.setTotalCartValue(preOrderResponseDTO.getTotalCartValue());
-            responseDTO.setDiscount(preOrderResponseDTO.getDiscount());
+            double activeOrdersTotal = 0.0;
+            boolean hasOrders = preOrder.getOrders() != null && !preOrder.getOrders().isEmpty();
+            if (hasOrders) {
+                for (Order order : preOrder.getOrders()) {
+                    if (order.getOrderStatus() != null && !order.getOrderStatus().equalsIgnoreCase("cancelled")) {
+                        activeOrdersTotal += order.getTotalAmount();
+                    }
+                }
+                responseDTO.setTotalCartValue(activeOrdersTotal);
+                double discount = preOrderResponseDTO != null && preOrderResponseDTO.getDiscount() != null ? preOrderResponseDTO.getDiscount() : 0.0;
+                responseDTO.setAmountToPay(activeOrdersTotal - discount);
+            } else {
+                responseDTO.setAmountToPay(preOrder.getTotalPayAmount() != null ? preOrder.getTotalPayAmount() : 0.0);
+                responseDTO.setTotalCartValue(preOrderResponseDTO != null && preOrderResponseDTO.getTotalCartValue() != null ? preOrderResponseDTO.getTotalCartValue() : 0.0);
+            }
+            responseDTO.setDiscount(preOrderResponseDTO != null && preOrderResponseDTO.getDiscount() != null ? preOrderResponseDTO.getDiscount() : 0.0);
             responseDTO.setPaymentStatus(preOrder.getPaymentStatus());
             responseDTO.setCreateDate(preOrder.getCreatedAt());
 
@@ -643,8 +656,9 @@ public class OrderServiceImpl implements IOrderService {
         List<OrderDTO> orderDTOList = new ArrayList<>();
         // Iterate over orders in PreOrder
         preOrder.getOrders().forEach(order -> {
-            System.out
-                    .println("Processing order ID: " + order.getId() + " for vendor ID: " + order.getVendor().getId());
+            com.trego.dao.entity.Vendor orderVendor = order.getVendor();
+            System.out.println("Processing order ID: " + order.getId()
+                    + " for vendor ID: " + (orderVendor != null ? orderVendor.getId() : "NULL (vendor deleted)"));
             OrderDTO orderDTO = new OrderDTO();
 
             // Populate fields of OrderDTO based on Order entity
@@ -659,17 +673,24 @@ public class OrderServiceImpl implements IOrderService {
             orderDTO.setCancelReasonId(order.getCancelReasonId());
             orderDTO.setDiscount(order.getDiscount());
             VendorDTO vendorDTO = new VendorDTO();
-            vendorDTO.setId(order.getVendor().getId());
-            vendorDTO.setName(order.getVendor().getName());
-            vendorDTO.setLogo(Constants.getVendorLogoWithFallback(order.getVendor().getLogo()));
-            vendorDTO.setLicence(order.getVendor().getDruglicense());
-            vendorDTO.setGstNumber(order.getVendor().getGistin());
-            vendorDTO.setAddress(order.getVendor().getAddress());
-            vendorDTO.setLat(order.getVendor().getLat() != null ? order.getVendor().getLat().doubleValue() : null);
-            vendorDTO.setLng(order.getVendor().getLng() != null ? order.getVendor().getLng().doubleValue() : null);
-            vendorDTO.setDeliveryTime(order.getVendor().getDeliveryTime());
-            vendorDTO.setReviews(order.getVendor().getReviews());
-            vendorDTO.setRating(order.getVendor().getRating());
+            if (orderVendor != null) {
+                vendorDTO.setId(orderVendor.getId());
+                vendorDTO.setName(orderVendor.getName());
+                vendorDTO.setLogo(Constants.getVendorLogoWithFallback(orderVendor.getLogo()));
+                vendorDTO.setLicence(orderVendor.getDruglicense());
+                vendorDTO.setGstNumber(orderVendor.getGistin());
+                vendorDTO.setAddress(orderVendor.getAddress());
+                vendorDTO.setLat(orderVendor.getLat() != null ? orderVendor.getLat().doubleValue() : null);
+                vendorDTO.setLng(orderVendor.getLng() != null ? orderVendor.getLng().doubleValue() : null);
+                vendorDTO.setDeliveryTime(orderVendor.getDeliveryTime());
+                vendorDTO.setReviews(orderVendor.getReviews());
+                vendorDTO.setRating(orderVendor.getRating());
+            } else {
+                // Vendor was deleted from DB — set safe defaults so order still shows
+                vendorDTO.setId(null);
+                vendorDTO.setName("Vendor Not Available");
+                vendorDTO.setLogo(null);
+            }
 
             orderDTO.setVendor(vendorDTO);
 

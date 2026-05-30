@@ -12,5 +12,6 @@ public class VandorCartResponseDTO {
     private long userId;
     private long orderId;
     private List<CartResponseDTO> carts;
+    private Double totalCartValue; // Total user is currently paying across all vendors
 
 }
