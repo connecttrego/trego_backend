@@ -9,11 +9,12 @@ import com.trego.dto.response.OrderResponseDTO;
 import com.trego.dto.response.OrderValidateResponseDTO;
 import com.trego.service.IOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.data.domain.Page;
 import java.util.List;
 
 @RestController
@@ -40,12 +41,22 @@ public class OrderController {
     }
 
     @GetMapping("/user/{userId}")
-    public Page<OrderResponseDTO> fetchAllOrders(
+    public ResponseEntity<?> fetchAllOrders(
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return orderService.fetchAllOrders(userId,  page, size);
+        try {
+            System.out.println(">>> ORDERS REQUEST for userId: " + userId + ", page: " + page + ", size: " + size);
+            Page<OrderResponseDTO> result = orderService.fetchAllOrders(userId, page, size);
+            System.out.println(">>> ORDERS RESULT count: " + result.getNumberOfElements() + " (total: " + result.getTotalElements() + ") for userId: " + userId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.err.println(">>> ORDERS ERROR for userId: " + userId + " - " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Unknown error"));
+        }
     }
 
     @PostMapping("/cancel")

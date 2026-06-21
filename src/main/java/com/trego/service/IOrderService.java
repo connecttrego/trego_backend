@@ -8,6 +8,7 @@ import com.trego.dto.response.CancelOrderResponseDTO;
 import com.trego.dto.response.OrderResponseDTO;
 import com.trego.dto.response.OrderValidateResponseDTO;
 import org.springframework.data.domain.Page;
+import java.util.List;
 
 public interface IOrderService {
 

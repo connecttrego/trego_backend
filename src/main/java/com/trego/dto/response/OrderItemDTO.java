@@ -7,11 +7,11 @@ import java.util.Map;
 
 @Data
 public class OrderItemDTO {
-   private Double totalAmount;
+   private Double totalAmount = 0.0;
    private long itemId;
+   private long id;
    private int qty;
-   private Double mrp;
-   private Double price;
+   private Double mrp = 0.0;
+   private Double price = 0.0;
    private Map<String, Object> medicine = new HashMap<>();
-
 }

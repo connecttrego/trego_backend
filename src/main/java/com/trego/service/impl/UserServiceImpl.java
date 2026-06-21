@@ -57,8 +57,8 @@ public class UserServiceImpl implements IUserService {
                         address.getCity(),
                         address.getLandmark(),
                         address.getPincode(),
-                        address.getLat(),
-                        address.getLng(), address.getUser().getId(), address.getMobileNo(), address.getName(), address.getAddressTypeValue()))
+                        address.getLat() != null ? address.getLat() : 0.0,
+                        address.getLng() != null ? address.getLng() : 0.0, address.getUser().getId(), address.getMobileNo(), address.getName(), address.getAddressTypeValue()))
                 .collect(Collectors.toList());
         userDTO.setAddress(addressDTOS);
         return userDTO;

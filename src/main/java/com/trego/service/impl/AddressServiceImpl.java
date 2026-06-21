@@ -64,8 +64,8 @@ public class AddressServiceImpl implements IAddressService {
                         address.getCity(),
                         address.getLandmark(),
                         address.getPincode(),
-                        address.getLat(),
-                        address.getLng(), address.getUser().getId() , address.getMobileNo() , address.getName(), address.getAddressType().getCode()))
+                        address.getLat() != null ? address.getLat() : 0.0,
+                        address.getLng() != null ? address.getLng() : 0.0, address.getUser().getId() , address.getMobileNo() , address.getName(), address.getAddressType().getCode()))
                 .collect(Collectors.toList());
 
     }

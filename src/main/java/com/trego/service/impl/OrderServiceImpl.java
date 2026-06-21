@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -573,42 +574,54 @@ public class OrderServiceImpl implements IOrderService {
             Gson gson = new Gson();
             PreOrderResponseDTO preOrderResponseDTO = gson.fromJson(preOrder.getPayload(), PreOrderResponseDTO.class);
             responseDTO.setUserId(preOrder.getUserId());
-            responseDTO.setRazorpayOrderId(preOrder.getRazorpayOrderId());
+            responseDTO.setRazorpayOrderId(preOrder.getRazorpayOrderId() != null ? preOrder.getRazorpayOrderId() : "");
             responseDTO.setOrderId(preOrder.getId());
-            responseDTO.setMobileNo(preOrder.getMobileNo());
-            Optional<Address> addressOpt = addressRepository.findById(preOrder.getAddressId());
-
-            if (addressOpt.isPresent()) {
-                Address address = addressOpt.get();
-                AddressDTO addressDTO = new AddressDTO(
-                        address.getId(),
-                        address.getAddress(),
-                        address.getCity(),
-                        address.getLandmark(),
-                        address.getPincode(),
-                        address.getLat(),
-                        address.getLng(), address.getUser().getId(), address.getMobileNo(), address.getName(),
-                        address.getAddressTypeValue());
-                responseDTO.setAddress(addressDTO);
+            responseDTO.setId(preOrder.getId());
+            responseDTO.setMobileNo(preOrder.getMobileNo() != null ? preOrder.getMobileNo() : "");
+            if (preOrder.getAddressId() != null) {
+                Optional<Address> addressOpt = addressRepository.findById(preOrder.getAddressId());
+                if (addressOpt.isPresent()) {
+                    Address address = addressOpt.get();
+                    AddressDTO addressDTO = new AddressDTO(
+                            address.getId(),
+                            address.getAddress(),
+                            address.getCity(),
+                            address.getLandmark(),
+                            address.getPincode(),
+                            address.getLat() != null ? address.getLat() : 0.0,
+                            address.getLng() != null ? address.getLng() : 0.0, address.getUser().getId(), address.getMobileNo(), address.getName(),
+                            address.getAddressTypeValue());
+                    responseDTO.setAddress(addressDTO);
+                }
             }
 
             double activeOrdersTotal = 0.0;
+            double allOrdersTotal = 0.0;
             boolean hasOrders = preOrder.getOrders() != null && !preOrder.getOrders().isEmpty();
             if (hasOrders) {
                 for (Order order : preOrder.getOrders()) {
+                    allOrdersTotal += order.getTotalAmount();
                     if (order.getOrderStatus() != null && !order.getOrderStatus().equalsIgnoreCase("cancelled")) {
                         activeOrdersTotal += order.getTotalAmount();
                     }
                 }
-                responseDTO.setTotalCartValue(activeOrdersTotal);
                 double discount = preOrderResponseDTO != null && preOrderResponseDTO.getDiscount() != null ? preOrderResponseDTO.getDiscount() : 0.0;
-                responseDTO.setAmountToPay(activeOrdersTotal - discount);
+                if (activeOrdersTotal > 0.0) {
+                    responseDTO.setTotalCartValue(activeOrdersTotal);
+                    responseDTO.setAmountToPay(activeOrdersTotal - discount);
+                } else {
+                    responseDTO.setTotalCartValue(allOrdersTotal);
+                    responseDTO.setAmountToPay(allOrdersTotal - discount);
+                }
+                if (responseDTO.getAmountToPay() < 0.0) {
+                    responseDTO.setAmountToPay(0.0);
+                }
             } else {
                 responseDTO.setAmountToPay(preOrder.getTotalPayAmount() != null ? preOrder.getTotalPayAmount() : 0.0);
                 responseDTO.setTotalCartValue(preOrderResponseDTO != null && preOrderResponseDTO.getTotalCartValue() != null ? preOrderResponseDTO.getTotalCartValue() : 0.0);
             }
             responseDTO.setDiscount(preOrderResponseDTO != null && preOrderResponseDTO.getDiscount() != null ? preOrderResponseDTO.getDiscount() : 0.0);
-            responseDTO.setPaymentStatus(preOrder.getPaymentStatus());
+            responseDTO.setPaymentStatus(preOrder.getPaymentStatus() != null ? preOrder.getPaymentStatus() : "");
             responseDTO.setCreateDate(preOrder.getCreatedAt());
 
             List<OrderDTO> orderDTO = populateOrders(preOrder);
@@ -663,33 +676,46 @@ public class OrderServiceImpl implements IOrderService {
 
             // Populate fields of OrderDTO based on Order entity
             orderDTO.setOrderId(order.getId());
-            orderDTO.setPaymentStatus(order.getPaymentStatus());
-            orderDTO.setOrderStatus(order.getOrderStatus());
-            orderDTO.setTotalAmount(order.getTotalAmount());
-            orderDTO.setAddress(order.getAddress());
-            orderDTO.setPinCode(order.getPincode());
+            orderDTO.setId(order.getId());
+            orderDTO.setPaymentStatus(order.getPaymentStatus() != null ? order.getPaymentStatus() : "");
+            orderDTO.setOrderStatus(order.getOrderStatus() != null ? order.getOrderStatus() : "");
+            orderDTO.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount() : 0.0);
+            orderDTO.setAddress(order.getAddress() != null ? order.getAddress() : "");
+            orderDTO.setPinCode(order.getPincode() != null ? order.getPincode() : "");
             orderDTO.setCreateDate(order.getCreatedAt());
-            orderDTO.setCancelReason(order.getCancelReason());
-            orderDTO.setCancelReasonId(order.getCancelReasonId());
-            orderDTO.setDiscount(order.getDiscount());
+            orderDTO.setCancelReason(order.getCancelReason() != null ? order.getCancelReason() : "");
+            orderDTO.setCancelReasonId(order.getCancelReasonId() != null ? order.getCancelReasonId() : "");
+            orderDTO.setDiscount(order.getDiscount() != null ? order.getDiscount() : 0.0);
             VendorDTO vendorDTO = new VendorDTO();
             if (orderVendor != null) {
                 vendorDTO.setId(orderVendor.getId());
-                vendorDTO.setName(orderVendor.getName());
+                vendorDTO.setName(orderVendor.getName() != null ? orderVendor.getName() : "");
                 vendorDTO.setLogo(Constants.getVendorLogoWithFallback(orderVendor.getLogo()));
-                vendorDTO.setLicence(orderVendor.getDruglicense());
-                vendorDTO.setGstNumber(orderVendor.getGistin());
-                vendorDTO.setAddress(orderVendor.getAddress());
-                vendorDTO.setLat(orderVendor.getLat() != null ? orderVendor.getLat().doubleValue() : null);
-                vendorDTO.setLng(orderVendor.getLng() != null ? orderVendor.getLng().doubleValue() : null);
-                vendorDTO.setDeliveryTime(orderVendor.getDeliveryTime());
-                vendorDTO.setReviews(orderVendor.getReviews());
-                vendorDTO.setRating(orderVendor.getRating());
+                vendorDTO.setLicence(orderVendor.getDruglicense() != null ? orderVendor.getDruglicense() : "");
+                vendorDTO.setGstNumber(orderVendor.getGistin() != null ? orderVendor.getGistin() : "");
+                vendorDTO.setAddress(orderVendor.getAddress() != null ? orderVendor.getAddress() : "");
+                vendorDTO.setLat(orderVendor.getLat() != null ? orderVendor.getLat().doubleValue() : 0.0);
+                vendorDTO.setLng(orderVendor.getLng() != null ? orderVendor.getLng().doubleValue() : 0.0);
+                vendorDTO.setDeliveryTime(orderVendor.getDeliveryTime() != null ? orderVendor.getDeliveryTime() : 0);
+                vendorDTO.setReviews(orderVendor.getReviews() != null ? orderVendor.getReviews() : "");
+                vendorDTO.setRating(orderVendor.getRating() != null ? orderVendor.getRating() : "0.0");
+                vendorDTO.setMedicines(new ArrayList<>());
+                vendorDTO.setBanners(new ArrayList<>());
             } else {
                 // Vendor was deleted from DB — set safe defaults so order still shows
-                vendorDTO.setId(null);
+                vendorDTO.setId(0);
                 vendorDTO.setName("Vendor Not Available");
-                vendorDTO.setLogo(null);
+                vendorDTO.setLogo(Constants.DEFAULT_VENDOR_LOGO);
+                vendorDTO.setLicence("");
+                vendorDTO.setGstNumber("");
+                vendorDTO.setAddress("");
+                vendorDTO.setLat(0.0);
+                vendorDTO.setLng(0.0);
+                vendorDTO.setDeliveryTime(0);
+                vendorDTO.setReviews("");
+                vendorDTO.setRating("0.0");
+                vendorDTO.setMedicines(new ArrayList<>());
+                vendorDTO.setBanners(new ArrayList<>());
             }
 
             orderDTO.setVendor(vendorDTO);
@@ -709,7 +735,8 @@ public class OrderServiceImpl implements IOrderService {
 
                 Map<String, Object> medicineDetails = new HashMap<>();
                 medicineDetails.put("medicineId", orderItem.getMedicineId());
-
+                medicineDetails.put("id", orderItem.getMedicineId());
+                
                 Medicine medicine = null;
                 if (orderItem.getVendorMedicineId() != null) {
                     medicine = medicineRepository.findById(orderItem.getVendorMedicineId()).orElse(null);
@@ -717,8 +744,40 @@ public class OrderServiceImpl implements IOrderService {
                 if (medicine == null) {
                     medicine = medicineRepository.findById(orderItem.getMedicineId()).orElse(null);
                 }
+
+                String name = "";
+                String manufacturer = "";
+                String saltComposition = "";
+                String medicineType = "";
+                String introduction = "";
+                String description = "";
+                String howItWorks = "";
+                String safetyAdvise = "";
+                String ifMiss = "";
+                String useOf = "";
+                String prescriptionRequired = "";
+                String storage = "";
+                String commonSideEffect = "";
+                String alcoholInteraction = "";
+                String pregnancyInteraction = "";
+                String lactationInteraction = "";
+                String drivingInteraction = "";
+                String kidneyInteraction = "";
+                String liverInteraction = "";
+                String manufacturerAddress = "";
+                String countryOfOrigin = "";
+                String questionAnswers = "";
+                String packing = "";
+                String imageUrl = "";
+
                 if (medicine != null) {
-                    medicineDetails.put("medicineName", medicine.getName());
+                    name = medicine.getName() != null ? medicine.getName() : "";
+                    manufacturer = medicine.getManufacture() != null ? medicine.getManufacture() : "";
+                    saltComposition = medicine.getSaltComposition() != null ? medicine.getSaltComposition() : "";
+                    medicineType = medicine.getMedicineType() != null ? medicine.getMedicineType() : "";
+                    prescriptionRequired = medicine.getPrescriptionRequired() != null ? medicine.getPrescriptionRequired() : "";
+                    storage = medicine.getStorage() != null ? medicine.getStorage() : "";
+                    countryOfOrigin = medicine.getCountryOfOrigin() != null ? medicine.getCountryOfOrigin() : "";
                     
                     // Retrieve master medicine for catalog fallback
                     MasterMedicine masterMed = null;
@@ -732,12 +791,26 @@ public class OrderServiceImpl implements IOrderService {
                     }
 
                     MedicineInformation medicineInformation = medicine.getMedicineInformation();
-                    String packing = "";
-                    String imageUrl = "";
                     if (medicineInformation != null) {
                         packing = medicineInformation.getPacking();
                         imageUrl = medicineInformation.getPhoto1();
+                        introduction = medicineInformation.getIntroduction();
+                        description = medicineInformation.getDescription();
+                        howItWorks = medicineInformation.getHowItWorks();
+                        safetyAdvise = medicineInformation.getSafetyAdvise();
+                        ifMiss = medicineInformation.getIfMiss();
+                        useOf = medicineInformation.getUseOf();
+                        commonSideEffect = medicineInformation.getCommonSideEffect();
+                        alcoholInteraction = medicineInformation.getAlcoholInteraction();
+                        pregnancyInteraction = medicineInformation.getPregnancyInteraction();
+                        lactationInteraction = medicineInformation.getLactationInteraction();
+                        drivingInteraction = medicineInformation.getDrivingInteraction();
+                        kidneyInteraction = medicineInformation.getKidneyInteraction();
+                        liverInteraction = medicineInformation.getLiverInteraction();
+                        manufacturerAddress = medicineInformation.getManufacturerAddress();
+                        questionAnswers = medicineInformation.getQuestionAnswers();
                     }
+                    
                     // Apply master medicine fallback
                     if ((packing == null || packing.trim().isEmpty()) && masterMed != null && masterMed.getPackaging() != null) {
                         packing = masterMed.getPackaging();
@@ -745,16 +818,159 @@ public class OrderServiceImpl implements IOrderService {
                     if ((imageUrl == null || imageUrl.trim().isEmpty()) && masterMed != null && masterMed.getPhoto1() != null) {
                         imageUrl = masterMed.getPhoto1();
                     }
-                    medicineDetails.put("packing", packing != null ? packing : "");
-                    medicineDetails.put("medicineLogo", Constants.getMedicineImageWithFallback(imageUrl));
-                } else {
-                    medicineDetails.put("medicineName", "");
-                    medicineDetails.put("packing", "");
-                    medicineDetails.put("medicineLogo", "");
+                    if ((introduction == null || introduction.trim().isEmpty()) && masterMed != null && masterMed.getIntroduction() != null) {
+                        introduction = masterMed.getIntroduction();
+                    }
+                    if ((description == null || description.trim().isEmpty()) && masterMed != null && masterMed.getDescription() != null) {
+                        description = masterMed.getDescription();
+                    }
+                    if ((howItWorks == null || howItWorks.trim().isEmpty()) && masterMed != null && masterMed.getHowItWorks() != null) {
+                        howItWorks = masterMed.getHowItWorks();
+                    }
+                    if ((safetyAdvise == null || safetyAdvise.trim().isEmpty()) && masterMed != null && (masterMed.getSafetyAdvice() != null || masterMed.getSafetyAdvise() != null)) {
+                        safetyAdvise = masterMed.getSafetyAdvice() != null ? masterMed.getSafetyAdvice() : masterMed.getSafetyAdvise();
+                    }
+                    if ((ifMiss == null || ifMiss.trim().isEmpty()) && masterMed != null && masterMed.getIfMiss() != null) {
+                        ifMiss = masterMed.getIfMiss();
+                    }
+                    if ((useOf == null || useOf.trim().isEmpty()) && masterMed != null && masterMed.getUseOf() != null) {
+                        useOf = masterMed.getUseOf();
+                    }
+                    if ((commonSideEffect == null || commonSideEffect.trim().isEmpty()) && masterMed != null && (masterMed.getCommonSideEffect() != null || masterMed.getSideEffect() != null)) {
+                        commonSideEffect = masterMed.getCommonSideEffect() != null ? masterMed.getCommonSideEffect() : masterMed.getSideEffect();
+                    }
+                    if ((alcoholInteraction == null || alcoholInteraction.trim().isEmpty()) && masterMed != null && masterMed.getAlcoholInteraction() != null) {
+                        alcoholInteraction = masterMed.getAlcoholInteraction();
+                    }
+                    if ((pregnancyInteraction == null || pregnancyInteraction.trim().isEmpty()) && masterMed != null && masterMed.getPregnancyInteraction() != null) {
+                        pregnancyInteraction = masterMed.getPregnancyInteraction();
+                    }
+                    if ((lactationInteraction == null || lactationInteraction.trim().isEmpty()) && masterMed != null && masterMed.getLactationInteraction() != null) {
+                        lactationInteraction = masterMed.getLactationInteraction();
+                    }
+                    if ((drivingInteraction == null || drivingInteraction.trim().isEmpty()) && masterMed != null && masterMed.getDrivingInteraction() != null) {
+                        drivingInteraction = masterMed.getDrivingInteraction();
+                    }
+                    if ((kidneyInteraction == null || kidneyInteraction.trim().isEmpty()) && masterMed != null && masterMed.getKidneyInteraction() != null) {
+                        kidneyInteraction = masterMed.getKidneyInteraction();
+                    }
+                    if ((liverInteraction == null || liverInteraction.trim().isEmpty()) && masterMed != null && masterMed.getLiverInteraction() != null) {
+                        liverInteraction = masterMed.getLiverInteraction();
+                    }
+                    if ((manufacturerAddress == null || manufacturerAddress.trim().isEmpty()) && masterMed != null && masterMed.getManufacturerAddress() != null) {
+                        manufacturerAddress = masterMed.getManufacturerAddress();
+                    }
+                    if ((questionAnswers == null || questionAnswers.trim().isEmpty()) && masterMed != null && masterMed.getQuestionAnswers() != null) {
+                        questionAnswers = masterMed.getQuestionAnswers();
+                    }
                 }
+
+                medicineDetails.put("medicineName", name);
+                medicineDetails.put("name", name);
+                medicineDetails.put("manufacturer", manufacturer);
+                medicineDetails.put("saltComposition", saltComposition);
+                medicineDetails.put("medicineType", medicineType);
+                medicineDetails.put("introduction", introduction);
+                medicineDetails.put("description", description);
+                medicineDetails.put("howItWorks", howItWorks);
+                medicineDetails.put("safetyAdvise", safetyAdvise);
+                medicineDetails.put("ifMiss", ifMiss);
+                medicineDetails.put("useOf", useOf);
+                medicineDetails.put("prescriptionRequired", prescriptionRequired);
+                medicineDetails.put("storage", storage);
+                medicineDetails.put("commonSideEffect", commonSideEffect);
+                medicineDetails.put("alcoholInteraction", alcoholInteraction);
+                medicineDetails.put("pregnancyInteraction", pregnancyInteraction);
+                medicineDetails.put("lactationInteraction", lactationInteraction);
+                medicineDetails.put("drivingInteraction", drivingInteraction);
+                medicineDetails.put("kidneyInteraction", kidneyInteraction);
+                medicineDetails.put("liverInteraction", liverInteraction);
+                medicineDetails.put("manufacturerAddress", manufacturerAddress);
+                medicineDetails.put("countryOfOrigin", countryOfOrigin);
+                medicineDetails.put("questionAnswers", questionAnswers);
+
+                String finalPacking = packing != null ? packing : "";
+                String finalImage = Constants.getMedicineImageWithFallback(imageUrl);
+                medicineDetails.put("packing", finalPacking);
+                medicineDetails.put("strip", finalPacking);
+                medicineDetails.put("medicineLogo", finalImage);
+                medicineDetails.put("image", finalImage);
+                medicineDetails.put("photo1", finalImage);
+
+                medicineDetails.put("mrp", orderItem.getMrp() != null ? orderItem.getMrp() : 0.0);
+                medicineDetails.put("discount", 0.0);
+                medicineDetails.put("qty", orderItem.getQty());
+                medicineDetails.put("expiryDate", "");
+                medicineDetails.put("actualPrice", orderItem.getMrp() != null ? orderItem.getMrp() : 0.0);
+                medicineDetails.put("offeredPrice", orderItem.getSellingPrice() != null ? orderItem.getSellingPrice() : 0.0);
+                medicineDetails.put("price", orderItem.getSellingPrice() != null ? orderItem.getSellingPrice() : 0.0);
+                medicineDetails.put("salesCount", 0L);
+
+                orderItemDTO.setId(orderItem.getId());
+                orderItemDTO.setItemId(orderItem.getId());
+                orderItemDTO.setQty(orderItem.getQty());
+                orderItemDTO.setMrp(orderItem.getMrp() != null ? orderItem.getMrp() : 0.0);
+                orderItemDTO.setPrice(orderItem.getSellingPrice() != null ? orderItem.getSellingPrice() : 0.0);
+                orderItemDTO.setTotalAmount(orderItem.getAmount() != null ? orderItem.getAmount() : 0.0);
+                totalAmount += orderItem.getAmount();
 
                 orderItemDTO.setMedicine(medicineDetails);
                 orderItemsList.add(orderItemDTO);
+            }
+
+            if (orderItemsList.isEmpty()) {
+                OrderItemDTO mockItem = new OrderItemDTO();
+                mockItem.setId(0);
+                mockItem.setItemId(0);
+                mockItem.setQty(1);
+                mockItem.setMrp(order.getTotalAmount() != null ? order.getTotalAmount() : 0.0);
+                mockItem.setPrice(order.getTotalAmount() != null ? order.getTotalAmount() : 0.0);
+                mockItem.setTotalAmount(order.getTotalAmount() != null ? order.getTotalAmount() : 0.0);
+
+                Map<String, Object> mockMedicineDetails = new HashMap<>();
+                mockMedicineDetails.put("medicineId", 0L);
+                mockMedicineDetails.put("id", 0L);
+                mockMedicineDetails.put("medicineName", "Medicine Details Not Available");
+                mockMedicineDetails.put("name", "Medicine Details Not Available");
+                mockMedicineDetails.put("manufacturer", "");
+                mockMedicineDetails.put("saltComposition", "");
+                mockMedicineDetails.put("medicineType", "");
+                mockMedicineDetails.put("introduction", "");
+                mockMedicineDetails.put("description", "");
+                mockMedicineDetails.put("howItWorks", "");
+                mockMedicineDetails.put("safetyAdvise", "");
+                mockMedicineDetails.put("ifMiss", "");
+                mockMedicineDetails.put("useOf", "");
+                mockMedicineDetails.put("prescriptionRequired", "");
+                mockMedicineDetails.put("storage", "");
+                mockMedicineDetails.put("commonSideEffect", "");
+                mockMedicineDetails.put("alcoholInteraction", "");
+                mockMedicineDetails.put("pregnancyInteraction", "");
+                mockMedicineDetails.put("lactationInteraction", "");
+                mockMedicineDetails.put("drivingInteraction", "");
+                mockMedicineDetails.put("kidneyInteraction", "");
+                mockMedicineDetails.put("liverInteraction", "");
+                mockMedicineDetails.put("manufacturerAddress", "");
+                mockMedicineDetails.put("countryOfOrigin", "");
+                mockMedicineDetails.put("questionAnswers", "");
+                mockMedicineDetails.put("packing", "");
+                mockMedicineDetails.put("strip", "");
+                mockMedicineDetails.put("medicineLogo", Constants.getMedicineImageWithFallback(""));
+                mockMedicineDetails.put("image", Constants.getMedicineImageWithFallback(""));
+                mockMedicineDetails.put("photo1", Constants.getMedicineImageWithFallback(""));
+                mockMedicineDetails.put("mrp", mockItem.getMrp());
+                mockMedicineDetails.put("discount", 0.0);
+                mockMedicineDetails.put("qty", 1);
+                mockMedicineDetails.put("expiryDate", "");
+                mockMedicineDetails.put("actualPrice", mockItem.getMrp());
+                mockMedicineDetails.put("offeredPrice", mockItem.getPrice());
+                mockMedicineDetails.put("price", mockItem.getPrice());
+                mockMedicineDetails.put("salesCount", 0L);
+                
+                mockItem.setMedicine(mockMedicineDetails);
+
+                orderItemsList.add(mockItem);
+                totalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : 0.0;
             }
 
             orderDTO.setOrderItemsList(orderItemsList);
