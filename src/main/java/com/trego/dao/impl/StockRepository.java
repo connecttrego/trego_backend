@@ -13,7 +13,7 @@ import java.util.List;
 @Repository
 public interface StockRepository extends JpaRepository<Stock, Long> {
 
-    List<Stock> findByMedicineId(long id);
+    List<Stock> findByMedicineId(Integer id);
 
     
 
@@ -30,7 +30,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
 
 
     Page<Stock> findByVendorId(Integer vendorId, Pageable pageable);
-    List<Stock> findByMedicineIdAndVendorId(long medicineId, Integer vendorId);
+    List<Stock> findByMedicineIdAndVendorId(Integer medicineId, Integer vendorId);
 
     @Query(value = "SELECT * FROM vendor_medicine_price WHERE vendor_id = :externalVendorId",
            countQuery = "SELECT count(*) FROM vendor_medicine_price WHERE vendor_id = :externalVendorId",
@@ -39,7 +39,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
 
     // Custom query to handle cases where there might be multiple stocks for the same medicine/vendor combination
     @Query("SELECT s FROM vendor_medicine_price s WHERE s.medicine.id = :medicineId AND s.vendor.id = :vendorId")
-    List<Stock> findStocksByMedicineIdAndVendorId(@Param("medicineId") long medicineId, @Param("vendorId") Integer vendorId);
+    List<Stock> findStocksByMedicineIdAndVendorId(@Param("medicineId") Integer medicineId, @Param("vendorId") Integer vendorId);
 
       @Query("""
      SELECT s
@@ -49,7 +49,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
      List<Stock> findByMedicineIds(@Param("medicineIds") List<Integer> medicineIds);
 
     @Query(value = "SELECT * FROM vendor_medicine_price WHERE (vendor_medicine_id = :medicineId OR vendor_medicine_id IN (SELECT vendor_medicine_id FROM vendor_medicine WHERE medicine_id = :medicineId AND (vendor_id = :vendorUserId OR vendor_id = :externalVendorId))) AND (vendor_id = :vendorUserId OR vendor_id = :externalVendorId)", nativeQuery = true)
-    List<Stock> findStocksByMedicineIdAndBothVendorIds(@Param("medicineId") long medicineId, @Param("vendorUserId") Integer vendorUserId, @Param("externalVendorId") Integer externalVendorId);
+    List<Stock> findStocksByMedicineIdAndBothVendorIds(@Param("medicineId") Integer medicineId, @Param("vendorUserId") Integer vendorUserId, @Param("externalVendorId") Integer externalVendorId);
 
     // Lookup by master medicine_id (medicine_master_db_table PK) for vendors like Super Vendor
     // whose vendor_medicine.medicine_id maps to the master table, not vendor_medicine_id
@@ -60,7 +60,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
           AND (vmp.vendor_id = :vendorUserId OR vmp.vendor_id = :externalVendorId)
         """, nativeQuery = true)
     List<Stock> findStocksByMasterMedicineIdAndBothVendorIds(
-            @Param("masterMedicineId") long masterMedicineId,
+            @Param("masterMedicineId") Integer masterMedicineId,
             @Param("vendorUserId") Integer vendorUserId,
             @Param("externalVendorId") Integer externalVendorId);
 }

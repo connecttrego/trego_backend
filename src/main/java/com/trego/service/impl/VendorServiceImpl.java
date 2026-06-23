@@ -168,7 +168,7 @@ public class VendorServiceImpl implements IVendorService {
                 medicineDTO.setDiscount(stock.getDiscount());
                 medicineDTO.setQty(stock.getQty());
                 medicineDTO.setMrp(stock.getMrp());
-                medicineDTO.setExpiryDate(stock.getExpiryDate());
+//                medicineDTO.setExpiryDate(stock.getExpiryDate());
 
                 medicineDTOList.add(medicineDTO);
             }

@@ -48,8 +48,8 @@ public class BucketServiceImpl implements IBucketService {
 
     @Override
     public List<BucketDTO> createOptimizedBuckets(BucketRequestDTO request) {
-        Map<Long, Integer> medicineQuantities = request.getMedicineQuantities();
-        List<Long> medicineIds = new ArrayList<>(medicineQuantities.keySet());
+        Map<Integer, Integer> medicineQuantities = request.getMedicineQuantities();
+        List<Integer> medicineIds = new ArrayList<>(medicineQuantities.keySet());
 
         // Check if medicineIds is empty
         if (medicineIds.isEmpty()) {
@@ -66,19 +66,19 @@ public class BucketServiceImpl implements IBucketService {
                 .collect(Collectors.toList());
 
         // Filter out medicines that are not available from any vendor
-        Set<Long> availableMedicineIds = relevantStocks.stream()
+        Set<Integer> availableMedicineIds = relevantStocks.stream()
                 .map(stock -> stock.getMedicine().getId())
                 .collect(Collectors.toSet());
 
         // Identify unavailable medicines
-        Set<Long> unavailableMedicineIds = medicineIds.stream()
+        Set<Integer> unavailableMedicineIds = medicineIds.stream()
                 .filter(id -> !availableMedicineIds.contains(id))
                 .collect(Collectors.toSet());
 
         // Log unavailable medicines
         if (!unavailableMedicineIds.isEmpty()) {
             System.out.println("Unavailable medicines: " + unavailableMedicineIds);
-            for (Long medicineId : unavailableMedicineIds) {
+            for (Integer medicineId : unavailableMedicineIds) {
                 System.out.println("Medicine ID " + medicineId + " is not available from any vendor");
             }
         }
@@ -125,8 +125,8 @@ public class BucketServiceImpl implements IBucketService {
 
     public List<BucketDTO> createOptimizedBucketsFromPreorder(VandorCartResponseDTO preorderData) {
         // Extract medicine IDs and quantities from preorder data
-        Map<Long, Integer> medicineQuantities = new HashMap<>();
-        List<Long> medicineIds = new ArrayList<>();
+        Map<Integer, Integer> medicineQuantities = new HashMap<>();
+        List<Integer> medicineIds = new ArrayList<>();
         Set<Integer> selectedVendorIds = new HashSet<>(); // Track vendors selected by user
 
         System.out.println("Processing preorder data with " + preorderData.getCarts().size() + " carts");
@@ -138,7 +138,7 @@ public class BucketServiceImpl implements IBucketService {
             selectedVendorIds.add(cart.getVendorId());
 
             for (MedicineDTO medicine : cart.getMedicine()) {
-                Long medicineId = medicine.getId();
+                Integer medicineId = (int) medicine.getId();
                 int quantity = medicine.getQty();
 
                 System.out.println("Medicine ID: " + medicineId + ", Quantity: " + quantity);
@@ -168,14 +168,14 @@ public class BucketServiceImpl implements IBucketService {
         // ── RESOLVE vendor_medicine_id → master medicine_id ──────────────────
         // Cart payload stores vendor_medicine_id (e.g. 133, 1001).
         // We need the master medicine_id (e.g. 1, 2, 3) to search across ALL vendors.
-        Map<Long, Long> cartIdToMasterId = new HashMap<>();
-        for (Long cartId : medicineIds) {
+        Map<Integer, Integer> cartIdToMasterId = new HashMap<>();
+        for (Integer cartId : medicineIds) {
             // First check if this IS already a master medicine_id (id exists in
             // vendor_medicine.medicine_id)
             com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(cartId).orElse(null);
             if (vendorMed != null && vendorMed.getMedicineId() != null) {
                 // cartId is a vendor_medicine_id — resolve to master
-                cartIdToMasterId.put(cartId, vendorMed.getMedicineId().longValue());
+                cartIdToMasterId.put(cartId, vendorMed.getMedicineId());
                 System.out.println(
                         "Resolved vendor_medicine_id " + cartId + " → master medicine_id " + vendorMed.getMedicineId());
             } else {
@@ -187,9 +187,9 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         // Rebuild medicineQuantities keyed by master medicine_id
-        Map<Long, Integer> masterMedicineQuantities = new HashMap<>();
-        for (Map.Entry<Long, Integer> entry : medicineQuantities.entrySet()) {
-            Long masterMedId = cartIdToMasterId.getOrDefault(entry.getKey(), entry.getKey());
+        Map<Integer, Integer> masterMedicineQuantities = new HashMap<>();
+        for (Map.Entry<Integer, Integer> entry : medicineQuantities.entrySet()) {
+            Integer masterMedId = cartIdToMasterId.getOrDefault(entry.getKey(), entry.getKey());
             masterMedicineQuantities.merge(masterMedId, entry.getValue(), Integer::sum);
         }
 
@@ -201,7 +201,7 @@ public class BucketServiceImpl implements IBucketService {
         System.out.println("Medicine quantities (master IDs): " + medicineQuantities);
 
         // Get all vendor_medicine records for these master IDs
-        List<Integer> masterIds = medicineIds.stream().map(Long::intValue).collect(Collectors.toList());
+        List<Integer> masterIds = new ArrayList<>(medicineIds);
         List<Medicine> medicines = medicineRepository.findByMedicineIdIn(masterIds);
         System.out.println("Found " + medicines.size() + " medicines in database");
 
@@ -209,20 +209,20 @@ public class BucketServiceImpl implements IBucketService {
         List<Stock> relevantStocks = stockRepository.findByMedicineIds(masterIds);
 
         // Filter out medicines that are not available from any vendor
-        Set<Long> availableMedicineIds = relevantStocks.stream()
+        Set<Integer> availableMedicineIds = relevantStocks.stream()
                 .filter(stock -> stock.getMedicine() != null && stock.getMedicine().getMedicineId() != null)
-                .map(stock -> stock.getMedicine().getMedicineId().longValue())
+                .map(stock -> stock.getMedicine().getMedicineId())
                 .collect(Collectors.toSet());
 
         // Identify unavailable medicines
-        Set<Long> unavailableMedicineIds = medicineIds.stream()
+        Set<Integer> unavailableMedicineIds = medicineIds.stream()
                 .filter(id -> !availableMedicineIds.contains(id))
                 .collect(Collectors.toSet());
 
         // Log unavailable medicines
         if (!unavailableMedicineIds.isEmpty()) {
             System.out.println("Unavailable medicines: " + unavailableMedicineIds);
-            for (Long medicineId : unavailableMedicineIds) {
+            for (Integer medicineId : unavailableMedicineIds) {
                 System.out.println("Medicine ID " + medicineId + " is not available from any vendor");
             }
         }
@@ -234,7 +234,7 @@ public class BucketServiceImpl implements IBucketService {
         // Update the medicines list to only include available medicines
         medicines = medicines.stream()
                 .filter(medicine -> medicine.getMedicineId() != null
-                        && availableMedicineIds.contains(medicine.getMedicineId().longValue()))
+                        && availableMedicineIds.contains(medicine.getMedicineId()))
                 .collect(Collectors.toList());
 
         System.out.println(
@@ -297,11 +297,11 @@ public class BucketServiceImpl implements IBucketService {
         // ── BUILD PER-MEDICINE USER PRICE MAP ──────────────────────────────────
         // Key = master medicine_id, Value = price user is currently paying per unit
         // This lets us do FAIR per-medicine comparison for partial vendors
-        Map<Long, Double> userPricePerMedicine = new HashMap<>();
+        Map<Integer, Double> userPricePerMedicine = new HashMap<>();
         for (CartResponseDTO cart : preorderData.getCarts()) {
             for (MedicineDTO m : cart.getMedicine()) {
-                Long cartId = m.getId();
-                Long masterMedId = cartIdToMasterId.getOrDefault(cartId, cartId);
+                Integer cartId = (int) m.getId();
+                Integer masterMedId = cartIdToMasterId.getOrDefault(cartId, cartId);
                 double price = m.getMrp() != null ? m.getMrp() : 0.0;
                 if (price > 0) {
                     userPricePerMedicine.put(masterMedId, price);
@@ -324,7 +324,7 @@ public class BucketServiceImpl implements IBucketService {
             double partialUserTotal = 0.0;
             if (bucket.getAvailableItems() != null) {
                 for (BucketItemDTO item : bucket.getAvailableItems()) {
-                    Long medId = item.getMedicineId();
+                    Integer medId = item.getMedicineId();
                     int qty = item.getRequestedQuantity() > 0 ? item.getRequestedQuantity() : 1;
                     double userPrice = userPricePerMedicine.getOrDefault(medId, 0.0);
                     partialUserTotal += userPrice * qty;
@@ -372,7 +372,7 @@ public class BucketServiceImpl implements IBucketService {
     }
 
     private BucketDTO createBucketForVendorWithPartialAvailability(Integer vendorId, List<Stock> vendorStocks,
-            List<Medicine> medicines, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
+            List<Medicine> medicines, Map<Integer, Integer> medicineQuantities, Set<Integer> unavailableMedicineIds) {
         System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");
 
         // Check if medicines list is empty
@@ -398,13 +398,13 @@ public class BucketServiceImpl implements IBucketService {
         double totalDiscount = 0.0; // Track total discount
 
         // Process available medicines
-        for (Long medicineId : medicineQuantities.keySet()) {
+        for (Integer medicineId : medicineQuantities.keySet()) {
             int requestedQuantity = medicineQuantities.get(medicineId);
 
             System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
 
             Medicine medicine = medicines.stream()
-                    .filter(m -> m.getMedicineId() != null && m.getMedicineId().longValue() == medicineId)
+                    .filter(m -> m.getMedicineId() != null && m.getMedicineId().equals(medicineId))
                     .findFirst().orElse(null);
 
             if (medicine == null) {
@@ -415,7 +415,7 @@ public class BucketServiceImpl implements IBucketService {
             // Find the stock for this medicine from this vendor
             Optional<Stock> stockOptional = vendorStocks.stream()
                     .filter(s -> s.getMedicine() != null && s.getMedicine().getMedicineId() != null
-                            && s.getMedicine().getMedicineId().longValue() == medicineId)
+                            && s.getMedicine().getMedicineId().equals(medicineId))
                     .findFirst();
 
             if (stockOptional.isPresent()) {
@@ -474,7 +474,7 @@ public class BucketServiceImpl implements IBucketService {
                     unavailableItem.setRequestedQuantity(requestedQuantity);
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -501,7 +501,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(
@@ -512,9 +512,9 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         // Add unavailable medicines to the bucket with appropriate information
-        for (Long unavailableMedicineId : unavailableMedicineIds) {
+        for (Integer unavailableMedicineId : unavailableMedicineIds) {
             Optional<Medicine> medicineOpt = medicines.stream()
-                    .filter(m -> m.getId() == unavailableMedicineId)
+                    .filter(m -> m.getId().equals(unavailableMedicineId))
                     .findFirst();
 
             if (medicineOpt.isPresent()) {
@@ -527,7 +527,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId);
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId.longValue());
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println("Error fetching substitutes for medicine ID: " + unavailableMedicineId
@@ -554,7 +554,7 @@ public class BucketServiceImpl implements IBucketService {
     }
 
     private BucketDTO createBucketForVendorWithSpecificQuantities(Integer vendorId, List<Stock> vendorStocks,
-            List<Medicine> medicines, Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
+            List<Medicine> medicines, Map<Integer, Integer> medicineQuantities, Set<Integer> unavailableMedicineIds) {
         System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");
 
         // Check if medicines list is empty
@@ -583,7 +583,7 @@ public class BucketServiceImpl implements IBucketService {
 
         // Process available medicines
         for (Medicine medicine : medicines) {
-            Long medicineId = medicine.getId();
+            Integer medicineId = medicine.getId();
 
             // Check if this medicine is requested from this vendor
             if (!medicineQuantities.containsKey(medicineId)) {
@@ -663,7 +663,7 @@ public class BucketServiceImpl implements IBucketService {
                     }
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -690,7 +690,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(
@@ -701,7 +701,7 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         // Add unavailable medicines to the bucket with appropriate information
-        for (Long unavailableMedicineId : unavailableMedicineIds) {
+        for (Integer unavailableMedicineId : unavailableMedicineIds) {
             // Check if this unavailable medicine was requested from this vendor
             if (!medicineQuantities.containsKey(unavailableMedicineId)) {
                 System.out.println("Unavailable medicine ID: " + unavailableMedicineId
@@ -719,7 +719,7 @@ public class BucketServiceImpl implements IBucketService {
             }
 
             Optional<Medicine> medicineOpt = medicines.stream()
-                    .filter(m -> m.getId() == unavailableMedicineId)
+                    .filter(m -> m.getId().equals(unavailableMedicineId))
                     .findFirst();
 
             if (medicineOpt.isPresent()) {
@@ -740,7 +740,7 @@ public class BucketServiceImpl implements IBucketService {
                 }
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId);
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId.longValue());
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println("Error fetching substitutes for medicine ID: " + unavailableMedicineId
@@ -776,7 +776,7 @@ public class BucketServiceImpl implements IBucketService {
      * @param quantity           The quantity of the substitute to add
      * @return The updated bucket
      */
-    public BucketDTO addSubstituteToBucket(BucketDTO bucket, Long originalMedicineId, SubstituteDetailView substitute,
+    public BucketDTO addSubstituteToBucket(BucketDTO bucket, Integer originalMedicineId, SubstituteDetailView substitute,
             int quantity) {
         System.out.println("Adding substitute to bucket - original medicine ID: " + originalMedicineId +
                 ", substitute ID: " + substitute.getId() + ", quantity: " + quantity);
@@ -784,7 +784,7 @@ public class BucketServiceImpl implements IBucketService {
         // Create a selected substitute DTO
         SelectedSubstituteDTO selectedSubstitute = new SelectedSubstituteDTO();
         selectedSubstitute.setOriginalMedicineId(originalMedicineId);
-        selectedSubstitute.setSubstituteMedicineId(substitute.getId());
+        selectedSubstitute.setSubstituteMedicineId(substitute.getId().intValue());
         selectedSubstitute.setSubstituteMedicineName(substitute.getName());
         selectedSubstitute.setQuantity(quantity);
         selectedSubstitute.setUnitPrice(substitute.getBestPrice().doubleValue());
@@ -819,7 +819,7 @@ public class BucketServiceImpl implements IBucketService {
      * @param substituteMedicineId The ID of the substitute medicine to remove
      * @return The updated bucket
      */
-    public BucketDTO removeSubstituteFromBucket(BucketDTO bucket, Long substituteMedicineId) {
+    public BucketDTO removeSubstituteFromBucket(BucketDTO bucket, Integer substituteMedicineId) {
         System.out.println("Removing substitute from bucket - substitute ID: " + substituteMedicineId);
 
         // Find and remove the substitute
@@ -850,7 +850,7 @@ public class BucketServiceImpl implements IBucketService {
     }
 
     private BucketDTO createMixedVendorBucketWithPartialAvailability(List<Medicine> medicines, List<Stock> allStocks,
-            Map<Long, Integer> medicineQuantities, Set<Long> unavailableMedicineIds) {
+            Map<Integer, Integer> medicineQuantities, Set<Integer> unavailableMedicineIds) {
         System.out.println("Creating mixed vendor bucket for " + medicines.size() + " medicines");
 
         // Check if medicines list is empty
@@ -867,14 +867,14 @@ public class BucketServiceImpl implements IBucketService {
 
         // Process available medicines
         for (Medicine medicine : medicines) {
-            Long medicineId = medicine.getId();
+            Integer medicineId = medicine.getId();
             int requestedQuantity = medicineQuantities.get(medicineId);
 
             System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
 
             // Find the best price for this medicine across all vendors
             List<Stock> medicineStocks = allStocks.stream()
-                    .filter(stock -> stock.getMedicine().getId() == medicineId)
+                    .filter(stock -> stock.getMedicine().getId().equals(medicineId))
                     .collect(Collectors.toList());
 
             System.out.println("Found " + medicineStocks.size() + " stocks for medicine ID: " + medicineId);
@@ -940,7 +940,7 @@ public class BucketServiceImpl implements IBucketService {
                     unavailableItem.setRequestedQuantity(requestedQuantity);
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -957,7 +957,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(
@@ -968,9 +968,9 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         // Add unavailable medicines to the bucket with appropriate information
-        for (Long unavailableMedicineId : unavailableMedicineIds) {
+        for (Integer unavailableMedicineId : unavailableMedicineIds) {
             Optional<Medicine> medicineOpt = medicines.stream()
-                    .filter(m -> m.getId() == unavailableMedicineId)
+                    .filter(m -> m.getId().equals(unavailableMedicineId))
                     .findFirst();
 
             if (medicineOpt.isPresent()) {
@@ -983,7 +983,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId);
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(unavailableMedicineId.longValue());
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println("Error fetching substitutes for medicine ID: " + unavailableMedicineId
@@ -1018,7 +1018,7 @@ public class BucketServiceImpl implements IBucketService {
     }
 
     private BucketDTO createBucketForVendor(Long vendorId, List<Stock> vendorStocks, List<Medicine> medicines,
-            Map<Long, Integer> medicineQuantities) {
+            Map<Integer, Integer> medicineQuantities) {
         System.out.println("Creating bucket for vendor ID: " + vendorId + " with " + medicines.size() + " medicines");
 
         // Check if medicines list is empty
@@ -1043,14 +1043,14 @@ public class BucketServiceImpl implements IBucketService {
         double totalDiscount = 0.0; // Track total discount
 
         for (Medicine medicine : medicines) {
-            Long medicineId = medicine.getId();
+            Integer medicineId = medicine.getId();
             int requestedQuantity = medicineQuantities.get(medicineId);
 
             System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
 
             // Find the stock for this medicine from this vendor
             Optional<Stock> stockOptional = vendorStocks.stream()
-                    .filter(s -> s.getMedicine().getId() == medicineId)
+                    .filter(s -> s.getMedicine().getId().equals(medicineId))
                     .findFirst();
 
             if (stockOptional.isPresent()) {
@@ -1099,7 +1099,7 @@ public class BucketServiceImpl implements IBucketService {
                     unavailableItem.setRequestedQuantity(requestedQuantity);
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -1116,7 +1116,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(
@@ -1142,7 +1142,7 @@ public class BucketServiceImpl implements IBucketService {
     }
 
     private BucketDTO createMixedVendorBucket(List<Medicine> medicines, List<Stock> allStocks,
-            Map<Long, Integer> medicineQuantities) {
+            Map<Integer, Integer> medicineQuantities) {
         System.out.println("Creating mixed vendor bucket for " + medicines.size() + " medicines");
 
         // Check if medicines list is empty
@@ -1157,14 +1157,14 @@ public class BucketServiceImpl implements IBucketService {
         double totalDiscount = 0.0; // Track total discount
 
         for (Medicine medicine : medicines) {
-            Long medicineId = medicine.getId();
+            Integer medicineId = medicine.getId();
             int requestedQuantity = medicineQuantities.get(medicineId);
 
             System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
 
             // Find the best price for this medicine across all vendors
             List<Stock> medicineStocks = allStocks.stream()
-                    .filter(stock -> stock.getMedicine().getId() == medicineId)
+                    .filter(stock -> stock.getMedicine().getId().equals(medicineId))
                     .collect(Collectors.toList());
 
             System.out.println("Found " + medicineStocks.size() + " stocks for medicine ID: " + medicineId);
@@ -1230,7 +1230,7 @@ public class BucketServiceImpl implements IBucketService {
                     unavailableItem.setRequestedQuantity(requestedQuantity);
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -1247,7 +1247,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(

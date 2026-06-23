@@ -110,7 +110,7 @@ public class MedicineServiceImpl implements IMedicineService {
         }
 
         // Fallback to legacy vendor medicine lookup if not found in master catalog
-        Medicine medicine = medicineRepository.findById(id).orElse(null);
+        Medicine medicine = medicineRepository.findById(id.intValue()).orElse(null);
         if (medicine == null)
             return null;
 
@@ -174,7 +174,7 @@ public class MedicineServiceImpl implements IMedicineService {
 
     private MedicineWithStockAndVendorDTO convertMasterToDto(com.trego.dao.entity.MasterMedicine masterMedicine) {
         MedicineWithStockAndVendorDTO dto = new MedicineWithStockAndVendorDTO();
-        dto.setId(masterMedicine.getMedicineId().longValue());
+        dto.setId(masterMedicine.getMedicineId());
         dto.setName(masterMedicine.getName());
         dto.setManufacturer(masterMedicine.getManufacture());
         dto.setSaltComposition(masterMedicine.getSaltComposition());
@@ -224,7 +224,7 @@ public class MedicineServiceImpl implements IMedicineService {
     public Page<MedicineWithStockAndVendorDTO> getMedicinesBySubcategory(Long subcategoryId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
 
-        Page<Medicine> medicines = medicineRepository.findBySubcategoryId(subcategoryId, pageable);
+        Page<Medicine> medicines = medicineRepository.findBySubcategoryId(subcategoryId.intValue(), pageable);
 
         return convertResponse(medicines);
     }

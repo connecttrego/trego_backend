@@ -44,8 +44,8 @@ public class Stock {
     @Column(name = "quantity")
     private int qty;
 
-    @Column(name = "expiry_date")
-    private String expiryDate;
+//    @Column(name = "expiry_date")
+//    private String expiryDate;
 
     @Column(name = "vendor_id", insertable = false, updatable = false)
     private Integer rawVendorId;

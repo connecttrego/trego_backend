@@ -22,7 +22,7 @@ public class SubstituteServiceImpl implements ISubstituteService {
     @Override
     public List<SubstituteDetailView> findSubstitute(Long id) {
 
-        List<SubstituteDetailView> medicines = medicineRepository.findSubstituteByMedicineId(id);
+        List<SubstituteDetailView> medicines = medicineRepository.findSubstituteByMedicineId(id.intValue());
 //        for (Medicine medicine : medicines) {
 //
 //            SubstituteDetailDTO medicineWithStockAndVendorDTO = populateMedicineWithStockVendor(medicine);

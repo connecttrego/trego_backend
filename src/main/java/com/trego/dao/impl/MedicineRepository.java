@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 // Spring Data JPA creates CRUD implementation at runtime automatically.
-public interface MedicineRepository extends JpaRepository<Medicine, Long> {
+public interface MedicineRepository extends JpaRepository<Medicine, Integer> {
 
     Page<Medicine> findByNameContainingIgnoreCaseOrNameIgnoreCase(String searchText, String description, Pageable pageable);
 
@@ -65,10 +65,10 @@ public interface MedicineRepository extends JpaRepository<Medicine, Long> {
         )
         and m.vendor_medicine_id != :medicineId LIMIT 2
         """, nativeQuery = true)
-    List<SubstituteDetailView> findSubstituteByMedicineId(@Param("medicineId") Long medicineId);
+    List<SubstituteDetailView> findSubstituteByMedicineId(@Param("medicineId") Integer medicineId);
 //AND m.manufacturer IN ('Abbott', 'Lupin Ltd', 'Dr. Reddy’s Labs')
 
-    Page<Medicine> findBySubcategoryId(Long subcategoryId, Pageable pageable);
+    Page<Medicine> findBySubcategoryId(Integer subcategoryId, Pageable pageable);
     
     Page<Medicine> findByVendorId(Integer vendorId, Pageable pageable);
 
