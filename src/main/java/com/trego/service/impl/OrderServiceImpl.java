@@ -739,10 +739,10 @@ public class OrderServiceImpl implements IOrderService {
                 
                 Medicine medicine = null;
                 if (orderItem.getVendorMedicineId() != null) {
-                    medicine = medicineRepository.findById(orderItem.getVendorMedicineId()).orElse(null);
+                    medicine = medicineRepository.findById(orderItem.getVendorMedicineId().intValue()).orElse(null);
                 }
                 if (medicine == null) {
-                    medicine = medicineRepository.findById(orderItem.getMedicineId()).orElse(null);
+                    medicine = medicineRepository.findById(orderItem.getMedicineId().intValue()).orElse(null);
                 }
 
                 String name = "";
