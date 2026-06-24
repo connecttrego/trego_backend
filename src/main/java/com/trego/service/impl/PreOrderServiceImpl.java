@@ -149,7 +149,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
                             return cart.getMedicine().stream();
                         })
                         .filter(Objects::nonNull)
-                        .map(MedicineDTO::getId)
+                        .map(m -> (int) m.getId())
                         .filter(Objects::nonNull)
                         .distinct()
                         .collect(Collectors.toList()));
@@ -259,7 +259,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
 
     private MedicineDTO populateMedicalDTO(MedicineDTO medicineDTO, Stock stock) {
 
-        Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
+        Medicine tempMedicine = medicineRepository.findById((int) medicineDTO.getId()).orElse(null);
         if (tempMedicine == null) {
             List<Medicine> list = medicineRepository.findByMedicineId((int) medicineDTO.getId());
             if (list != null && !list.isEmpty()) {
@@ -325,7 +325,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     private MedicineDTO populateUnavailableMedicalDTO(MedicineDTO medicineDTO) {
-        Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
+        Medicine tempMedicine = medicineRepository.findById((int) medicineDTO.getId()).orElse(null);
         if (tempMedicine == null) {
             List<Medicine> list = medicineRepository.findByMedicineId((int) medicineDTO.getId());
             if (list != null && !list.isEmpty()) {
@@ -509,7 +509,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
         // uses a different vendor_medicine_id for the same master medicine
         if (stocks.isEmpty()) {
             // Find the master medicine_id for this vendor_medicine_id
-            com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(medicineId).orElse(null);
+            com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(medicineId.intValue()).orElse(null);
             if (vendorMed != null && vendorMed.getMedicineId() != null) {
                 stocks = stockRepository.findStocksByMasterMedicineIdAndBothVendorIds(
                         vendorMed.getMedicineId(), vendorUserId, externalVendorId);

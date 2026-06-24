@@ -108,7 +108,7 @@ public class MainServiceImpl implements IMainService {
            });
 
            if (vendor.getMedicines().size() < 5) {
-               Medicine med = medicineRepository.findById(medicineId.longValue()).orElse(null);
+               Medicine med = medicineRepository.findById(medicineId).orElse(null);
                if (med == null) {
                    System.out.println("Skipping deleted medicine ID: " + medicineId);
                    continue;
@@ -179,8 +179,8 @@ public class MainServiceImpl implements IMainService {
             List<Stock> stocks = new ArrayList<>(stocksByVendor.getOrDefault(vendor.getId(), new ArrayList<>()));
             stocks.sort((s1, s2) -> {
                 if (s1.getMedicine() == null || s2.getMedicine() == null) return 0;
-                Long medicineId1 = s1.getMedicine().getId();
-                Long medicineId2 = s2.getMedicine().getId();
+                Integer medicineId1 = s1.getMedicine().getId();
+                Integer medicineId2 = s2.getMedicine().getId();
                 Long sales1 = medicineSalesMap.getOrDefault(medicineId1.intValue(), 0L);
                 Long sales2 = medicineSalesMap.getOrDefault(medicineId2.intValue(), 0L);
                 return sales2.compareTo(sales1);

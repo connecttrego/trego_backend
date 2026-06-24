@@ -110,7 +110,7 @@ public class MedicineServiceImpl implements IMedicineService {
         }
 
         // Fallback to legacy vendor medicine lookup if not found in master catalog
-        Medicine medicine = medicineRepository.findById(id).orElse(null);
+        Medicine medicine = medicineRepository.findById(id.intValue()).orElse(null);
         if (medicine == null)
             return null;
 

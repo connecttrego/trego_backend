@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 // Spring Data JPA creates CRUD implementation at runtime automatically.
-public interface MedicineRepository extends JpaRepository<Medicine, Long> {
+public interface MedicineRepository extends JpaRepository<Medicine, Integer> {
 
     Page<Medicine> findByNameContainingIgnoreCaseOrNameIgnoreCase(String searchText, String description, Pageable pageable);
 
