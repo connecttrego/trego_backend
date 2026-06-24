@@ -741,7 +741,7 @@ public class OrderServiceImpl implements IOrderService {
                 
                 Medicine medicine = null;
                 if (orderItem.getVendorMedicineId() != null) {
-                    medicine = medicineRepository.findById(orderItem.getVendorMedicineId().intValue()).orElse(null);
+                    medicine = medicineRepository.findById(orderItem.getVendorMedicineId()).orElse(null);
                 }
                 if (medicine == null && orderItem.getMedicineId() != null) {
                     medicine = medicineRepository.findById(orderItem.getMedicineId()).orElse(null);
@@ -1563,11 +1563,11 @@ public class OrderServiceImpl implements IOrderService {
             externalVendorId = vendor.getVendorId();
         }
         
-        return stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId.intValue(), vendorUserId, externalVendorId);
+        return stockRepository.findStocksByMedicineIdAndBothVendorIds((int) medicineId, vendorUserId, externalVendorId);
     }
 
     private Medicine resolveMedicine(long medicineId, Integer vendorId) {
-        Medicine med = medicineRepository.findById(medicineId).orElse(null);
+        Medicine med = medicineRepository.findById(Long.valueOf(medicineId)).orElse(null);
         if (med == null && vendorId != null) {
             Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
             if (vendor == null) {

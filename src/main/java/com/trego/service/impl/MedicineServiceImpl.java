@@ -187,7 +187,7 @@ public class MedicineServiceImpl implements IMedicineService {
         List<Medicine> vendorMedicines = medicineRepository.findByMedicineId(masterMedicine.getMedicineId());
         List<Stock> allStocks = new ArrayList<>();
         for (Medicine vm : vendorMedicines) {
-            List<Stock> stocks = stockRepository.findByMedicineId(vm.getId().intValue());
+            List<Stock> stocks = stockRepository.findByMedicineId(vm.getId());
             if (stocks != null) {
                 for (Stock s : stocks) {
                     if (s.getVendor() == null && s.getRawVendorId() != null) {

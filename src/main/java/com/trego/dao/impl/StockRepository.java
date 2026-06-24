@@ -13,7 +13,7 @@ import java.util.List;
 @Repository
 public interface StockRepository extends JpaRepository<Stock, Long> {
 
-    List<Stock> findByMedicineId(Integer id);
+    List<Stock> findByMedicineId(Long id);
 
     
 
