@@ -21,10 +21,10 @@ public class OrderItem {
     private Order order;
 
     @Column(name = "medicine_id", nullable = false)
-    private Integer medicineId;
+    private Long medicineId;
 
     @Column(name = "vendor_medicine_id")
-    private Integer vendorMedicineId;
+    private Long vendorMedicineId;
 
     @Column(nullable = true)
     private Integer qty;

@@ -6,10 +6,10 @@ import java.util.Map;
 
 @Data
 public class BucketRequestDTO {
-    // Changed from List<Integer> to Map<Integer, Integer> to include medicine ID and quantity
-    private Map<Integer, Integer> medicineQuantities;
+    // Changed from List<Long> to Map<Long, Integer> to include medicine ID and quantity
+    private Map<Long, Integer> medicineQuantities;
     
-    public Map<Integer, Integer> getMedicineQuantities() {
+    public Map<Long, Integer> getMedicineQuantities() {
         return medicineQuantities;
     }
 }

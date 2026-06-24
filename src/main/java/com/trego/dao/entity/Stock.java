@@ -50,6 +50,9 @@ public class Stock {
     @Column(name = "vendor_id", insertable = false, updatable = false)
     private Integer rawVendorId;
 
+    @Column(name = "vendor_medicine_id", insertable = false, updatable = false, columnDefinition = "INT")
+    private Integer rawVendorMedicineId;
+
     @ManyToOne
     @JoinColumn(name = "vendor_medicine_id")
     @JsonIgnore

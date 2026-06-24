@@ -110,7 +110,7 @@ public class MedicineServiceImpl implements IMedicineService {
         }
 
         // Fallback to legacy vendor medicine lookup if not found in master catalog
-        Medicine medicine = medicineRepository.findById(id.intValue()).orElse(null);
+        Medicine medicine = medicineRepository.findById(id).orElse(null);
         if (medicine == null)
             return null;
 
@@ -187,7 +187,7 @@ public class MedicineServiceImpl implements IMedicineService {
         List<Medicine> vendorMedicines = medicineRepository.findByMedicineId(masterMedicine.getMedicineId());
         List<Stock> allStocks = new ArrayList<>();
         for (Medicine vm : vendorMedicines) {
-            List<Stock> stocks = stockRepository.findByMedicineId(vm.getId());
+            List<Stock> stocks = stockRepository.findByMedicineId(vm.getId().intValue());
             if (stocks != null) {
                 for (Stock s : stocks) {
                     if (s.getVendor() == null && s.getRawVendorId() != null) {
@@ -309,7 +309,7 @@ public class MedicineServiceImpl implements IMedicineService {
 
     private MedicineWithStockAndVendorDTO populateMedicineWithStockVendor(Medicine medicine) {
         MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = new MedicineWithStockAndVendorDTO();
-        medicineWithStockAndVendorDTO.setId(medicine.getId());
+        medicineWithStockAndVendorDTO.setId(medicine.getId().intValue());
         medicineWithStockAndVendorDTO.setName(medicine.getName());
         medicineWithStockAndVendorDTO.setMedicineType(medicine.getMedicineType());
         medicineWithStockAndVendorDTO.setManufacturer(medicine.getManufacture()); // Fixed rename
