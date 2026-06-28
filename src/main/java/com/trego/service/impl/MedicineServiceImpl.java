@@ -110,7 +110,7 @@ public class MedicineServiceImpl implements IMedicineService {
         }
 
         // Fallback to legacy vendor medicine lookup if not found in master catalog
-        Medicine medicine = medicineRepository.findById(id.intValue()).orElse(null);
+        Medicine medicine = medicineRepository.findById(id).orElse(null);
         if (medicine == null)
             return null;
 
@@ -174,7 +174,7 @@ public class MedicineServiceImpl implements IMedicineService {
 
     private MedicineWithStockAndVendorDTO convertMasterToDto(com.trego.dao.entity.MasterMedicine masterMedicine) {
         MedicineWithStockAndVendorDTO dto = new MedicineWithStockAndVendorDTO();
-        dto.setId(masterMedicine.getMedicineId());
+        dto.setId(Long.valueOf(masterMedicine.getMedicineId()));
         dto.setName(masterMedicine.getName());
         dto.setManufacturer(masterMedicine.getManufacture());
         dto.setSaltComposition(masterMedicine.getSaltComposition());
@@ -258,7 +258,7 @@ public class MedicineServiceImpl implements IMedicineService {
         com.trego.dao.entity.MasterMedicine masterMed = masterMedicineRepository.findById(medicineId.intValue()).orElse(null);
 
         // Direct FK lookup: vendor_medicine.medicine_id → medicine_master_db_table.medicine_id
-        List<VendorMedicinePriceView> views = medicineRepository.searchMedicineVendorPrices(medicineId.intValue());
+        List<VendorMedicinePriceView> views = medicineRepository.searchMedicineVendorPrices(Math.toIntExact(medicineId));
 
         // Use LinkedHashMap to preserve insertion order (already sorted by selling
         // price ASC from DB)
@@ -309,7 +309,7 @@ public class MedicineServiceImpl implements IMedicineService {
 
     private MedicineWithStockAndVendorDTO populateMedicineWithStockVendor(Medicine medicine) {
         MedicineWithStockAndVendorDTO medicineWithStockAndVendorDTO = new MedicineWithStockAndVendorDTO();
-        medicineWithStockAndVendorDTO.setId(medicine.getId().intValue());
+        medicineWithStockAndVendorDTO.setId(medicine.getId());
         medicineWithStockAndVendorDTO.setName(medicine.getName());
         medicineWithStockAndVendorDTO.setMedicineType(medicine.getMedicineType());
         medicineWithStockAndVendorDTO.setManufacturer(medicine.getManufacture()); // Fixed rename

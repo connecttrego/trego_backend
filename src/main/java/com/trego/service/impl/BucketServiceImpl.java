@@ -57,16 +57,16 @@ public class BucketServiceImpl implements IBucketService {
         }
 
         // Get all medicines
-        List<Medicine> medicines = medicineRepository.findAllById(medicineIds.stream().map(Long::intValue).collect(java.util.stream.Collectors.toList()));
+        List<Medicine> medicines = medicineRepository.findAllById(medicineIds);
 
         // Get all stocks for these medicines
         List<Stock> allStocks = stockRepository.findAll();
         List<Stock> relevantStocks = allStocks.stream()
-                .filter(stock -> stock.getMedicine() != null && medicineIds.contains(stock.getMedicine().getId()))
+                .filter(stock -> stock.getMedicine() != null && stock.getMedicine().getId() != null && medicineIds.contains(stock.getMedicine().getId()))
                 .collect(Collectors.toList());
 
         // Filter out medicines that are not available from any vendor
-        Set<Integer> availableMedicineIds = relevantStocks.stream()
+        Set<Long> availableMedicineIds = relevantStocks.stream()
                 .map(stock -> stock.getMedicine().getId())
                 .collect(Collectors.toSet());
 
@@ -172,7 +172,7 @@ public class BucketServiceImpl implements IBucketService {
         for (Long cartId : medicineIds) {
             // First check if this IS already a master medicine_id (id exists in
             // vendor_medicine.medicine_id)
-            com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(cartId.intValue()).orElse(null);
+            com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(cartId).orElse(null);
             if (vendorMed != null && vendorMed.getMedicineId() != null) {
                 // cartId is a vendor_medicine_id — resolve to master
                 cartIdToMasterId.put(cartId, vendorMed.getMedicineId().longValue());
@@ -324,7 +324,7 @@ public class BucketServiceImpl implements IBucketService {
             double partialUserTotal = 0.0;
             if (bucket.getAvailableItems() != null) {
                 for (BucketItemDTO item : bucket.getAvailableItems()) {
-                    Long medId = item.getMedicineId().longValue();
+                    Long medId = item.getMedicineId();
                     int qty = item.getRequestedQuantity() > 0 ? item.getRequestedQuantity() : 1;
                     double userPrice = userPricePerMedicine.getOrDefault(medId, 0.0);
                     partialUserTotal += userPrice * qty;
@@ -427,7 +427,7 @@ public class BucketServiceImpl implements IBucketService {
                 // Check if vendor has enough quantity
                 if (stock.getQty() >= requestedQuantity) {
                     BucketItemDTO item = new BucketItemDTO();
-                    item.setMedicineId(medicineId.intValue());
+                    item.setMedicineId(medicineId);
                     item.setMedicineName(medicine.getName());
 
                     // Fetch image from master medicine table (vendor_medicine_information is empty)
@@ -469,12 +469,12 @@ public class BucketServiceImpl implements IBucketService {
                     System.out.println("Vendor doesn't have enough quantity for medicine ID: " + medicineId
                             + " (required: " + requestedQuantity + ", available: " + stock.getQty() + ")");
                     UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                    unavailableItem.setMedicineId(medicineId.intValue());
+                    unavailableItem.setMedicineId(medicineId);
                     unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
                     unavailableItem.setRequestedQuantity(requestedQuantity);
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -486,7 +486,7 @@ public class BucketServiceImpl implements IBucketService {
                 // Vendor doesn't have this medicine, add to unavailable items
                 System.out.println("Vendor doesn't have medicine ID: " + medicineId);
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(medicineId.intValue());
+                unavailableItem.setMedicineId(medicineId);
                 unavailableItem.setMedicineName(medicine.getName());
 
                 MedicineInformation medicineInformation = medicine.getMedicineInformation();
@@ -501,7 +501,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(
@@ -514,7 +514,7 @@ public class BucketServiceImpl implements IBucketService {
         // Add unavailable medicines to the bucket with appropriate information
         for (Long unavailableMedicineId : unavailableMedicineIds) {
             Optional<Medicine> medicineOpt = medicines.stream()
-                    .filter(m -> m.getId() != null && m.getId().longValue() == unavailableMedicineId)
+                    .filter(m -> m.getId() != null && m.getId().equals(unavailableMedicineId))
                     .findFirst();
 
             if (medicineOpt.isPresent()) {
@@ -522,7 +522,7 @@ public class BucketServiceImpl implements IBucketService {
                 int requestedQuantity = medicineQuantities.getOrDefault(unavailableMedicineId, 0);
 
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(unavailableMedicineId.intValue());
+                unavailableItem.setMedicineId(unavailableMedicineId);
                 unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
@@ -583,7 +583,7 @@ public class BucketServiceImpl implements IBucketService {
 
         // Process available medicines
         for (Medicine medicine : medicines) {
-            Integer medicineId = medicine.getId();
+            Long medicineId = medicine.getId();
 
             // Check if this medicine is requested from this vendor
             if (!medicineQuantities.containsKey(medicineId)) {
@@ -616,7 +616,7 @@ public class BucketServiceImpl implements IBucketService {
                 // Check if vendor has enough quantity
                 if (stock.getQty() >= requestedQuantity) {
                     BucketItemDTO item = new BucketItemDTO();
-                    item.setMedicineId(medicineId.intValue());
+                    item.setMedicineId(medicineId);
                     item.setMedicineName(medicine.getName());
 
                     MedicineInformation medicineInformation = medicine.getMedicineInformation();
@@ -649,7 +649,7 @@ public class BucketServiceImpl implements IBucketService {
                     System.out.println("Vendor doesn't have enough quantity for medicine ID: " + medicineId
                             + " (required: " + requestedQuantity + ", available: " + stock.getQty() + ")");
                     UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                    unavailableItem.setMedicineId(medicineId.intValue());
+                    unavailableItem.setMedicineId(medicineId);
                     unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
                     unavailableItem.setRequestedQuantity(requestedQuantity);
 
@@ -663,7 +663,7 @@ public class BucketServiceImpl implements IBucketService {
                     }
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -675,7 +675,7 @@ public class BucketServiceImpl implements IBucketService {
                 // Vendor doesn't have this medicine, add to unavailable items
                 System.out.println("Vendor doesn't have medicine ID: " + medicineId);
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(medicineId.intValue());
+                unavailableItem.setMedicineId(medicineId);
                 unavailableItem.setMedicineName(medicine.getName());
 
                 MedicineInformation medicineInformation = medicine.getMedicineInformation();
@@ -690,7 +690,7 @@ public class BucketServiceImpl implements IBucketService {
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(
@@ -726,7 +726,7 @@ public class BucketServiceImpl implements IBucketService {
                 Medicine medicine = medicineOpt.get();
 
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(unavailableMedicineId.intValue());
+                unavailableItem.setMedicineId(unavailableMedicineId);
                 unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
                 unavailableItem.setRequestedQuantity(requestedQuantity);
 
@@ -776,7 +776,7 @@ public class BucketServiceImpl implements IBucketService {
      * @param quantity           The quantity of the substitute to add
      * @return The updated bucket
      */
-    public BucketDTO addSubstituteToBucket(BucketDTO bucket, Integer originalMedicineId, SubstituteDetailView substitute,
+    public BucketDTO addSubstituteToBucket(BucketDTO bucket, Long originalMedicineId, SubstituteDetailView substitute,
             int quantity) {
         System.out.println("Adding substitute to bucket - original medicine ID: " + originalMedicineId +
                 ", substitute ID: " + substitute.getId() + ", quantity: " + quantity);
@@ -784,7 +784,7 @@ public class BucketServiceImpl implements IBucketService {
         // Create a selected substitute DTO
         SelectedSubstituteDTO selectedSubstitute = new SelectedSubstituteDTO();
         selectedSubstitute.setOriginalMedicineId(originalMedicineId);
-        selectedSubstitute.setSubstituteMedicineId(substitute.getId().intValue());
+        selectedSubstitute.setSubstituteMedicineId(substitute.getId());
         selectedSubstitute.setSubstituteMedicineName(substitute.getName());
         selectedSubstitute.setQuantity(quantity);
         selectedSubstitute.setUnitPrice(substitute.getBestPrice().doubleValue());
@@ -867,7 +867,7 @@ public class BucketServiceImpl implements IBucketService {
 
         // Process available medicines
         for (Medicine medicine : medicines) {
-            Integer medicineId = medicine.getId();
+            Long medicineId = medicine.getId();
             int requestedQuantity = medicineQuantities.get(medicineId);
 
             System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
@@ -901,7 +901,7 @@ public class BucketServiceImpl implements IBucketService {
                                 + bestStock.getMrp() + ", discount: " + bestStock.getDiscount());
 
                         BucketItemDTO item = new BucketItemDTO();
-                        item.setMedicineId(medicineId.intValue());
+                        item.setMedicineId(medicineId);
                         item.setMedicineName(medicine.getName());
                         MedicineInformation medicineInformation = medicine.getMedicineInformation();
                         if (medicineInformation != null) {
@@ -935,12 +935,12 @@ public class BucketServiceImpl implements IBucketService {
                     Vendor vendor = bestStock.getVendor();
 
                     UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                    unavailableItem.setMedicineId(medicineId.intValue());
+                    unavailableItem.setMedicineId(medicineId);
                     unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
                     unavailableItem.setRequestedQuantity(requestedQuantity);
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -952,12 +952,12 @@ public class BucketServiceImpl implements IBucketService {
                 // Medicine not available from any vendor, add to unavailable items
                 System.out.println("Medicine ID: " + medicineId + " not available from any vendor");
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(medicineId.intValue());
+                unavailableItem.setMedicineId(medicineId);
                 unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(
@@ -978,7 +978,7 @@ public class BucketServiceImpl implements IBucketService {
                 int requestedQuantity = medicineQuantities.getOrDefault(unavailableMedicineId, 0);
 
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(unavailableMedicineId.intValue());
+                unavailableItem.setMedicineId(unavailableMedicineId);
                 unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
@@ -1043,7 +1043,7 @@ public class BucketServiceImpl implements IBucketService {
         double totalDiscount = 0.0; // Track total discount
 
         for (Medicine medicine : medicines) {
-            Integer medicineId = medicine.getId();
+            Long medicineId = medicine.getId();
             int requestedQuantity = medicineQuantities.get(medicineId);
 
             System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
@@ -1062,7 +1062,7 @@ public class BucketServiceImpl implements IBucketService {
                 // Check if vendor has enough quantity
                 if (stock.getQty() >= requestedQuantity) {
                     BucketItemDTO item = new BucketItemDTO();
-                    item.setMedicineId(medicineId.intValue());
+                    item.setMedicineId(medicineId);
                     item.setMedicineName(medicine.getName());
                     MedicineInformation medicineInformation = medicine.getMedicineInformation();
                     if (medicineInformation != null) {
@@ -1094,7 +1094,7 @@ public class BucketServiceImpl implements IBucketService {
                     System.out.println("Vendor doesn't have enough quantity for medicine ID: " + medicineId
                             + " (required: " + requestedQuantity + ", available: " + stock.getQty() + ")");
                     UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                    unavailableItem.setMedicineId(medicineId.intValue());
+                    unavailableItem.setMedicineId(medicineId);
                     unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
                     unavailableItem.setRequestedQuantity(requestedQuantity);
                     // Get substitutes for this medicine
@@ -1111,7 +1111,7 @@ public class BucketServiceImpl implements IBucketService {
                 // Vendor doesn't have this medicine, add to unavailable items
                 System.out.println("Vendor doesn't have medicine ID: " + medicineId);
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(medicineId.intValue());
+                unavailableItem.setMedicineId(medicineId);
                 unavailableItem.setMedicineName(medicine.getName());
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
@@ -1157,7 +1157,7 @@ public class BucketServiceImpl implements IBucketService {
         double totalDiscount = 0.0; // Track total discount
 
         for (Medicine medicine : medicines) {
-            Integer medicineId = medicine.getId();
+            Long medicineId = medicine.getId();
             int requestedQuantity = medicineQuantities.get(medicineId);
 
             System.out.println("Processing medicine ID: " + medicineId + ", requested quantity: " + requestedQuantity);
@@ -1191,7 +1191,7 @@ public class BucketServiceImpl implements IBucketService {
                                 + bestStock.getMrp() + ", discount: " + bestStock.getDiscount());
 
                         BucketItemDTO item = new BucketItemDTO();
-                        item.setMedicineId(medicineId.intValue());
+                        item.setMedicineId(medicineId);
                         item.setMedicineName(medicine.getName());
                         MedicineInformation medicineInformation = medicine.getMedicineInformation();
                         if (medicineInformation != null) {
@@ -1225,12 +1225,12 @@ public class BucketServiceImpl implements IBucketService {
                     Vendor vendor = bestStock.getVendor();
 
                     UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                    unavailableItem.setMedicineId(medicineId.intValue());
+                    unavailableItem.setMedicineId(medicineId);
                     unavailableItem.setMedicineName(medicine.getName() + " (Insufficient quantity available)");
                     unavailableItem.setRequestedQuantity(requestedQuantity);
                     // Get substitutes for this medicine
                     try {
-                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
+                        List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
                         unavailableItem.setSubstitutes(substitutes);
                     } catch (Exception e) {
                         System.out.println("Error fetching substitutes for medicine ID: " + medicineId + ", error: "
@@ -1242,12 +1242,12 @@ public class BucketServiceImpl implements IBucketService {
                 // Medicine not available from any vendor, add to unavailable items
                 System.out.println("Medicine ID: " + medicineId + " not available from any vendor");
                 UnavailableMedicineDTO unavailableItem = new UnavailableMedicineDTO();
-                unavailableItem.setMedicineId(medicineId.intValue());
+                unavailableItem.setMedicineId(medicineId);
                 unavailableItem.setMedicineName(medicine.getName() + " (Not available from any vendor)");
                 unavailableItem.setRequestedQuantity(requestedQuantity);
                 // Get substitutes for this medicine
                 try {
-                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId.longValue());
+                    List<SubstituteDetailView> substitutes = substituteService.findSubstitute(medicineId);
                     unavailableItem.setSubstitutes(substitutes);
                 } catch (Exception e) {
                     System.out.println(

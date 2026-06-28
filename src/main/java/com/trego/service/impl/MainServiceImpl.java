@@ -91,7 +91,7 @@ public class MainServiceImpl implements IMainService {
 
        for (Object[] row : salesData) {
            Integer vendorId = (Integer) row[0];
-           Integer medicineId = ((Number) row[1]).intValue();
+           Long medicineId = ((Number) row[1]).longValue();
            Long salesCount = ((Number) row[2]).longValue();
 
            // Skip if vendor was deleted from DB
@@ -153,9 +153,9 @@ public class MainServiceImpl implements IMainService {
         List<Vendor> offlineVendors = vendorRepository.findAll();
         List<VendorDTO> topOfflineVendors = new ArrayList<>();
         List<Object[]> topSellingMedicineData = orderItemRepository.findTopSellingMedicineIds(PageRequest.of(0, 5));
-        Map<Integer, Long> medicineSalesMap = new HashMap<>();
+        Map<Long, Long> medicineSalesMap = new HashMap<>();
         for (Object[] data : topSellingMedicineData) {
-            medicineSalesMap.put(((Number) data[0]).intValue(), (Long) data[1]);
+            medicineSalesMap.put(((Number) data[0]).longValue(), (Long) data[1]);
         }
 
         // Fix N+1 queries: Batch fetch all stocks for all vendor IDs in a single query
@@ -179,10 +179,10 @@ public class MainServiceImpl implements IMainService {
             List<Stock> stocks = new ArrayList<>(stocksByVendor.getOrDefault(vendor.getId(), new ArrayList<>()));
             stocks.sort((s1, s2) -> {
                 if (s1.getMedicine() == null || s2.getMedicine() == null) return 0;
-                Integer medicineId1 = s1.getMedicine().getId();
-                Integer medicineId2 = s2.getMedicine().getId();
-                Long sales1 = medicineSalesMap.getOrDefault(medicineId1.intValue(), 0L);
-                Long sales2 = medicineSalesMap.getOrDefault(medicineId2.intValue(), 0L);
+                Long medicineId1 = s1.getMedicine().getId();
+                Long medicineId2 = s2.getMedicine().getId();
+                Long sales1 = medicineSalesMap.getOrDefault(medicineId1, 0L);
+                Long sales2 = medicineSalesMap.getOrDefault(medicineId2, 0L);
                 return sales2.compareTo(sales1);
             });
             List<MedicineDTO> medicineDTOList = populateMedicineDTOs(stocks, medicineSalesMap);
@@ -210,7 +210,7 @@ public class MainServiceImpl implements IMainService {
         return dto;
     }
 
-    private List<MedicineDTO> populateMedicineDTOs(List<Stock> stocks, Map<Integer, Long> medicineSalesMap) {
+    private List<MedicineDTO> populateMedicineDTOs(List<Stock> stocks, Map<Long, Long> medicineSalesMap) {
         List<MedicineDTO> medicineDTOList = new ArrayList<>();
         for (Stock stock : stocks) {
             Medicine medicine = stock.getMedicine();

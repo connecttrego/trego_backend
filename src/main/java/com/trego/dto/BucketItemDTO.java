@@ -4,7 +4,7 @@ import lombok.Data;
 
 @Data
 public class BucketItemDTO {
-    private Integer medicineId;
+    private Long medicineId;
     private String medicineName;
     private String medicineImage;
     private String medicineStrip;

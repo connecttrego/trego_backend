@@ -12,7 +12,7 @@ public class Medicine {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "vendor_medicine_id")
-    private Integer vendorMedicineId;
+    private Long vendorMedicineId;
 
     @Column(columnDefinition = "TEXT")
     private String name;
@@ -73,11 +73,11 @@ public class Medicine {
 
     // Delegate getId()/setId() to vendorMedicineId (the actual PK)
     // because the legacy "id" column is NULL in DB and has been removed
-    public Integer getId() {
+    public Long getId() {
         return this.vendorMedicineId;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.vendorMedicineId = id;
     }
 }

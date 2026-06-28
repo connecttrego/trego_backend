@@ -66,7 +66,7 @@ public class MedicineController {
     ) {
         // Create an unavailable medicine DTO with the requested information
         UnavailableMedicineDTO unavailableMedicine = new UnavailableMedicineDTO();
-        unavailableMedicine.setMedicineId(id.intValue());
+        unavailableMedicine.setMedicineId(id);
         unavailableMedicine.setRequestedQuantity(requestedQuantity);
         
         // Try to get substitute information

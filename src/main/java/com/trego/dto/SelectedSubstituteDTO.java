@@ -4,8 +4,8 @@ import lombok.Data;
 
 @Data
 public class SelectedSubstituteDTO {
-    private Integer originalMedicineId;
-    private Integer substituteMedicineId;
+    private Long originalMedicineId;
+    private Long substituteMedicineId;
     private String substituteMedicineName;
     private int quantity;
     private double unitPrice;

@@ -149,7 +149,7 @@ public class PreOrderServiceImpl implements IPreOrderService {
                             return cart.getMedicine().stream();
                         })
                         .filter(Objects::nonNull)
-                        .map(m -> (int) m.getId())
+                        .map(MedicineDTO::getId)
                         .filter(Objects::nonNull)
                         .distinct()
                         .collect(Collectors.toList()));
@@ -259,9 +259,9 @@ public class PreOrderServiceImpl implements IPreOrderService {
 
     private MedicineDTO populateMedicalDTO(MedicineDTO medicineDTO, Stock stock) {
 
-        Medicine tempMedicine = medicineRepository.findById((int) medicineDTO.getId()).orElse(null);
+        Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
         if (tempMedicine == null) {
-            List<Medicine> list = medicineRepository.findByMedicineId((int) medicineDTO.getId());
+            List<Medicine> list = medicineRepository.findByMedicineId(Math.toIntExact(tempMedicine.getMedicineId()));
             if (list != null && !list.isEmpty()) {
                 tempMedicine = list.get(0);
             }
@@ -325,9 +325,9 @@ public class PreOrderServiceImpl implements IPreOrderService {
     }
 
     private MedicineDTO populateUnavailableMedicalDTO(MedicineDTO medicineDTO) {
-        Medicine tempMedicine = medicineRepository.findById((int) medicineDTO.getId()).orElse(null);
+        Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
         if (tempMedicine == null) {
-            List<Medicine> list = medicineRepository.findByMedicineId((int) medicineDTO.getId());
+            List<Medicine> list = medicineRepository.findByMedicineId(Math.toIntExact(medicineDTO.getId()));
             if (list != null && !list.isEmpty()) {
                 tempMedicine = list.get(0);
             }
@@ -502,14 +502,14 @@ public class PreOrderServiceImpl implements IPreOrderService {
         }
         
         // Primary lookup: by vendor_medicine_id directly
-        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndBothVendorIds((int) medicineId, vendorUserId, externalVendorId);
+        List<Stock> stocks = stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId, vendorUserId, externalVendorId);
         
         // Fallback: if not found, try by master medicine_id (medicine_id column in vendor_medicine)
         // This handles cases where cart has vendor_medicine_id from vendor A, but selected vendor B
         // uses a different vendor_medicine_id for the same master medicine
         if (stocks.isEmpty()) {
             // Find the master medicine_id for this vendor_medicine_id
-            com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(medicineId.intValue()).orElse(null);
+            com.trego.dao.entity.Medicine vendorMed = medicineRepository.findById(medicineId).orElse(null);
             if (vendorMed != null && vendorMed.getMedicineId() != null) {
                 stocks = stockRepository.findStocksByMasterMedicineIdAndBothVendorIds(
                         vendorMed.getMedicineId(), vendorUserId, externalVendorId);

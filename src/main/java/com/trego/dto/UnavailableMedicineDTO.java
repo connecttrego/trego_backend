@@ -6,7 +6,7 @@ import java.util.List;
 
 @Data
 public class UnavailableMedicineDTO {
-    private Integer medicineId;
+    private Long medicineId;
     private String medicineName;
     private String medicineImage;
     private String medicineStrip;

@@ -7,7 +7,7 @@ import java.util.List;
 
 @Data
 public class MedicineWithStockAndVendorDTO {
-    private Integer id;
+    private Long id;
     private String name;
     private String manufacturer;
     private String saltComposition;

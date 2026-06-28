@@ -741,10 +741,10 @@ public class OrderServiceImpl implements IOrderService {
                 
                 Medicine medicine = null;
                 if (orderItem.getVendorMedicineId() != null) {
-                    medicine = medicineRepository.findById(orderItem.getVendorMedicineId().intValue()).orElse(null);
+                    medicine = medicineRepository.findById(orderItem.getVendorMedicineId()).orElse(null);
                 }
                 if (medicine == null && orderItem.getMedicineId() != null) {
-                    medicine = medicineRepository.findById(orderItem.getMedicineId().intValue()).orElse(null);
+                    medicine = medicineRepository.findById(orderItem.getMedicineId()).orElse(null);
                 }
 
                 String name = "";
@@ -1138,7 +1138,7 @@ public class OrderServiceImpl implements IOrderService {
 
     private MedicineDTO populateMedicalDTO(MedicineDTO medicineDTO, Stock stock) {
 
-        Medicine tempMedicine = medicineRepository.findById((int) medicineDTO.getId()).orElse(null);
+        Medicine tempMedicine = medicineRepository.findById(medicineDTO.getId()).orElse(null);
         if (tempMedicine == null) return medicineDTO;
         
         // Retrieve master medicine to serve as catalog fallback
@@ -1224,7 +1224,7 @@ public class OrderServiceImpl implements IOrderService {
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 
-                            List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId((int) medicineId, vendorId);
+                            List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
 
                             if (!stocks.isEmpty()) {
 
@@ -1259,7 +1259,7 @@ public class OrderServiceImpl implements IOrderService {
                             long medicineId = medicine.getId();
                             int qty = medicine.getQty();
 
-                            List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId((int) medicineId, vendorId);
+                            List<Stock> stocks = stockRepository.findByMedicineIdAndVendorId(medicineId, vendorId);
 
                             if (!stocks.isEmpty()) {
 
@@ -1563,11 +1563,11 @@ public class OrderServiceImpl implements IOrderService {
             externalVendorId = vendor.getVendorId();
         }
         
-        return stockRepository.findStocksByMedicineIdAndBothVendorIds((int) medicineId, vendorUserId, externalVendorId);
+        return stockRepository.findStocksByMedicineIdAndBothVendorIds(medicineId, vendorUserId, externalVendorId);
     }
 
     private Medicine resolveMedicine(long medicineId, Integer vendorId) {
-        Medicine med = medicineRepository.findById((int) medicineId).orElse(null);
+        Medicine med = medicineRepository.findById(medicineId).orElse(null);
         if (med == null && vendorId != null) {
             Vendor vendor = vendorRepository.findById(vendorId).orElse(null);
             if (vendor == null) {
@@ -1579,7 +1579,7 @@ public class OrderServiceImpl implements IOrderService {
                 vendorUserId = vendor.getId();
                 externalVendorId = vendor.getVendorId();
             }
-            List<Medicine> meds = medicineRepository.findByMedicineId((int) medicineId);
+            List<Medicine> meds = medicineRepository.findByMedicineId(Math.toIntExact(medicineId));
             if (meds != null) {
                 for (Medicine m : meds) {
                     if (m.getVendorId() != null && 
